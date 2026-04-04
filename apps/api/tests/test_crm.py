@@ -208,3 +208,110 @@ def test_interactions_sync_opportunity_and_overdue_filter(client: TestClient) ->
     overdue = client.get("/v1/opportunities?overdue_next_action=true", headers=headers)
     assert overdue.status_code == 200
     assert any(row["id"] == opp_id for row in overdue.json())
+
+
+def test_module52_org_users_leads_convert_insured_audit(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = client.get("/v1/me", headers=headers)
+    assert me.status_code == 200
+    my_id = me.json()["user"]["id"]
+
+    org_users = client.get("/v1/org/users", headers=headers)
+    assert org_users.status_code == 200
+    assert any(u["id"] == my_id for u in org_users.json())
+
+    lead = client.post(
+        "/v1/leads",
+        headers=headers,
+        json={
+            "full_name": "Lead One",
+            "email": f"lead-{uuid.uuid4().hex}@example.com",
+            "owner_id": my_id,
+            "status": "NEW",
+        },
+    )
+    assert lead.status_code == 201, lead.text
+    lead_id = lead.json()["id"]
+
+    listed = client.get("/v1/leads", headers=headers)
+    assert listed.status_code == 200
+    assert any(x["id"] == lead_id for x in listed.json())
+
+    products = client.get("/v1/products", headers=headers)
+    assert products.status_code == 200
+    product_id = products.json()[0]["id"]
+
+    conv = client.post(
+        f"/v1/leads/{lead_id}/convert",
+        headers=headers,
+        json={
+            "client_owner_id": my_id,
+            "opportunity": {
+                "owner_id": my_id,
+                "product_id": product_id,
+                "stage": "LEAD",
+                "status": "OPEN",
+                "estimated_value": "500.00",
+                "closing_probability": 10,
+            },
+        },
+    )
+    assert conv.status_code == 200, conv.text
+    conv_body = conv.json()
+    assert conv_body["client"]["owner_id"] == my_id
+    assert conv_body["opportunity"] is not None
+    new_client_id = conv_body["client"]["id"]
+
+    audit_converted = client.get(
+        f"/v1/clients/{new_client_id}/audit-events",
+        headers=headers,
+    )
+    assert audit_converted.status_code == 200
+    assert len(audit_converted.json()) >= 1
+
+    comp = client.post(
+        "/v1/clients",
+        headers=headers,
+        json={
+            "full_name": "Empresa SA",
+            "client_kind": "COMPANY",
+            "company_legal_name": "Empresa SA",
+            "company_tax_id": "123",
+            "owner_id": my_id,
+        },
+    )
+    assert comp.status_code == 201, comp.text
+    cid = comp.json()["id"]
+    assert comp.json()["client_kind"] == "COMPANY"
+
+    ins = client.post(
+        f"/v1/clients/{cid}/insured-persons",
+        headers=headers,
+        json={"full_name": "Dependente", "relation": "DEPENDENT"},
+    )
+    assert ins.status_code == 201, ins.text
+    ins_id = ins.json()["id"]
+
+    detail = client.get(f"/v1/clients/{cid}", headers=headers)
+    assert detail.status_code == 200
+    assert len(detail.json()["insured_persons"]) == 1
+
+    audit = client.get(f"/v1/clients/{cid}/audit-events", headers=headers)
+    assert audit.status_code == 200
+    events = audit.json()
+    assert any(e["entity_type"] == "INSURED_PERSON" for e in events)
+
+    patch_ins = client.patch(
+        f"/v1/clients/{cid}/insured-persons/{ins_id}",
+        headers=headers,
+        json={"notes": "nota"},
+    )
+    assert patch_ins.status_code == 200
+
+    del_ins = client.delete(
+        f"/v1/clients/{cid}/insured-persons/{ins_id}",
+        headers=headers,
+    )
+    assert del_ins.status_code == 204

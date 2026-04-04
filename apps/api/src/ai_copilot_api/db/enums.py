@@ -30,9 +30,8 @@ class ProductCategory(StrEnum):
     LIFE_INSURANCE = "LIFE_INSURANCE"
     HEALTH_INSURANCE = "HEALTH_INSURANCE"
     AUTO_INSURANCE = "AUTO_INSURANCE"
-    PENSION = "PENSION"
-    INVESTMENT = "INVESTMENT"
-    OTHER = "OTHER"
+    # Ramos elementares / general insurance (multirisco, RC, acidentes pessoais, etc.)
+    GENERAL_INSURANCE = "GENERAL_INSURANCE"
 
 
 class ProductRiskLevel(StrEnum):
@@ -52,3 +51,36 @@ class InteractionType(StrEnum):
     NOTE = "NOTE"
     POST_SALE = "POST_SALE"
     CAMPAIGN_TOUCH = "CAMPAIGN_TOUCH"
+
+
+class LeadStatus(StrEnum):
+    NEW = "NEW"
+    CONTACTING = "CONTACTING"
+    QUALIFIED = "QUALIFIED"
+    CONVERTED = "CONVERTED"
+    LOST = "LOST"
+
+
+class ClientKind(StrEnum):
+    INDIVIDUAL = "INDIVIDUAL"
+    COMPANY = "COMPANY"
+
+
+class InsuredRelation(StrEnum):
+    HOLDER = "HOLDER"
+    DEPENDENT = "DEPENDENT"
+    OTHER = "OTHER"
+
+
+class CrmEntityType(StrEnum):
+    CLIENT = "CLIENT"
+    LEAD = "LEAD"
+    OPPORTUNITY = "OPPORTUNITY"
+    INSURED_PERSON = "INSURED_PERSON"
+
+
+class CrmAuditAction(StrEnum):
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    CONVERT = "CONVERT"

@@ -7,6 +7,8 @@ import { ClientsPage } from '@/pages/ClientsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage'
+import { LeadDetailPage } from '@/pages/LeadDetailPage'
+import { LeadsPage } from '@/pages/LeadsPage'
 import { OpportunityDetailPage } from '@/pages/OpportunityDetailPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 
@@ -25,6 +27,8 @@ export default function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
+        <Route path="/leads" element={<LeadsPage />} />
+        <Route path="/leads/:leadId" element={<LeadDetailPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/opportunities/:opportunityId" element={<OpportunityDetailPage />} />
       </Route>

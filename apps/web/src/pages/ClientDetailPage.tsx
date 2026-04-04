@@ -21,6 +21,36 @@ const INTERACTION_TYPES = [
   'CAMPAIGN_TOUCH',
 ] as const
 
+const PROFILE_SELECT_CLASS =
+  'border-input bg-background h-9 w-full rounded-md border px-2 text-sm'
+
+const LIFE_STAGE_OPTIONS = [
+  { value: 'young_single' },
+  { value: 'couple_no_children' },
+  { value: 'young_family' },
+  { value: 'family_with_teens' },
+  { value: 'empty_nest' },
+  { value: 'retired' },
+  { value: 'entrepreneur' },
+  { value: 'other' },
+] as const
+
+const PROPERTY_TYPE_OPTIONS = [
+  { value: 'owned' },
+  { value: 'financed' },
+  { value: 'rented' },
+] as const
+
+const VEHICLE_PRIMARY_USE_OPTIONS = [
+  { value: 'commute_work' },
+  { value: 'personal_leisure' },
+  { value: 'business_commercial' },
+  { value: 'ride_hailing' },
+  { value: 'long_distance' },
+  { value: 'urban_only' },
+  { value: 'other' },
+] as const
+
 type LineOfBusinessDto = {
   id: string
   code: string
@@ -51,14 +81,45 @@ type HeldDto = {
 
 type ProfileBlock = Record<string, unknown> | null
 
+type UserBrief = {
+  id: string
+  email: string
+  full_name: string | null
+}
+
+type InsuredDto = {
+  id: string
+  full_name: string
+  relation: string
+  notes: string | null
+}
+
+type AuditEventDto = {
+  id: string
+  entity_type: string
+  entity_id: string
+  action: string
+  field_name: string | null
+  old_value: string | null
+  new_value: string | null
+  created_at: string
+  actor_user_id: string
+}
+
 type ClientDetail = {
   id: string
   full_name: string
   email: string | null
   phone: string | null
   notes: string | null
+  owner_id: string | null
+  owner: UserBrief | null
+  client_kind: string
+  company_legal_name: string | null
+  company_tax_id: string | null
   lines_of_business: LobLinkDto[]
   held_products: HeldDto[]
+  insured_persons: InsuredDto[]
   profile: Record<string, ProfileBlock>
   profile_completeness_score: number
   profile_alerts: string[]
@@ -105,6 +166,17 @@ export function ClientDetailPage() {
   const [ixSummary, setIxSummary] = useState('')
   const [ixOppId, setIxOppId] = useState('')
   const [addingIx, setAddingIx] = useState(false)
+  const [orgUsers, setOrgUsers] = useState<UserBrief[]>([])
+  const [auditEvents, setAuditEvents] = useState<AuditEventDto[]>([])
+  const [crmOwnerId, setCrmOwnerId] = useState('')
+  const [crmKind, setCrmKind] = useState('INDIVIDUAL')
+  const [crmLegal, setCrmLegal] = useState('')
+  const [crmTax, setCrmTax] = useState('')
+  const [savingCrm, setSavingCrm] = useState(false)
+  const [insuredName, setInsuredName] = useState('')
+  const [insuredRelation, setInsuredRelation] = useState('HOLDER')
+  const [insuredNotes, setInsuredNotes] = useState('')
+  const [addingInsured, setAddingInsured] = useState(false)
 
   const loadAll = useCallback(async () => {
     if (!clientId) {
@@ -113,16 +185,24 @@ export function ClientDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [d, catalog, plist, ixList, oppList] = await Promise.all([
+      const [d, catalog, plist, ixList, oppList, users, audits] = await Promise.all([
         apiFetch<ClientDetail>(`/v1/clients/${clientId}`),
         apiFetch<LineOfBusinessDto[]>('/v1/lines-of-business'),
         apiFetch<ProductBrief[]>('/v1/products'),
         apiFetch<InteractionDto[]>(`/v1/interactions?client_id=${clientId}&limit=100`),
         apiFetch<ClientOppRow[]>(`/v1/opportunities?client_id=${clientId}&limit=50`),
+        apiFetch<UserBrief[]>('/v1/org/users'),
+        apiFetch<AuditEventDto[]>(`/v1/clients/${clientId}/audit-events?limit=100`),
       ])
       setInteractions(ixList)
       setClientOpportunities(oppList)
       setDetail(d)
+      setOrgUsers(users)
+      setAuditEvents(audits)
+      setCrmOwnerId(d.owner_id ?? '')
+      setCrmKind(d.client_kind)
+      setCrmLegal(d.company_legal_name ?? '')
+      setCrmTax(d.company_tax_id ?? '')
       const per = d.profile.personal as Record<string, unknown> | null | undefined
       const res = d.profile.residence as Record<string, unknown> | null | undefined
       const mob = d.profile.mobility as Record<string, unknown> | null | undefined
@@ -267,6 +347,73 @@ export function ClientDetailPage() {
     }
   }
 
+  const onSaveCrmCore = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!clientId) {
+      return
+    }
+    setSavingCrm(true)
+    setError(null)
+    try {
+      await apiFetch(`/v1/clients/${clientId}`, {
+        method: 'PATCH',
+        json: {
+          owner_id: crmOwnerId || null,
+          client_kind: crmKind,
+          company_legal_name: crmKind === 'COMPANY' ? crmLegal.trim() || null : null,
+          company_tax_id: crmKind === 'COMPANY' ? crmTax.trim() || null : null,
+        },
+      })
+      await loadAll()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setSavingCrm(false)
+    }
+  }
+
+  const onAddInsured = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!clientId || !insuredName.trim()) {
+      return
+    }
+    setAddingInsured(true)
+    setError(null)
+    try {
+      await apiFetch(`/v1/clients/${clientId}/insured-persons`, {
+        method: 'POST',
+        json: {
+          full_name: insuredName.trim(),
+          relation: insuredRelation,
+          notes: insuredNotes.trim() || undefined,
+        },
+      })
+      setInsuredName('')
+      setInsuredRelation('HOLDER')
+      setInsuredNotes('')
+      await loadAll()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setAddingInsured(false)
+    }
+  }
+
+  const onDeleteInsured = async (insuredId: string) => {
+    if (!clientId) {
+      return
+    }
+    setError(null)
+    try {
+      await apiFetch(`/v1/clients/${clientId}/insured-persons/${insuredId}`, {
+        method: 'DELETE',
+      })
+      await loadAll()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    }
+  }
+
   const onAddInteraction = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!clientId || !ixSummary.trim()) {
@@ -324,6 +471,173 @@ export function ClientDetailPage() {
         <>
           <Card>
             <CardHeader>
+              <CardTitle className="text-base">{t('crm.core.title')}</CardTitle>
+              <p className="text-muted-foreground text-sm">{t('crm.core.subtitle')}</p>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSaveCrmCore}>
+                <div className="grid gap-2">
+                  <Label htmlFor="crm-owner">{t('crm.core.owner')}</Label>
+                  <select
+                    id="crm-owner"
+                    className={PROFILE_SELECT_CLASS}
+                    value={crmOwnerId}
+                    onChange={(ev) => setCrmOwnerId(ev.target.value)}
+                  >
+                    <option value="">{t('crm.core.noOwner')}</option>
+                    {orgUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name ?? u.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="crm-kind">{t('crm.core.kind')}</Label>
+                  <select
+                    id="crm-kind"
+                    className={PROFILE_SELECT_CLASS}
+                    value={crmKind}
+                    onChange={(ev) => setCrmKind(ev.target.value)}
+                  >
+                    <option value="INDIVIDUAL">{t('crm.core.kindIndividual')}</option>
+                    <option value="COMPANY">{t('crm.core.kindCompany')}</option>
+                  </select>
+                </div>
+                {crmKind === 'COMPANY' ? (
+                  <>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="crm-legal">{t('crm.core.companyLegal')}</Label>
+                      <Input
+                        id="crm-legal"
+                        value={crmLegal}
+                        onChange={(ev) => setCrmLegal(ev.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="crm-tax">{t('crm.core.companyTax')}</Label>
+                      <Input id="crm-tax" value={crmTax} onChange={(ev) => setCrmTax(ev.target.value)} />
+                    </div>
+                  </>
+                ) : null}
+                <div className="sm:col-span-2">
+                  <Button type="submit" disabled={savingCrm}>
+                    {savingCrm ? t('crm.core.saving') : t('crm.core.save')}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('crm.insured.title')}</CardTitle>
+              <p className="text-muted-foreground text-sm">{t('crm.insured.subtitle')}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {detail.insured_persons.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('crm.insured.empty')}</p>
+              ) : (
+                <ul className="text-sm">
+                  {detail.insured_persons.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-0"
+                    >
+                      <div>
+                        <span className="font-medium">{p.full_name}</span>
+                        <span className="text-muted-foreground ml-2 text-xs">{p.relation}</span>
+                        {p.notes ? (
+                          <p className="text-muted-foreground mt-1 text-xs">{p.notes}</p>
+                        ) : null}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void onDeleteInsured(p.id)}
+                      >
+                        {t('crm.insured.remove')}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form className="grid gap-3 sm:grid-cols-2" onSubmit={onAddInsured}>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="ins-name">{t('crm.insured.name')}</Label>
+                  <Input
+                    id="ins-name"
+                    value={insuredName}
+                    onChange={(ev) => setInsuredName(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ins-rel">{t('crm.insured.relation')}</Label>
+                  <select
+                    id="ins-rel"
+                    className={PROFILE_SELECT_CLASS}
+                    value={insuredRelation}
+                    onChange={(ev) => setInsuredRelation(ev.target.value)}
+                  >
+                    <option value="HOLDER">{t('crm.insured.relationHolder')}</option>
+                    <option value="DEPENDENT">{t('crm.insured.relationDependent')}</option>
+                    <option value="OTHER">{t('crm.insured.relationOther')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ins-notes">{t('crm.insured.notesOptional')}</Label>
+                  <Input
+                    id="ins-notes"
+                    value={insuredNotes}
+                    onChange={(ev) => setInsuredNotes(ev.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Button type="submit" disabled={addingInsured || !insuredName.trim()}>
+                    {addingInsured ? t('crm.insured.adding') : t('crm.insured.add')}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('crm.audit.title')}</CardTitle>
+              <p className="text-muted-foreground text-sm">{t('crm.audit.subtitle')}</p>
+            </CardHeader>
+            <CardContent>
+              {auditEvents.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('crm.audit.empty')}</p>
+              ) : (
+                <ul className="max-h-72 space-y-2 overflow-y-auto text-xs">
+                  {auditEvents.map((ev) => (
+                    <li key={ev.id} className="border-b pb-2 font-mono last:border-0">
+                      <span className="text-muted-foreground">
+                        {new Date(ev.created_at).toLocaleString()}
+                      </span>{' '}
+                      · {ev.entity_type} · {ev.action}
+                      {ev.field_name ? (
+                        <>
+                          {' '}
+                          · {ev.field_name}
+                        </>
+                      ) : null}
+                      {ev.old_value != null || ev.new_value != null ? (
+                        <div className="text-muted-foreground mt-1 break-all">
+                          {ev.old_value ?? '—'} → {ev.new_value ?? '—'}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="text-base">{t('crm.profile.title')}</CardTitle>
               <p className="text-muted-foreground text-sm">{t('crm.profile.subtitle')}</p>
             </CardHeader>
@@ -347,11 +661,23 @@ export function ClientDetailPage() {
               <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSaveProfile}>
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="pf-life">{t('crm.profile.lifeStage')}</Label>
-                  <Input
+                  <select
                     id="pf-life"
+                    className={PROFILE_SELECT_CLASS}
                     value={lifeStage}
                     onChange={(ev) => setLifeStage(ev.target.value)}
-                  />
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {lifeStage &&
+                    !LIFE_STAGE_OPTIONS.some((o) => o.value === lifeStage) ? (
+                      <option value={lifeStage}>{lifeStage}</option>
+                    ) : null}
+                    {LIFE_STAGE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.lifeStageOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-children">{t('crm.profile.children')}</Label>
@@ -367,7 +693,7 @@ export function ClientDetailPage() {
                   <Label htmlFor="pf-owns-prop">{t('crm.profile.ownsProperty')}</Label>
                   <select
                     id="pf-owns-prop"
-                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+                    className={PROFILE_SELECT_CLASS}
                     value={ownsProperty}
                     onChange={(ev) => setOwnsProperty(ev.target.value)}
                   >
@@ -378,17 +704,29 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="pf-prop-type">{t('crm.profile.propertyType')}</Label>
-                  <Input
+                  <select
                     id="pf-prop-type"
+                    className={PROFILE_SELECT_CLASS}
                     value={propertyType}
                     onChange={(ev) => setPropertyType(ev.target.value)}
-                  />
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {propertyType &&
+                    !PROPERTY_TYPE_OPTIONS.some((o) => o.value === propertyType) ? (
+                      <option value={propertyType}>{propertyType}</option>
+                    ) : null}
+                    {PROPERTY_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.propertyTypeOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-owns-veh">{t('crm.profile.ownsVehicle')}</Label>
                   <select
                     id="pf-owns-veh"
-                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+                    className={PROFILE_SELECT_CLASS}
                     value={ownsVehicle}
                     onChange={(ev) => setOwnsVehicle(ev.target.value)}
                   >
@@ -399,11 +737,23 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-veh-use">{t('crm.profile.vehicleUse')}</Label>
-                  <Input
+                  <select
                     id="pf-veh-use"
+                    className={PROFILE_SELECT_CLASS}
                     value={vehicleUse}
                     onChange={(ev) => setVehicleUse(ev.target.value)}
-                  />
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {vehicleUse &&
+                    !VEHICLE_PRIMARY_USE_OPTIONS.some((o) => o.value === vehicleUse) ? (
+                      <option value={vehicleUse}>{vehicleUse}</option>
+                    ) : null}
+                    {VEHICLE_PRIMARY_USE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.vehicleUseOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="sm:col-span-2">
                   <Button type="submit" disabled={savingProfile}>

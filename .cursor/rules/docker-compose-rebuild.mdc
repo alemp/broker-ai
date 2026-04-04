@@ -1,18 +1,21 @@
 ---
-description: After API/web code or Docker changes, rebuild images and recreate containers
+description: After API/web changes, run local compile/tests when relevant, then rebuild and recreate involved Docker services
 alwaysApply: true
 ---
 
-# Docker Compose — build e reinício
+# Build local + Docker Compose (obrigatório)
 
-Quando alterares código em `apps/api`, `apps/web`, `docker-compose.yml`, Dockerfiles ou dependências que entram na imagem, **no fim da tarefa** (e antes de dizer que está pronto), executa na **raiz do repositório**:
+No **fim de cada tarefa** que toque em `apps/api`, `apps/web`, `docker-compose.yml`, Dockerfiles ou dependências de imagem, **antes de considerar concluído**:
 
-```bash
-docker compose build api web && docker compose up -d --force-recreate api web
-```
+1. **Compilar / validar localmente** (serviços envolvidos):
+   - **API:** `cd apps/api && uv run ruff check src tests` (e `uv run pytest` se houver testes de integração com `DATABASE_URL`, quando fizer sentido).
+   - **Web:** `cd apps/web && npm run build`.
 
-- Isto **compila** as imagens (API com `uv sync`, web com `pnpm build` no Dockerfile) e **reinicia** os contentores `api` e `web`.
-- O **postgres** pode ficar a correr; só recria se for necessário para a tarefa.
-- Se a stack não estiver levantada, o mesmo comando cria e inicia os serviços.
+2. **Imagens e contentores envolvidos** — na **raiz do repositório**, reconstrói e recria **só o que mudou**; se houver dúvida, faz **api** e **web**:
+   - Só API: `docker compose build api && docker compose up -d --force-recreate api`
+   - Só Web: `docker compose build web && docker compose up -d --force-recreate web`
+   - API + Web: `docker compose build api web && docker compose up -d --force-recreate api web`
 
-Alternativa equivalente para subir tudo com build: `docker compose up -d --build --force-recreate`.
+3. **Postgres:** mantém a correr; só recria se a tarefa exigir (ex.: volume novo). Migrações: `alembic upgrade head` dentro do contentor API ou com `DATABASE_URL` local, conforme o fluxo do projeto.
+
+Não declares a tarefa pronta sem ter corrido estes passos para os serviços afetados.

@@ -8,42 +8,41 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apiFetch } from '@/lib/api'
 
-type ClientRow = {
-  id: string
-  full_name: string
-  email: string | null
-}
-
 type UserBrief = {
   id: string
   email: string
   full_name: string | null
 }
 
-export function ClientsPage() {
+type LeadRow = {
+  id: string
+  full_name: string
+  email: string | null
+  status: string
+  converted_client_id: string | null
+}
+
+export function LeadsPage() {
   const { t } = useTranslation('common')
-  const [items, setItems] = useState<ClientRow[]>([])
+  const [items, setItems] = useState<LeadRow[]>([])
+  const [users, setUsers] = useState<UserBrief[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [ownerId, setOwnerId] = useState('')
-  const [clientKind, setClientKind] = useState('INDIVIDUAL')
-  const [companyLegal, setCompanyLegal] = useState('')
-  const [companyTax, setCompanyTax] = useState('')
-  const [orgUsers, setOrgUsers] = useState<UserBrief[]>([])
   const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [data, users] = await Promise.all([
-        apiFetch<ClientRow[]>('/v1/clients'),
+      const [leads, orgUsers] = await Promise.all([
+        apiFetch<LeadRow[]>('/v1/leads'),
         apiFetch<UserBrief[]>('/v1/org/users'),
       ])
-      setItems(data)
-      setOrgUsers(users)
+      setItems(leads)
+      setUsers(orgUsers)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -60,34 +59,21 @@ export function ClientsPage() {
     if (!fullName.trim()) {
       return
     }
-    if (clientKind === 'COMPANY' && !companyLegal.trim()) {
-      setError(t('crm.core.companyLegalRequired'))
-      return
-    }
     setCreating(true)
     setError(null)
     try {
-      await apiFetch<ClientRow>('/v1/clients', {
+      await apiFetch('/v1/leads', {
         method: 'POST',
         json: {
           full_name: fullName.trim(),
           email: email.trim() || undefined,
           owner_id: ownerId || undefined,
-          client_kind: clientKind,
-          ...(clientKind === 'COMPANY'
-            ? {
-                company_legal_name: companyLegal.trim(),
-                company_tax_id: companyTax.trim() || undefined,
-              }
-            : {}),
+          status: 'NEW',
         },
       })
       setFullName('')
       setEmail('')
       setOwnerId('')
-      setClientKind('INDIVIDUAL')
-      setCompanyLegal('')
-      setCompanyTax('')
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
@@ -99,87 +85,53 @@ export function ClientsPage() {
   return (
     <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('crm.clients.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('crm.clients.subtitle')}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('crm.leads.title')}</h1>
+        <p className="text-muted-foreground mt-1 text-sm">{t('crm.leads.subtitle')}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('crm.clients.new')}</CardTitle>
+          <CardTitle className="text-base">{t('crm.leads.new')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={onCreate}>
             <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="client-name">{t('crm.clients.field.name')}</Label>
+              <Label htmlFor="lead-name">{t('crm.clients.field.name')}</Label>
               <Input
-                id="client-name"
+                id="lead-name"
                 value={fullName}
                 onChange={(ev) => setFullName(ev.target.value)}
-                autoComplete="name"
                 required
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="client-email">{t('crm.clients.field.emailOptional')}</Label>
+              <Label htmlFor="lead-email">{t('crm.clients.field.emailOptional')}</Label>
               <Input
-                id="client-email"
+                id="lead-email"
                 type="email"
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
-                autoComplete="email"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="client-owner">{t('crm.core.owner')}</Label>
+              <Label htmlFor="lead-owner">{t('crm.leads.ownerOptional')}</Label>
               <select
-                id="client-owner"
+                id="lead-owner"
                 className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                 value={ownerId}
                 onChange={(ev) => setOwnerId(ev.target.value)}
               >
-                <option value="">{t('crm.core.noOwner')}</option>
-                {orgUsers.map((u) => (
+                <option value="">{t('crm.leads.noOwner')}</option>
+                {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.full_name ?? u.email}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="client-kind">{t('crm.core.kind')}</Label>
-              <select
-                id="client-kind"
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-                value={clientKind}
-                onChange={(ev) => setClientKind(ev.target.value)}
-              >
-                <option value="INDIVIDUAL">{t('crm.core.kindIndividual')}</option>
-                <option value="COMPANY">{t('crm.core.kindCompany')}</option>
-              </select>
-            </div>
-            {clientKind === 'COMPANY' ? (
-              <>
-                <div className="grid gap-2 sm:col-span-2">
-                  <Label htmlFor="client-legal">{t('crm.core.companyLegal')}</Label>
-                  <Input
-                    id="client-legal"
-                    value={companyLegal}
-                    onChange={(ev) => setCompanyLegal(ev.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2 sm:col-span-2">
-                  <Label htmlFor="client-tax">{t('crm.core.companyTax')}</Label>
-                  <Input
-                    id="client-tax"
-                    value={companyTax}
-                    onChange={(ev) => setCompanyTax(ev.target.value)}
-                  />
-                </div>
-              </>
-            ) : null}
             <div className="sm:col-span-2">
               <Button type="submit" disabled={creating}>
-                {creating ? t('crm.clients.creating') : t('crm.clients.create')}
+                {creating ? t('crm.leads.creating') : t('crm.leads.create')}
               </Button>
             </div>
           </form>
@@ -190,7 +142,7 @@ export function ClientsPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">{t('crm.clients.list')}</CardTitle>
+          <CardTitle className="text-base">{t('crm.leads.list')}</CardTitle>
           <Button type="button" variant="secondary" size="sm" onClick={() => void load()} disabled={loading}>
             {t('action.refresh')}
           </Button>
@@ -199,24 +151,25 @@ export function ClientsPage() {
           {loading ? (
             <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
           ) : items.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t('crm.clients.empty')}</p>
+            <p className="text-muted-foreground text-sm">{t('crm.leads.empty')}</p>
           ) : (
             <ul className="divide-y rounded-md border">
-              {items.map((c) => (
-                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+              {items.map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                   <div>
-                    <Link to={`/clients/${c.id}`} className="font-medium hover:underline">
-                      {c.full_name}
+                    <Link to={`/leads/${row.id}`} className="font-medium hover:underline">
+                      {row.full_name}
                     </Link>
-                    {c.email ? (
-                      <p className="text-muted-foreground text-xs">{c.email}</p>
-                    ) : null}
+                    <p className="text-muted-foreground text-xs">
+                      {row.status}
+                      {row.email ? ` · ${row.email}` : ''}
+                    </p>
                   </div>
                   <Link
-                    to={`/clients/${c.id}`}
+                    to={`/leads/${row.id}`}
                     className="text-muted-foreground hover:text-foreground text-xs font-medium"
                   >
-                    {t('crm.action.view')}
+                    {row.converted_client_id ? t('crm.leads.openConverted') : t('crm.action.view')}
                   </Link>
                 </li>
               ))}

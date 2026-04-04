@@ -5,15 +5,18 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import ValidationError
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
+from ai_copilot_api.db.enums import ClientKind, CrmAuditAction, CrmEntityType
 from ai_copilot_api.db.models import (
     Client,
     ClientHeldProduct,
     ClientLineOfBusiness,
+    CrmAuditEvent,
+    InsuredPerson,
     LineOfBusiness,
     Product,
     User,
@@ -24,6 +27,11 @@ from ai_copilot_api.domain.client_profile import (
     merge_profile_dict,
     parse_profile,
     profile_alerts,
+)
+from ai_copilot_api.domain.crm_audit import (
+    record_audit,
+    record_entity_snapshot_create,
+    record_field_updates,
 )
 from ai_copilot_api.schemas.client_profile import ClientInsuranceProfile, ClientProfileOut
 from ai_copilot_api.schemas.crm import (
@@ -36,11 +44,47 @@ from ai_copilot_api.schemas.crm import (
     ClientLineOfBusinessOut,
     ClientOut,
     ClientUpdate,
+    CrmAuditEventOut,
+    InsuredPersonCreate,
+    InsuredPersonOut,
+    InsuredPersonUpdate,
 )
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
 _MAX_PAGE = 100
+
+_CLIENT_AUDIT_KEYS = (
+    "full_name",
+    "email",
+    "phone",
+    "external_id",
+    "notes",
+    "owner_id",
+    "client_kind",
+    "company_legal_name",
+    "company_tax_id",
+)
+
+
+def _client_audit_dict(row: Client) -> dict:
+    return {
+        "full_name": row.full_name,
+        "email": row.email,
+        "phone": row.phone,
+        "external_id": row.external_id,
+        "notes": row.notes,
+        "owner_id": row.owner_id,
+        "client_kind": row.client_kind.value,
+        "company_legal_name": row.company_legal_name,
+        "company_tax_id": row.company_tax_id,
+    }
+
+
+def _user_in_org(db: Session, org_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    u = db.scalar(select(User).where(User.id == user_id, User.organization_id == org_id))
+    if u is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
 
 def _raw_profile_data(row: Client) -> dict[str, Any]:
@@ -60,12 +104,14 @@ def _client_profile_bundle(row: Client) -> tuple[ClientInsuranceProfile, int, li
 def _build_client_detail_out(row: Client) -> ClientDetailOut:
     prof, score, alerts = _client_profile_bundle(row)
     base = ClientOut.model_validate(row)
+    insured = getattr(row, "insured_persons", []) or []
     return ClientDetailOut(
         **base.model_dump(),
         lines_of_business=[
             ClientLineOfBusinessOut.model_validate(link) for link in row.line_of_business_links
         ],
         held_products=[ClientHeldProductOut.model_validate(h) for h in row.held_products],
+        insured_persons=[InsuredPersonOut.model_validate(p) for p in insured],
         profile=prof,
         profile_completeness_score=score,
         profile_alerts=alerts,
@@ -113,7 +159,11 @@ def list_clients(
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
     q: str | None = Query(default=None, max_length=200),
 ) -> list[ClientOut]:
-    stmt = select(Client).where(Client.organization_id == current_user.organization_id)
+    stmt = (
+        select(Client)
+        .options(joinedload(Client.owner))
+        .where(Client.organization_id == current_user.organization_id)
+    )
     if q and q.strip():
         pat = f"%{q.strip()}%"
         stmt = stmt.where(or_(Client.full_name.ilike(pat), Client.email.ilike(pat)))
@@ -128,16 +178,32 @@ def create_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ClientOut:
+    org_id = current_user.organization_id
+    if body.owner_id is not None:
+        _user_in_org(db, org_id, body.owner_id)
     row = Client(
-        organization_id=current_user.organization_id,
+        organization_id=org_id,
         full_name=body.full_name,
         email=str(body.email) if body.email is not None else None,
         phone=body.phone,
         external_id=body.external_id,
         notes=body.notes,
+        owner_id=body.owner_id,
+        client_kind=body.client_kind,
+        company_legal_name=body.company_legal_name,
+        company_tax_id=body.company_tax_id,
     )
     db.add(row)
     try:
+        db.flush()
+        record_entity_snapshot_create(
+            db,
+            organization_id=org_id,
+            actor_user_id=current_user.id,
+            entity_type=CrmEntityType.CLIENT,
+            entity_id=row.id,
+            snapshot={k: v for k, v in _client_audit_dict(row).items() if v is not None},
+        )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -145,7 +211,10 @@ def create_client(
             status_code=status.HTTP_409_CONFLICT,
             detail="Client violates unique email or external_id for this organization",
         ) from None
-    db.refresh(row)
+    row = db.scalar(
+        select(Client).options(joinedload(Client.owner)).where(Client.id == row.id),
+    )
+    assert row is not None
     return ClientOut.model_validate(row)
 
 
@@ -158,6 +227,8 @@ def get_client(
     row = db.scalar(
         select(Client)
         .options(
+            joinedload(Client.owner),
+            selectinload(Client.insured_persons),
             selectinload(Client.line_of_business_links).selectinload(
                 ClientLineOfBusiness.line_of_business
             ),
@@ -214,13 +285,37 @@ def update_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ClientOut:
-    row = _client_or_404(db, current_user.organization_id, client_id)
+    org_id = current_user.organization_id
+    row = _client_or_404(db, org_id, client_id)
+    before = _client_audit_dict(row)
     data = body.model_dump(exclude_unset=True)
     if "email" in data and data["email"] is not None:
         data["email"] = str(data["email"])
+    if "owner_id" in data and data["owner_id"] is not None:
+        _user_in_org(db, org_id, data["owner_id"])
+    merged_kind = data.get("client_kind", row.client_kind)
+    merged_legal = data.get("company_legal_name", row.company_legal_name)
+    if merged_kind == ClientKind.COMPANY and not (merged_legal and str(merged_legal).strip()):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="company_legal_name is required when client_kind is COMPANY",
+        )
     for k, v in data.items():
         setattr(row, k, v)
     try:
+        db.flush()
+        after = _client_audit_dict(row)
+        updates = {k: after[k] for k in _CLIENT_AUDIT_KEYS if before.get(k) != after.get(k)}
+        if updates:
+            record_field_updates(
+                db,
+                organization_id=org_id,
+                actor_user_id=current_user.id,
+                entity_type=CrmEntityType.CLIENT,
+                entity_id=client_id,
+                before=before,
+                updates=updates,
+            )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -228,7 +323,10 @@ def update_client(
             status_code=status.HTTP_409_CONFLICT,
             detail="Client violates unique email or external_id for this organization",
         ) from None
-    db.refresh(row)
+    row = db.scalar(
+        select(Client).options(joinedload(Client.owner)).where(Client.id == client_id),
+    )
+    assert row is not None
     return ClientOut.model_validate(row)
 
 
@@ -238,7 +336,199 @@ def delete_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    row = _client_or_404(db, current_user.organization_id, client_id)
+    org_id = current_user.organization_id
+    row = _client_or_404(db, org_id, client_id)
+    record_audit(
+        db,
+        organization_id=org_id,
+        actor_user_id=current_user.id,
+        entity_type=CrmEntityType.CLIENT,
+        entity_id=client_id,
+        action=CrmAuditAction.DELETE,
+    )
+    db.delete(row)
+    db.commit()
+
+
+_INSURED_AUDIT_KEYS = ("full_name", "relation", "notes", "client_id")
+
+
+def _insured_audit_dict(row: InsuredPerson) -> dict:
+    return {
+        "full_name": row.full_name,
+        "relation": row.relation.value,
+        "notes": row.notes,
+        "client_id": row.client_id,
+    }
+
+
+@router.get("/{client_id}/audit-events", response_model=list[CrmAuditEventOut])
+def list_client_audit_events(
+    client_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[CrmAuditEventOut]:
+    org_id = current_user.organization_id
+    _client_or_404(db, org_id, client_id)
+    insured_subq = select(InsuredPerson.id).where(
+        InsuredPerson.client_id == client_id,
+        InsuredPerson.organization_id == org_id,
+    )
+    rows = db.scalars(
+        select(CrmAuditEvent)
+        .where(
+            CrmAuditEvent.organization_id == org_id,
+            or_(
+                and_(
+                    CrmAuditEvent.entity_type == CrmEntityType.CLIENT,
+                    CrmAuditEvent.entity_id == client_id,
+                ),
+                and_(
+                    CrmAuditEvent.entity_type == CrmEntityType.INSURED_PERSON,
+                    CrmAuditEvent.entity_id.in_(insured_subq),
+                ),
+            ),
+        )
+        .order_by(CrmAuditEvent.created_at.desc())
+        .limit(limit),
+    ).all()
+    return [CrmAuditEventOut.model_validate(r) for r in rows]
+
+
+@router.get("/{client_id}/insured-persons", response_model=list[InsuredPersonOut])
+def list_insured_persons(
+    client_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[InsuredPersonOut]:
+    org_id = current_user.organization_id
+    _client_or_404(db, org_id, client_id)
+    rows = db.scalars(
+        select(InsuredPerson)
+        .where(
+            InsuredPerson.client_id == client_id,
+            InsuredPerson.organization_id == org_id,
+        )
+        .order_by(InsuredPerson.created_at),
+    ).all()
+    return [InsuredPersonOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/{client_id}/insured-persons",
+    response_model=InsuredPersonOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_insured_person(
+    client_id: uuid.UUID,
+    body: InsuredPersonCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> InsuredPersonOut:
+    org_id = current_user.organization_id
+    _client_or_404(db, org_id, client_id)
+    row = InsuredPerson(
+        organization_id=org_id,
+        client_id=client_id,
+        full_name=body.full_name,
+        relation=body.relation,
+        notes=body.notes,
+    )
+    db.add(row)
+    db.flush()
+    record_entity_snapshot_create(
+        db,
+        organization_id=org_id,
+        actor_user_id=current_user.id,
+        entity_type=CrmEntityType.INSURED_PERSON,
+        entity_id=row.id,
+        snapshot={k: v for k, v in _insured_audit_dict(row).items() if v is not None},
+    )
+    db.commit()
+    db.refresh(row)
+    return InsuredPersonOut.model_validate(row)
+
+
+@router.patch(
+    "/{client_id}/insured-persons/{insured_id}",
+    response_model=InsuredPersonOut,
+)
+def update_insured_person(
+    client_id: uuid.UUID,
+    insured_id: uuid.UUID,
+    body: InsuredPersonUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> InsuredPersonOut:
+    org_id = current_user.organization_id
+    _client_or_404(db, org_id, client_id)
+    row = db.scalar(
+        select(InsuredPerson).where(
+            InsuredPerson.id == insured_id,
+            InsuredPerson.client_id == client_id,
+            InsuredPerson.organization_id == org_id,
+        ),
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Insured person not found",
+        )
+    before = _insured_audit_dict(row)
+    data = body.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(row, k, v)
+    db.flush()
+    after = _insured_audit_dict(row)
+    updates = {k: after[k] for k in _INSURED_AUDIT_KEYS if before.get(k) != after.get(k)}
+    if updates:
+        record_field_updates(
+            db,
+            organization_id=org_id,
+            actor_user_id=current_user.id,
+            entity_type=CrmEntityType.INSURED_PERSON,
+            entity_id=insured_id,
+            before=before,
+            updates=updates,
+        )
+    db.commit()
+    db.refresh(row)
+    return InsuredPersonOut.model_validate(row)
+
+
+@router.delete(
+    "/{client_id}/insured-persons/{insured_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_insured_person(
+    client_id: uuid.UUID,
+    insured_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    org_id = current_user.organization_id
+    _client_or_404(db, org_id, client_id)
+    row = db.scalar(
+        select(InsuredPerson).where(
+            InsuredPerson.id == insured_id,
+            InsuredPerson.client_id == client_id,
+            InsuredPerson.organization_id == org_id,
+        ),
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Insured person not found",
+        )
+    record_audit(
+        db,
+        organization_id=org_id,
+        actor_user_id=current_user.id,
+        entity_type=CrmEntityType.INSURED_PERSON,
+        entity_id=insured_id,
+        action=CrmAuditAction.DELETE,
+    )
     db.delete(row)
     db.commit()
 

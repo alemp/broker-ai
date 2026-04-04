@@ -5,7 +5,7 @@
 ## Data model
 
 - `**Product`** — Org-scoped catalog (`name`, `category`, `risk_level`, `active`, …). Seeded rows for the `default` org in the migration (MVP placeholders).
-- `**LineOfBusiness**` — Org-scoped LOB catalog (`code`, `name`). Seeded `MOTOR`, `LIFE`, `HEALTH` for `default`.
+- `**LineOfBusiness**` — Org-scoped LOB catalog (`code`, `name`). Initial seed: `MOTOR`, `LIFE`, `HEALTH` for `default`. Migration **`mvp_catalog_007`** narrows MVP to **Auto (Motor)** (`MOTOR`), **Ramos elementares** (`GENERAL`), **Vida (Life)** (`LIFE`), removes unused `HEALTH` when safe, and seeds three matching **Product** rows (`target_tags = mvp_catalog_v1`).
 - `**Client**` — `organization_id`, optional `external_id` / `email` (partial unique indexes per org), `full_name`, contact fields, notes.
 - `**ClientLineOfBusiness**` — Client ↔ LOB with `**ingestion_source**` (e.g. `internal_crm`).
 - `**ClientHeldProduct**` — Optional FK to `**Product**`, insurer, policy dates/status, `**ingestion_source**`.

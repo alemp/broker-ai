@@ -1,6 +1,6 @@
 # Implementation plan (MVP)
 
-**Status:** **Phases 0–4** are implemented in-repo (foundation, auth, CRM/portfolio/pipeline, enriched client profile, interactions and overdue/next-action signals). Phase 5+ remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phases 0–4** are implemented in-repo, plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 5** (CSV/Excel bulk import) and later phases remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
 **Living checklist:** Stakeholder scope from [`PRODUCT.md`](./PRODUCT.md) vs repo status is maintained in [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) — update that file when phases ship or scope shifts.  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
@@ -20,6 +20,7 @@
 - **Email/password** authentication; users belong to the org.
 - **Client** and **Opportunity** CRUD, pipeline stages per `OPPORTUNITY.md`.
 - **Lines of business** (`LineOfBusiness`, `ClientLineOfBusiness`) and **held products** (`ClientHeldProduct`) on the client, with **`ingestion_source`**, maintained in-app and via bulk import.
+- **MVP product lines** (catalog + LOB labels): **Auto (Motor)**, **Ramos elementares** (general / multirisco), **Vida (Life)** — see Alembic `mvp_catalog_007` and `ProductCategory.GENERAL_INSURANCE`.
 - **Enriched insurance-oriented client profile** (progressive blocks, completeness score, inputs for rules and semáforo) per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3**.
 - **Interactions** (types, timeline, link to client/opportunity, next-action and overdue signals) per [`PRODUCT.md`](./PRODUCT.md) §5.5 — **Phase 4**.
 - **CSV and Excel (`.xlsx`) import** for **clients**, including optional LOB / held-product columns per template; upsert order: `external_id` → normalized `email` → insert-only or strict error — **Phase 5**.
@@ -148,6 +149,18 @@
 
 ---
 
+### PRODUCT §5.2 — Leads, client ownership, empresa/segurados, audit (before Phase 5)
+
+**Goal:** Close [`PRODUCT.md`](./PRODUCT.md) §5.2 gaps that are **not** bulk import: **Lead** lifecycle, **corretor** on **Client**, **Empresa** vs pessoa física, **segurados** nested on the client, **histórico** of field-level changes, and **convert lead → client** (with optional **Opportunity**).
+
+**Implemented:** Alembic `module52_006` (`leads`, `insured_persons`, `crm_audit_events`; client columns `owner_id`, `client_kind`, company fields). API: `/v1/org/users`, `/v1/leads` (+ `POST …/convert`), `/v1/clients/…` PATCH with audit, `/v1/clients/{id}/insured-persons`, `/v1/clients/{id}/audit-events`. Web: **Leads** list/detail + conversion; client create/detail: owner, tipo, empresa, segurados, histórico.
+
+**Exit criteria:** Broker creates a lead, converts to client (optional oportunity), assigns **owner**, registers **COMPANY** + legal name, adds **insured persons**, and sees **audit** events on the client detail screen.
+
+**Depends on:** Phase 2. **Does not include** CSV/Excel import (that is **Phase 5**).
+
+---
+
 ### Phase 5 — CSV and Excel client import (including portfolio)
 
 **Goal:** Bulk bootstrap and updates without external CRM; **same canonical tables** as the UI.
@@ -162,7 +175,7 @@
 
 **Exit criteria:** Import 100+ rows with mixed inserts/updates **including** at least one scenario with LOB and held-product data populated; audit record exists; invalid rows reported without silent corruption.
 
-**Depends on:** Phase 2. **Phase 3** optional for profile column mapping in template.
+**Depends on:** Phase 2; **PRODUCT §5.2** extends client schema (owner, kind, company, segurados) — import template should align when Phase 5 ships. **Phase 3** optional for profile column mapping in template.
 
 ---
 

@@ -22,6 +22,8 @@ The strategic brief recommends an **accelerator** model: adopt mature CRM, marke
 
 **Product narrative:** For the first release we **defer CRM/marketing accelerators** and ship a **unified thin CRM + portfolio** so recommendations and future semáforo/scoring read one truth. **External CRM sync** remains explicit **post-MVP** ([`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) Phase 11, [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) Stage 2).
 
+**MVP insurance lines (catalog focus):** **Auto (Motor)**, **Ramos elementares** (general / multirisco), **Vida (Life)** — DB seed and LOB labels via Alembic `mvp_catalog_007`; API enum `ProductCategory.GENERAL_INSURANCE` for elementares.
+
 ---
 
 ## 2. Functional modules: strategic scope vs implementation
@@ -31,7 +33,7 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 | Strategic module (brief §5) | In-repo status | Phase / notes |
 |------------------------------|----------------|---------------|
 | **5.1** Users, roles, permissions, org structure | **Partial** | JWT auth, org scope, users ([`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md)). Missing: broker/manager/admin **roles**, regional/team/supervisor, password recovery, module permissions, **audit log** — extend over time; LGPD audit Phase 10 |
-| **5.2** Leads, clients, opportunities, import | **Partial** | `Client` + `Opportunity` + owner; no separate **Lead** entity. **Bulk import** → **Phase 5** |
+| **5.2** Leads, clients, opportunities, import | **Partial** | **Done (pre–Phase 5 slice):** `Lead`, `Client.owner_id`, `ClientKind` + company fields, `InsuredPerson`, `CrmAuditEvent`, lead→client convert + optional opp, org users list, web — see [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) §5.2 block. **Still planned:** **bulk import** → [**Phase 5**](./IMPLEMENTATION-PLAN.md); full **roles**/hierarchy still §5.1 |
 | **5.3** Enriched insurance profile (blocks A–H) | **Done (core)** | [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md): JSONB `profile_data`, Pydantic blocks, merge `PATCH`, score + alerts, detail UI subset; bulk import mapping **Phase 5**; consent enforcement **Phase 10** |
 | **5.4** Commercial funnel | **Partial** | Pipeline exists with **6** stages — see [`enums.py`](../apps/api/src/ai_copilot_api/db/enums.py). Brief: **10** steps + post-sale fields. Missing on `Opportunity`: insurer considered, expected close, loss reason; enforce next-action/loss rules — backlog (can straddle Phase 2 follow-up or Phase 4) |
 | **5.5** Interactions, agenda, history | **Done (core)** | [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md): `Interaction` + API, timeline (client/opp), dashboard overdue + today; `last_interaction_at` sync; `next_action_due_at` + overdue filter — push notifications / full calendar later |
@@ -41,6 +43,24 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 | **5.9** Post-sale, régua, campaigns | **Planned** | Out of numbered MVP phases; **Phase 11 / Stage 2** or external tools (HubSpot/RD/WhatsApp) |
 | **5.10** Executive dashboards | **Planned** | **Phase 9**; use brief KPIs as acceptance checklist |
 | **5.11** Intelligent assistant (copilot) | **Planned** | Roadmap Stage 4; after core CRM + catalog + rules + semáforo mature |
+
+### 2.1 PRODUCT §5.2 — checklist vs this repo
+
+[`PRODUCT.md`](./PRODUCT.md) §5.2 lists **entities** (Lead, Opportunity, Client, Segurado, Empresa) and **seven** functional requirements. Coverage after the **§5.2 pre–Phase 5** slice:
+
+| # | Requirement (brief) | In repo today |
+|---|----------------------|---------------|
+| — | **Lead** entity | **Yes** — `Lead` + CRUD + status; convert creates `Client` and optional `Opportunity` |
+| — | **Segurado** / **Empresa** | **Yes** — **Empresa** = `ClientKind.COMPANY` + legal/tax fields; **Segurado** = `InsuredPerson` under `Client` |
+| 1 | Manual lead registration | **Yes** — leads API + web |
+| 2 | Bulk spreadsheet import | **No** — [**Phase 5**](./IMPLEMENTATION-PLAN.md) |
+| 3 | Progressive enrichment | **Partial** — profile JSONB + portfolio + interactions; §5.3 UI still incremental |
+| 4 | Convert lead → client or opportunity | **Yes** — `POST /v1/leads/{id}/convert` |
+| 5 | Assign responsible broker | **Partial** — `Client.owner_id` + `Lead.owner_id`; org-wide **roles** still §5.1 |
+| 6 | Data update history | **Partial** — append-only `crm_audit_events` for client, lead, insured, opportunity (create path); broad LGPD retention still **Phase 10** |
+| 7 | Single view with multiple products | **Partial** — client detail: held products + LOB + new CRM/segurados/audit sections |
+
+**Remaining** for full §5.2: **Phase 5** import; optional hardening (roles, richer audit filters, empresa as separate party if product demands it beyond `ClientKind`).
 
 ---
 

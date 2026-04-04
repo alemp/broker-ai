@@ -37,12 +37,12 @@ jobs:
         run: uv sync --group dev
       - name: Ruff
         run: uv run ruff check src tests
-      - name: Pytest
-        run: uv run pytest
-        env:
-          DATABASE_URL: postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
       - name: Alembic upgrade
         run: uv run alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
+      - name: Pytest
+        run: uv run pytest
         env:
           DATABASE_URL: postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
 

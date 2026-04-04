@@ -21,6 +21,9 @@ export function AppLayout() {
             <Link to="/clients" className={linkClass}>
               {t('nav.clients')}
             </Link>
+            <Link to="/leads" className={linkClass}>
+              {t('nav.leads')}
+            </Link>
             <Link to="/opportunities" className={linkClass}>
               {t('nav.opportunities')}
             </Link>
