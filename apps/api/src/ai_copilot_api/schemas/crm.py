@@ -3,11 +3,13 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from ai_copilot_api.db.enums import (
+    AdequacyTrafficLight,
+    CampaignTouchStatus,
     ClientKind,
     CrmAuditAction,
     CrmEntityType,
@@ -19,6 +21,7 @@ from ai_copilot_api.db.enums import (
     OpportunityStatus,
     ProductCategory,
     ProductRiskLevel,
+    RecommendationFeedbackAction,
 )
 from ai_copilot_api.schemas.client_profile import ClientInsuranceProfile
 
@@ -49,6 +52,8 @@ class ClientCreate(BaseModel):
     client_kind: ClientKind = ClientKind.INDIVIDUAL
     company_legal_name: str | None = Field(default=None, max_length=255)
     company_tax_id: str | None = Field(default=None, max_length=32)
+    marketing_opt_in: bool = True
+    preferred_marketing_channel: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def require_company_legal_name(self) -> Self:
@@ -69,6 +74,8 @@ class ClientUpdate(BaseModel):
     client_kind: ClientKind | None = None
     company_legal_name: str | None = Field(default=None, max_length=255)
     company_tax_id: str | None = Field(default=None, max_length=32)
+    marketing_opt_in: bool | None = None
+    preferred_marketing_channel: str | None = Field(default=None, max_length=64)
 
 
 class ClientOut(BaseModel):
@@ -85,6 +92,8 @@ class ClientOut(BaseModel):
     client_kind: ClientKind
     company_legal_name: str | None
     company_tax_id: str | None
+    marketing_opt_in: bool
+    preferred_marketing_channel: str | None
     created_at: datetime
     updated_at: datetime
     owner: UserBrief | None = Field(default=None, validation_alias="owner")
@@ -153,6 +162,40 @@ class ProductBrief(BaseModel):
     id: uuid.UUID
     name: str
     category: ProductCategory
+
+
+class InsurerBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    code: str | None
+
+
+class InsurerCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    code: str | None = Field(default=None, max_length=64)
+    active: bool = True
+    notes: str | None = None
+
+
+class InsurerUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    code: str | None = Field(default=None, max_length=64)
+    active: bool | None = None
+    notes: str | None = None
+
+
+class InsurerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    name: str
+    code: str | None
+    active: bool
+    notes: str | None
+    created_at: datetime
 
 
 class ClientHeldProductOut(BaseModel):
@@ -274,6 +317,16 @@ class LeadOpportunityPayload(BaseModel):
     last_interaction_at: datetime | None = None
     next_action: str | None = None
     next_action_due_at: datetime | None = None
+    preferred_insurer_name: str | None = Field(default=None, max_length=255)
+    expected_close_at: datetime | None = None
+    loss_reason: str | None = None
+
+    @model_validator(mode="after")
+    def loss_reason_when_lost_on_convert(self) -> Self:
+        if self.stage == OpportunityStage.CLOSED_LOST:
+            if not (self.loss_reason and str(self.loss_reason).strip()):
+                raise ValueError("loss_reason is required when stage is CLOSED_LOST")
+        return self
 
 
 class LeadConvertRequest(BaseModel):
@@ -295,6 +348,14 @@ class ProductCreate(BaseModel):
     risk_level: ProductRiskLevel
     target_tags: str | None = Field(default=None, max_length=512)
     active: bool = True
+    insurer_id: uuid.UUID | None = None
+    line_of_business_id: uuid.UUID | None = None
+    main_coverage_summary: str | None = None
+    additional_coverages: list[dict[str, Any]] = Field(default_factory=list)
+    exclusions_notes: str | None = None
+    recommended_profile_summary: str | None = None
+    commercial_arguments: str | None = None
+    support_materials: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ProductUpdate(BaseModel):
@@ -304,10 +365,18 @@ class ProductUpdate(BaseModel):
     risk_level: ProductRiskLevel | None = None
     target_tags: str | None = Field(default=None, max_length=512)
     active: bool | None = None
+    insurer_id: uuid.UUID | None = None
+    line_of_business_id: uuid.UUID | None = None
+    main_coverage_summary: str | None = None
+    additional_coverages: list[dict[str, Any]] | None = None
+    exclusions_notes: str | None = None
+    recommended_profile_summary: str | None = None
+    commercial_arguments: str | None = None
+    support_materials: list[dict[str, Any]] | None = None
 
 
 class ProductOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: uuid.UUID
     organization_id: uuid.UUID
@@ -317,7 +386,16 @@ class ProductOut(BaseModel):
     risk_level: ProductRiskLevel
     target_tags: str | None
     active: bool
+    insurer_id: uuid.UUID | None
+    line_of_business_id: uuid.UUID | None
+    main_coverage_summary: str | None
+    additional_coverages: list[dict[str, Any]]
+    exclusions_notes: str | None
+    recommended_profile_summary: str | None
+    commercial_arguments: str | None
+    support_materials: list[dict[str, Any]]
     created_at: datetime
+    insurer: InsurerBrief | None = Field(default=None, validation_alias="insurer")
 
 
 class OpportunityCreate(BaseModel):
@@ -332,6 +410,16 @@ class OpportunityCreate(BaseModel):
     last_interaction_at: datetime | None = None
     next_action: str | None = None
     next_action_due_at: datetime | None = None
+    preferred_insurer_name: str | None = Field(default=None, max_length=255)
+    expected_close_at: datetime | None = None
+    loss_reason: str | None = None
+
+    @model_validator(mode="after")
+    def loss_reason_when_lost_on_create(self) -> Self:
+        if self.stage == OpportunityStage.CLOSED_LOST:
+            if not (self.loss_reason and str(self.loss_reason).strip()):
+                raise ValueError("loss_reason is required when stage is CLOSED_LOST")
+        return self
 
 
 class OpportunityUpdate(BaseModel):
@@ -345,10 +433,21 @@ class OpportunityUpdate(BaseModel):
     last_interaction_at: datetime | None = None
     next_action: str | None = None
     next_action_due_at: datetime | None = None
+    preferred_insurer_name: str | None = Field(default=None, max_length=255)
+    expected_close_at: datetime | None = None
+    loss_reason: str | None = None
 
 
 class OpportunityStagePatch(BaseModel):
     stage: OpportunityStage
+    loss_reason: str | None = Field(default=None, max_length=4000)
+
+    @model_validator(mode="after")
+    def loss_reason_when_closing_lost(self) -> Self:
+        if self.stage == OpportunityStage.CLOSED_LOST:
+            if not (self.loss_reason and str(self.loss_reason).strip()):
+                raise ValueError("loss_reason is required when moving to CLOSED_LOST")
+        return self
 
 
 class OpportunityOut(BaseModel):
@@ -367,11 +466,22 @@ class OpportunityOut(BaseModel):
     last_interaction_at: datetime | None
     next_action: str | None
     next_action_due_at: datetime | None
+    preferred_insurer_name: str | None
+    expected_close_at: datetime | None
+    loss_reason: str | None
     created_at: datetime
     updated_at: datetime
     client: ClientBrief
     owner: UserBrief
     product: ProductBrief | None
+
+
+class OpportunityMetricsSummary(BaseModel):
+    """Lightweight funnel metrics (PRODUCT.md §5.4 dashboards — MVP slice)."""
+
+    by_stage: dict[str, int]
+    by_owner_open: dict[str, int]
+    open_total: int
 
 
 class InteractionCreate(BaseModel):
@@ -404,3 +514,148 @@ class InteractionOut(BaseModel):
     occurred_at: datetime
     created_at: datetime
     created_by: UserBrief = Field(validation_alias="created_by_user")
+
+
+# --- PRODUCT.md §5.7–5.9 (pre–Phase 6) — recommendations, adequacy, campaigns ---
+
+
+class RecommendationRunCreate(BaseModel):
+    opportunity_id: uuid.UUID | None = None
+
+
+class RecommendationItemOut(BaseModel):
+    product_id: uuid.UUID
+    product_name: str
+    product_category: ProductCategory
+    priority: int
+    rule_ids: list[str]
+    rationale: str
+    protection_gaps: str
+    predictable_objections: str
+    next_best_action: str
+
+
+class RuleTraceOut(BaseModel):
+    rule_id: str
+    fired: bool
+    detail: str
+
+
+class RecommendationRunOut(BaseModel):
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    client_id: uuid.UUID
+    opportunity_id: uuid.UUID | None
+    created_by_id: uuid.UUID
+    items: list[RecommendationItemOut]
+    rule_trace: list[RuleTraceOut]
+    created_at: datetime
+
+
+class RecommendationsPreviewOut(BaseModel):
+    """Phase 6 — rule engine output without persisting a run (GET preview)."""
+
+    items: list[RecommendationItemOut]
+    rule_trace: list[RuleTraceOut]
+
+
+class RecommendationFeedbackCreate(BaseModel):
+    client_id: uuid.UUID
+    product_id: uuid.UUID
+    recommendation_run_id: uuid.UUID | None = None
+    rule_ids: str = Field(min_length=1, max_length=512)
+    action: RecommendationFeedbackAction
+    note: str | None = None
+
+
+class RecommendationFeedbackOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    client_id: uuid.UUID
+    product_id: uuid.UUID
+    recommendation_run_id: uuid.UUID | None
+    rule_ids: str
+    action: RecommendationFeedbackAction
+    actor_user_id: uuid.UUID
+    note: str | None
+    created_at: datetime
+
+
+class ClientAdequacyOut(BaseModel):
+    traffic_light: AdequacyTrafficLight
+    summary: str
+    reasons: list[str]
+    needs_human_review: bool
+    profile_completeness_score: int
+    profile_alert_codes: list[str]
+
+
+class ClientAdequacyReviewBrief(BaseModel):
+    client_id: uuid.UUID
+    full_name: str
+    traffic_light: AdequacyTrafficLight
+    summary: str
+    needs_human_review: bool
+
+
+class CampaignCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    kind: str = Field(min_length=1, max_length=64)
+    description: str | None = None
+    template_subject: str | None = Field(default=None, max_length=255)
+    template_body: str = Field(min_length=1)
+    segment_criteria: dict[str, Any] = Field(default_factory=dict)
+    active: bool = True
+
+
+class CampaignUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    kind: str | None = Field(default=None, min_length=1, max_length=64)
+    description: str | None = None
+    template_subject: str | None = Field(default=None, max_length=255)
+    template_body: str | None = Field(default=None, min_length=1)
+    segment_criteria: dict[str, Any] | None = None
+    active: bool | None = None
+
+
+class CampaignOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    name: str
+    kind: str
+    description: str | None
+    template_subject: str | None
+    template_body: str
+    segment_criteria: dict[str, Any]
+    active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class CampaignSegmentRefreshIn(BaseModel):
+    scheduled_at: datetime | None = None
+    channel: str = Field(default="EMAIL", max_length=32)
+
+
+class CampaignTouchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    campaign_id: uuid.UUID
+    client_id: uuid.UUID
+    scheduled_at: datetime
+    status: CampaignTouchStatus
+    channel: str
+    sent_at: datetime | None
+    notes: str | None
+    created_at: datetime
+
+
+class CampaignTouchPatch(BaseModel):
+    status: CampaignTouchStatus | None = None
+    sent_at: datetime | None = None
+    notes: str | None = None

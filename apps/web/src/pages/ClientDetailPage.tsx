@@ -51,6 +51,45 @@ const VEHICLE_PRIMARY_USE_OPTIONS = [
   { value: 'other' },
 ] as const
 
+const EMPLOYMENT_TYPE_OPTIONS = [
+  { value: 'CLT' },
+  { value: 'self_employed' },
+  { value: 'business_owner' },
+  { value: 'public_servant' },
+  { value: 'liberal_professional' },
+  { value: 'other' },
+] as const
+
+const HEALTH_PLAN_TYPE_OPTIONS = [
+  { value: 'individual' },
+  { value: 'family' },
+  { value: 'corporate' },
+  { value: 'other' },
+] as const
+
+const CONTACT_CHANNEL_OPTIONS = [
+  { value: 'phone' },
+  { value: 'whatsapp' },
+  { value: 'email' },
+  { value: 'in_person' },
+  { value: 'other' },
+] as const
+
+const VET_USAGE_OPTIONS = [
+  { value: 'rarely' },
+  { value: 'yearly_checkups' },
+  { value: 'frequent' },
+  { value: 'other' },
+] as const
+
+function profileStr(v: unknown): string {
+  return typeof v === 'string' ? v : ''
+}
+
+function profileIntStr(v: unknown): string {
+  return typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
+}
+
 type LineOfBusinessDto = {
   id: string
   code: string
@@ -106,6 +145,34 @@ type AuditEventDto = {
   actor_user_id: string
 }
 
+type AdequacyDto = {
+  traffic_light: string
+  summary: string
+  reasons: string[]
+  needs_human_review: boolean
+  profile_completeness_score: number
+  profile_alert_codes: string[]
+}
+
+type RecItemDto = {
+  product_id: string
+  product_name: string
+  product_category: string
+  priority: number
+  rule_ids: string[]
+  rationale: string
+  protection_gaps: string
+  predictable_objections: string
+  next_best_action: string
+}
+
+type RecommendationRunDto = {
+  id: string
+  items: RecItemDto[]
+  rule_trace: { rule_id: string; fired: boolean; detail: string }[]
+  created_at: string
+}
+
 type ClientDetail = {
   id: string
   full_name: string
@@ -117,6 +184,8 @@ type ClientDetail = {
   client_kind: string
   company_legal_name: string | null
   company_tax_id: string | null
+  marketing_opt_in: boolean
+  preferred_marketing_channel: string | null
   lines_of_business: LobLinkDto[]
   held_products: HeldDto[]
   insured_persons: InsuredDto[]
@@ -159,6 +228,37 @@ export function ClientDetailPage() {
   const [propertyType, setPropertyType] = useState('')
   const [ownsVehicle, setOwnsVehicle] = useState('')
   const [vehicleUse, setVehicleUse] = useState('')
+  const [profProfession, setProfProfession] = useState('')
+  const [profEmployment, setProfEmployment] = useState('')
+  const [profIncomeBand, setProfIncomeBand] = useState('')
+  const [profIncomeStability, setProfIncomeStability] = useState('')
+  const [profWealthBand, setProfWealthBand] = useState('')
+  const [profHasStake, setProfHasStake] = useState('')
+  const [hlthHasPlan, setHlthHasPlan] = useState('')
+  const [hlthPlanType, setHlthPlanType] = useState('')
+  const [hlthLives, setHlthLives] = useState('')
+  const [hlthDependentsAge, setHlthDependentsAge] = useState('')
+  const [hlthSatisfaction, setHlthSatisfaction] = useState('')
+  const [hlthInterest, setHlthInterest] = useState('')
+  const [busOwns, setBusOwns] = useState('')
+  const [busSegment, setBusSegment] = useState('')
+  const [busRevenueBand, setBusRevenueBand] = useState('')
+  const [busEmployees, setBusEmployees] = useState('')
+  const [busBids, setBusBids] = useState('')
+  const [busGuarantee, setBusGuarantee] = useState('')
+  const [busBond, setBusBond] = useState('')
+  const [petHas, setPetHas] = useState('')
+  const [petSpecies, setPetSpecies] = useState('')
+  const [petBreed, setPetBreed] = useState('')
+  const [petAge, setPetAge] = useState('')
+  const [petCount, setPetCount] = useState('')
+  const [petVetFreq, setPetVetFreq] = useState('')
+  const [behChannel, setBehChannel] = useState('')
+  const [behTime, setBehTime] = useState('')
+  const [behTeam, setBehTeam] = useState('')
+  const [behDates, setBehDates] = useState('')
+  const [behComm, setBehComm] = useState('')
+  const [behLifeEvents, setBehLifeEvents] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [interactions, setInteractions] = useState<InteractionDto[]>([])
   const [clientOpportunities, setClientOpportunities] = useState<ClientOppRow[]>([])
@@ -177,6 +277,11 @@ export function ClientDetailPage() {
   const [insuredRelation, setInsuredRelation] = useState('HOLDER')
   const [insuredNotes, setInsuredNotes] = useState('')
   const [addingInsured, setAddingInsured] = useState(false)
+  const [crmMarketingOptIn, setCrmMarketingOptIn] = useState('yes')
+  const [crmMarketingChannel, setCrmMarketingChannel] = useState('')
+  const [adequacy, setAdequacy] = useState<AdequacyDto | null>(null)
+  const [recommendationRuns, setRecommendationRuns] = useState<RecommendationRunDto[]>([])
+  const [runRecLoading, setRunRecLoading] = useState(false)
 
   const loadAll = useCallback(async () => {
     if (!clientId) {
@@ -185,15 +290,22 @@ export function ClientDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [d, catalog, plist, ixList, oppList, users, audits] = await Promise.all([
-        apiFetch<ClientDetail>(`/v1/clients/${clientId}`),
-        apiFetch<LineOfBusinessDto[]>('/v1/lines-of-business'),
-        apiFetch<ProductBrief[]>('/v1/products'),
-        apiFetch<InteractionDto[]>(`/v1/interactions?client_id=${clientId}&limit=100`),
-        apiFetch<ClientOppRow[]>(`/v1/opportunities?client_id=${clientId}&limit=50`),
-        apiFetch<UserBrief[]>('/v1/org/users'),
-        apiFetch<AuditEventDto[]>(`/v1/clients/${clientId}/audit-events?limit=100`),
-      ])
+      const [d, catalog, plist, ixList, oppList, users, audits, adeq, recRuns] =
+        await Promise.all([
+          apiFetch<ClientDetail>(`/v1/clients/${clientId}`),
+          apiFetch<LineOfBusinessDto[]>('/v1/lines-of-business'),
+          apiFetch<ProductBrief[]>('/v1/products'),
+          apiFetch<InteractionDto[]>(`/v1/interactions?client_id=${clientId}&limit=100`),
+          apiFetch<ClientOppRow[]>(`/v1/opportunities?client_id=${clientId}&limit=50`),
+          apiFetch<UserBrief[]>('/v1/org/users'),
+          apiFetch<AuditEventDto[]>(`/v1/clients/${clientId}/audit-events?limit=100`),
+          apiFetch<AdequacyDto>(`/v1/clients/${clientId}/adequacy`),
+          apiFetch<RecommendationRunDto[]>(
+            `/v1/clients/${clientId}/recommendation-runs?limit=5`,
+          ),
+        ])
+      setAdequacy(adeq)
+      setRecommendationRuns(recRuns)
       setInteractions(ixList)
       setClientOpportunities(oppList)
       setDetail(d)
@@ -203,6 +315,8 @@ export function ClientDetailPage() {
       setCrmKind(d.client_kind)
       setCrmLegal(d.company_legal_name ?? '')
       setCrmTax(d.company_tax_id ?? '')
+      setCrmMarketingOptIn(d.marketing_opt_in ? 'yes' : 'no')
+      setCrmMarketingChannel(d.preferred_marketing_channel ?? '')
       const per = d.profile.personal as Record<string, unknown> | null | undefined
       const res = d.profile.residence as Record<string, unknown> | null | undefined
       const mob = d.profile.mobility as Record<string, unknown> | null | undefined
@@ -226,6 +340,84 @@ export function ClientDetailPage() {
         setOwnsVehicle('')
       }
       setVehicleUse(typeof mob?.vehicle_primary_use === 'string' ? mob.vehicle_primary_use : '')
+      const pro = d.profile.professional as Record<string, unknown> | null | undefined
+      setProfProfession(profileStr(pro?.profession))
+      setProfEmployment(profileStr(pro?.employment_type))
+      setProfIncomeBand(profileStr(pro?.approximate_income_band))
+      setProfIncomeStability(profileStr(pro?.income_stability))
+      setProfWealthBand(profileStr(pro?.wealth_band))
+      if (pro?.has_company_stake === true) {
+        setProfHasStake('yes')
+      } else if (pro?.has_company_stake === false) {
+        setProfHasStake('no')
+      } else {
+        setProfHasStake('')
+      }
+      const hlth = d.profile.health as Record<string, unknown> | null | undefined
+      if (hlth?.has_health_plan === true) {
+        setHlthHasPlan('yes')
+      } else if (hlth?.has_health_plan === false) {
+        setHlthHasPlan('no')
+      } else {
+        setHlthHasPlan('')
+      }
+      setHlthPlanType(profileStr(hlth?.health_plan_type))
+      setHlthLives(profileIntStr(hlth?.health_lives_count))
+      setHlthDependentsAge(profileStr(hlth?.dependents_age_band))
+      setHlthSatisfaction(profileStr(hlth?.health_plan_satisfaction))
+      setHlthInterest(profileStr(hlth?.health_plan_interest))
+      const bus = d.profile.business as Record<string, unknown> | null | undefined
+      if (bus?.owns_business === true) {
+        setBusOwns('yes')
+      } else if (bus?.owns_business === false) {
+        setBusOwns('no')
+      } else {
+        setBusOwns('')
+      }
+      setBusSegment(profileStr(bus?.business_segment))
+      setBusRevenueBand(profileStr(bus?.estimated_revenue_band))
+      setBusEmployees(profileIntStr(bus?.employee_count))
+      if (bus?.participates_bids === true) {
+        setBusBids('yes')
+      } else if (bus?.participates_bids === false) {
+        setBusBids('no')
+      } else {
+        setBusBids('')
+      }
+      if (bus?.contracts_require_guarantee === true) {
+        setBusGuarantee('yes')
+      } else if (bus?.contracts_require_guarantee === false) {
+        setBusGuarantee('no')
+      } else {
+        setBusGuarantee('')
+      }
+      if (bus?.needs_performance_bond === true) {
+        setBusBond('yes')
+      } else if (bus?.needs_performance_bond === false) {
+        setBusBond('no')
+      } else {
+        setBusBond('')
+      }
+      const pet = d.profile.pet as Record<string, unknown> | null | undefined
+      if (pet?.has_pet === true) {
+        setPetHas('yes')
+      } else if (pet?.has_pet === false) {
+        setPetHas('no')
+      } else {
+        setPetHas('')
+      }
+      setPetSpecies(profileStr(pet?.pet_species))
+      setPetBreed(profileStr(pet?.pet_breed))
+      setPetAge(profileStr(pet?.pet_age))
+      setPetCount(profileIntStr(pet?.pet_count))
+      setPetVetFreq(profileStr(pet?.vet_usage_frequency))
+      const beh = d.profile.behavior as Record<string, unknown> | null | undefined
+      setBehChannel(profileStr(beh?.preferred_contact_channel))
+      setBehTime(profileStr(beh?.preferred_contact_time))
+      setBehTeam(profileStr(beh?.football_team))
+      setBehDates(profileStr(beh?.relevant_dates_note))
+      setBehComm(profileStr(beh?.communication_preferences))
+      setBehLifeEvents(profileStr(beh?.life_events_note))
       setLobs(catalog)
       setProducts(plist)
     } catch (e) {
@@ -325,6 +517,134 @@ export function ClientDetailPage() {
       if (vehicleUse.trim()) {
         mobility.vehicle_primary_use = vehicleUse.trim()
       }
+      const professional: Record<string, unknown> = {}
+      if (profProfession.trim()) {
+        professional.profession = profProfession.trim()
+      }
+      if (profEmployment.trim()) {
+        professional.employment_type = profEmployment.trim()
+      }
+      if (profIncomeBand.trim()) {
+        professional.approximate_income_band = profIncomeBand.trim()
+      }
+      if (profIncomeStability.trim()) {
+        professional.income_stability = profIncomeStability.trim()
+      }
+      if (profWealthBand.trim()) {
+        professional.wealth_band = profWealthBand.trim()
+      }
+      if (profHasStake === 'yes') {
+        professional.has_company_stake = true
+      }
+      if (profHasStake === 'no') {
+        professional.has_company_stake = false
+      }
+      const health: Record<string, unknown> = {}
+      if (hlthHasPlan === 'yes') {
+        health.has_health_plan = true
+      }
+      if (hlthHasPlan === 'no') {
+        health.has_health_plan = false
+      }
+      if (hlthPlanType.trim()) {
+        health.health_plan_type = hlthPlanType.trim()
+      }
+      if (hlthLives.trim() !== '') {
+        const n = parseInt(hlthLives, 10)
+        if (!Number.isNaN(n)) {
+          health.health_lives_count = n
+        }
+      }
+      if (hlthDependentsAge.trim()) {
+        health.dependents_age_band = hlthDependentsAge.trim()
+      }
+      if (hlthSatisfaction.trim()) {
+        health.health_plan_satisfaction = hlthSatisfaction.trim()
+      }
+      if (hlthInterest.trim()) {
+        health.health_plan_interest = hlthInterest.trim()
+      }
+      const business: Record<string, unknown> = {}
+      if (busOwns === 'yes') {
+        business.owns_business = true
+      }
+      if (busOwns === 'no') {
+        business.owns_business = false
+      }
+      if (busSegment.trim()) {
+        business.business_segment = busSegment.trim()
+      }
+      if (busRevenueBand.trim()) {
+        business.estimated_revenue_band = busRevenueBand.trim()
+      }
+      if (busEmployees.trim() !== '') {
+        const n = parseInt(busEmployees, 10)
+        if (!Number.isNaN(n)) {
+          business.employee_count = n
+        }
+      }
+      if (busBids === 'yes') {
+        business.participates_bids = true
+      }
+      if (busBids === 'no') {
+        business.participates_bids = false
+      }
+      if (busGuarantee === 'yes') {
+        business.contracts_require_guarantee = true
+      }
+      if (busGuarantee === 'no') {
+        business.contracts_require_guarantee = false
+      }
+      if (busBond === 'yes') {
+        business.needs_performance_bond = true
+      }
+      if (busBond === 'no') {
+        business.needs_performance_bond = false
+      }
+      const petBlock: Record<string, unknown> = {}
+      if (petHas === 'yes') {
+        petBlock.has_pet = true
+      }
+      if (petHas === 'no') {
+        petBlock.has_pet = false
+      }
+      if (petSpecies.trim()) {
+        petBlock.pet_species = petSpecies.trim()
+      }
+      if (petBreed.trim()) {
+        petBlock.pet_breed = petBreed.trim()
+      }
+      if (petAge.trim()) {
+        petBlock.pet_age = petAge.trim()
+      }
+      if (petCount.trim() !== '') {
+        const n = parseInt(petCount, 10)
+        if (!Number.isNaN(n)) {
+          petBlock.pet_count = n
+        }
+      }
+      if (petVetFreq.trim()) {
+        petBlock.vet_usage_frequency = petVetFreq.trim()
+      }
+      const behavior: Record<string, unknown> = {}
+      if (behChannel.trim()) {
+        behavior.preferred_contact_channel = behChannel.trim()
+      }
+      if (behTime.trim()) {
+        behavior.preferred_contact_time = behTime.trim()
+      }
+      if (behTeam.trim()) {
+        behavior.football_team = behTeam.trim()
+      }
+      if (behDates.trim()) {
+        behavior.relevant_dates_note = behDates.trim()
+      }
+      if (behComm.trim()) {
+        behavior.communication_preferences = behComm.trim()
+      }
+      if (behLifeEvents.trim()) {
+        behavior.life_events_note = behLifeEvents.trim()
+      }
       const json: Record<string, Record<string, unknown>> = {}
       if (Object.keys(personal).length > 0) {
         json.personal = personal
@@ -334,6 +654,21 @@ export function ClientDetailPage() {
       }
       if (Object.keys(mobility).length > 0) {
         json.mobility = mobility
+      }
+      if (Object.keys(professional).length > 0) {
+        json.professional = professional
+      }
+      if (Object.keys(health).length > 0) {
+        json.health = health
+      }
+      if (Object.keys(business).length > 0) {
+        json.business = business
+      }
+      if (Object.keys(petBlock).length > 0) {
+        json.pet = petBlock
+      }
+      if (Object.keys(behavior).length > 0) {
+        json.behavior = behavior
       }
       await apiFetch(`/v1/clients/${clientId}/profile`, {
         method: 'PATCH',
@@ -362,6 +697,8 @@ export function ClientDetailPage() {
           client_kind: crmKind,
           company_legal_name: crmKind === 'COMPANY' ? crmLegal.trim() || null : null,
           company_tax_id: crmKind === 'COMPANY' ? crmTax.trim() || null : null,
+          marketing_opt_in: crmMarketingOptIn === 'yes',
+          preferred_marketing_channel: crmMarketingChannel.trim() || null,
         },
       })
       await loadAll()
@@ -411,6 +748,27 @@ export function ClientDetailPage() {
       await loadAll()
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    }
+  }
+
+  const onRunRecommendation = async () => {
+    if (!clientId) {
+      return
+    }
+    setRunRecLoading(true)
+    setError(null)
+    try {
+      const run = await apiFetch<RecommendationRunDto>(`/v1/clients/${clientId}/recommendation-runs`, {
+        method: 'POST',
+        json: {},
+      })
+      setRecommendationRuns((prev) => [run, ...prev])
+      const ad = await apiFetch<AdequacyDto>(`/v1/clients/${clientId}/adequacy`)
+      setAdequacy(ad)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setRunRecLoading(false)
     }
   }
 
@@ -520,12 +878,136 @@ export function ClientDetailPage() {
                     </div>
                   </>
                 ) : null}
+                <div className="grid gap-2">
+                  <Label htmlFor="crm-mkt-opt">{t('crm.core.marketingOptIn')}</Label>
+                  <select
+                    id="crm-mkt-opt"
+                    className={PROFILE_SELECT_CLASS}
+                    value={crmMarketingOptIn}
+                    onChange={(ev) => setCrmMarketingOptIn(ev.target.value)}
+                  >
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="crm-mkt-ch">{t('crm.core.marketingChannel')}</Label>
+                  <Input
+                    id="crm-mkt-ch"
+                    value={crmMarketingChannel}
+                    onChange={(ev) => setCrmMarketingChannel(ev.target.value)}
+                  />
+                </div>
                 <div className="sm:col-span-2">
                   <Button type="submit" disabled={savingCrm}>
                     {savingCrm ? t('crm.core.saving') : t('crm.core.save')}
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('crm.intel.title')}</CardTitle>
+              <p className="text-muted-foreground text-sm">{t('crm.intel.subtitle')}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {adequacy ? (
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">{t('crm.intel.traffic')}: </span>
+                    <span
+                      className={
+                        adequacy.traffic_light === 'RED'
+                          ? 'font-semibold text-red-600'
+                          : adequacy.traffic_light === 'YELLOW'
+                            ? 'font-semibold text-amber-600'
+                            : 'font-semibold text-emerald-600'
+                      }
+                    >
+                      {adequacy.traffic_light}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">{t('crm.intel.summary')}: </span>
+                    {adequacy.summary}
+                  </p>
+                  {adequacy.reasons.length > 0 ? (
+                    <div>
+                      <p className="text-muted-foreground mb-1">{t('crm.intel.reasons')}</p>
+                      <ul className="list-inside list-disc text-xs">
+                        {adequacy.reasons.map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <Button
+                type="button"
+                disabled={runRecLoading || !clientId}
+                onClick={() => void onRunRecommendation()}
+              >
+                {runRecLoading ? t('crm.intel.running') : t('crm.intel.runRecommendation')}
+              </Button>
+              {recommendationRuns.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-sm">{t('crm.intel.recentRuns')}</p>
+                  {recommendationRuns.map((run) => (
+                    <div key={run.id} className="bg-muted/40 rounded-md border p-3 text-xs">
+                      <p className="text-muted-foreground mb-2">
+                        {new Date(run.created_at).toLocaleString()} · {run.id.slice(0, 8)}…
+                      </p>
+                      {run.items.length === 0 ? (
+                        <p>{t('crm.intel.noItems')}</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {run.items.map((it) => (
+                            <li key={`${run.id}-${it.product_id}`} className="border-t pt-2 first:border-0 first:pt-0">
+                              <span className="font-medium">{it.product_name}</span>
+                              <span className="text-muted-foreground ml-2">
+                                ({it.product_category}) · {t('crm.intel.itemPriority')}:{' '}
+                                {it.priority}
+                              </span>
+                              <p className="mt-1">{it.rationale}</p>
+                              {it.rule_ids.length > 0 ? (
+                                <p className="text-muted-foreground mt-1 text-[11px]">
+                                  <span className="font-medium text-foreground">
+                                    {t('crm.intel.rulesMatched')}:{' '}
+                                  </span>
+                                  {it.rule_ids.join(', ')}
+                                </p>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {run.rule_trace.length > 0 ? (
+                        <details className="mt-2 border-t pt-2">
+                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                            {t('crm.intel.ruleTraceTitle')}
+                          </summary>
+                          <ul className="mt-2 space-y-1 font-mono text-[11px]">
+                            {run.rule_trace.map((tr) => (
+                              <li key={`${run.id}-${tr.rule_id}`}>
+                                <span className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}>
+                                  {tr.rule_id}{' '}
+                                  {tr.fired
+                                    ? `(${t('crm.intel.ruleTraceFired')})`
+                                    : `(${t('crm.intel.ruleTraceNotFired')})`}
+                                </span>
+                                <span className="text-muted-foreground"> — {tr.detail}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -755,6 +1237,377 @@ export function ClientDetailPage() {
                     ))}
                   </select>
                 </div>
+
+                <div className="grid gap-2 sm:col-span-2">
+                  <p className="text-muted-foreground border-border mt-2 border-t pt-4 text-sm font-medium">
+                    {t('crm.profile.sectionB')}
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-prof">{t('crm.profile.profession')}</Label>
+                  <Input
+                    id="pf-prof"
+                    value={profProfession}
+                    onChange={(ev) => setProfProfession(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-emp">{t('crm.profile.employmentType')}</Label>
+                  <select
+                    id="pf-emp"
+                    className={PROFILE_SELECT_CLASS}
+                    value={profEmployment}
+                    onChange={(ev) => setProfEmployment(ev.target.value)}
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {profEmployment &&
+                    !EMPLOYMENT_TYPE_OPTIONS.some((o) => o.value === profEmployment) ? (
+                      <option value={profEmployment}>{profEmployment}</option>
+                    ) : null}
+                    {EMPLOYMENT_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.employmentTypeOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-inc">{t('crm.profile.incomeBand')}</Label>
+                  <Input
+                    id="pf-inc"
+                    value={profIncomeBand}
+                    onChange={(ev) => setProfIncomeBand(ev.target.value)}
+                    placeholder={t('crm.profile.incomeBandHint')}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-stab">{t('crm.profile.incomeStability')}</Label>
+                  <Input
+                    id="pf-stab"
+                    value={profIncomeStability}
+                    onChange={(ev) => setProfIncomeStability(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-wealth">{t('crm.profile.wealthBand')}</Label>
+                  <Input
+                    id="pf-wealth"
+                    value={profWealthBand}
+                    onChange={(ev) => setProfWealthBand(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-stake">{t('crm.profile.hasCompanyStake')}</Label>
+                  <select
+                    id="pf-stake"
+                    className={PROFILE_SELECT_CLASS}
+                    value={profHasStake}
+                    onChange={(ev) => setProfHasStake(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-2 sm:col-span-2">
+                  <p className="text-muted-foreground border-border mt-2 border-t pt-4 text-sm font-medium">
+                    {t('crm.profile.sectionE')}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-hlth-plan">{t('crm.profile.hasHealthPlan')}</Label>
+                  <select
+                    id="pf-hlth-plan"
+                    className={PROFILE_SELECT_CLASS}
+                    value={hlthHasPlan}
+                    onChange={(ev) => setHlthHasPlan(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-hlth-type">{t('crm.profile.healthPlanType')}</Label>
+                  <select
+                    id="pf-hlth-type"
+                    className={PROFILE_SELECT_CLASS}
+                    value={hlthPlanType}
+                    onChange={(ev) => setHlthPlanType(ev.target.value)}
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {hlthPlanType &&
+                    !HEALTH_PLAN_TYPE_OPTIONS.some((o) => o.value === hlthPlanType) ? (
+                      <option value={hlthPlanType}>{hlthPlanType}</option>
+                    ) : null}
+                    {HEALTH_PLAN_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.healthPlanTypeOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-hlth-lives">{t('crm.profile.healthLivesCount')}</Label>
+                  <Input
+                    id="pf-hlth-lives"
+                    type="number"
+                    min={0}
+                    value={hlthLives}
+                    onChange={(ev) => setHlthLives(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-hlth-age">{t('crm.profile.dependentsAgeBand')}</Label>
+                  <Input
+                    id="pf-hlth-age"
+                    value={hlthDependentsAge}
+                    onChange={(ev) => setHlthDependentsAge(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-hlth-sat">{t('crm.profile.healthSatisfaction')}</Label>
+                  <Input
+                    id="pf-hlth-sat"
+                    value={hlthSatisfaction}
+                    onChange={(ev) => setHlthSatisfaction(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-hlth-int">{t('crm.profile.healthInterest')}</Label>
+                  <Input
+                    id="pf-hlth-int"
+                    value={hlthInterest}
+                    onChange={(ev) => setHlthInterest(ev.target.value)}
+                  />
+                </div>
+
+                <div className="grid gap-2 sm:col-span-2">
+                  <p className="text-muted-foreground border-border mt-2 border-t pt-4 text-sm font-medium">
+                    {t('crm.profile.sectionF')}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-bus-own">{t('crm.profile.ownsBusiness')}</Label>
+                  <select
+                    id="pf-bus-own"
+                    className={PROFILE_SELECT_CLASS}
+                    value={busOwns}
+                    onChange={(ev) => setBusOwns(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-bus-seg">{t('crm.profile.businessSegment')}</Label>
+                  <Input
+                    id="pf-bus-seg"
+                    value={busSegment}
+                    onChange={(ev) => setBusSegment(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-bus-rev">{t('crm.profile.revenueBand')}</Label>
+                  <Input
+                    id="pf-bus-rev"
+                    value={busRevenueBand}
+                    onChange={(ev) => setBusRevenueBand(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-bus-emp">{t('crm.profile.employeeCount')}</Label>
+                  <Input
+                    id="pf-bus-emp"
+                    type="number"
+                    min={0}
+                    value={busEmployees}
+                    onChange={(ev) => setBusEmployees(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-bus-bids">{t('crm.profile.participatesBids')}</Label>
+                  <select
+                    id="pf-bus-bids"
+                    className={PROFILE_SELECT_CLASS}
+                    value={busBids}
+                    onChange={(ev) => setBusBids(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-bus-guar">{t('crm.profile.contractsGuarantee')}</Label>
+                  <select
+                    id="pf-bus-guar"
+                    className={PROFILE_SELECT_CLASS}
+                    value={busGuarantee}
+                    onChange={(ev) => setBusGuarantee(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-bus-bond">{t('crm.profile.needsPerformanceBond')}</Label>
+                  <select
+                    id="pf-bus-bond"
+                    className={PROFILE_SELECT_CLASS}
+                    value={busBond}
+                    onChange={(ev) => setBusBond(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-2 sm:col-span-2">
+                  <p className="text-muted-foreground border-border mt-2 border-t pt-4 text-sm font-medium">
+                    {t('crm.profile.sectionG')}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-pet-has">{t('crm.profile.hasPet')}</Label>
+                  <select
+                    id="pf-pet-has"
+                    className={PROFILE_SELECT_CLASS}
+                    value={petHas}
+                    onChange={(ev) => setPetHas(ev.target.value)}
+                  >
+                    <option value="">—</option>
+                    <option value="yes">{t('crm.profile.yes')}</option>
+                    <option value="no">{t('crm.profile.no')}</option>
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-pet-spec">{t('crm.profile.petSpecies')}</Label>
+                  <Input
+                    id="pf-pet-spec"
+                    value={petSpecies}
+                    onChange={(ev) => setPetSpecies(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-pet-breed">{t('crm.profile.petBreed')}</Label>
+                  <Input
+                    id="pf-pet-breed"
+                    value={petBreed}
+                    onChange={(ev) => setPetBreed(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-pet-age">{t('crm.profile.petAge')}</Label>
+                  <Input
+                    id="pf-pet-age"
+                    value={petAge}
+                    onChange={(ev) => setPetAge(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-pet-count">{t('crm.profile.petCount')}</Label>
+                  <Input
+                    id="pf-pet-count"
+                    type="number"
+                    min={0}
+                    value={petCount}
+                    onChange={(ev) => setPetCount(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-pet-vet">{t('crm.profile.vetUsage')}</Label>
+                  <select
+                    id="pf-pet-vet"
+                    className={PROFILE_SELECT_CLASS}
+                    value={petVetFreq}
+                    onChange={(ev) => setPetVetFreq(ev.target.value)}
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {petVetFreq && !VET_USAGE_OPTIONS.some((o) => o.value === petVetFreq) ? (
+                      <option value={petVetFreq}>{petVetFreq}</option>
+                    ) : null}
+                    {VET_USAGE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.vetUsageOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-2 sm:col-span-2">
+                  <p className="text-muted-foreground border-border mt-2 border-t pt-4 text-sm font-medium">
+                    {t('crm.profile.sectionH')}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-beh-ch">{t('crm.profile.preferredChannel')}</Label>
+                  <select
+                    id="pf-beh-ch"
+                    className={PROFILE_SELECT_CLASS}
+                    value={behChannel}
+                    onChange={(ev) => setBehChannel(ev.target.value)}
+                  >
+                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
+                    {behChannel && !CONTACT_CHANNEL_OPTIONS.some((o) => o.value === behChannel) ? (
+                      <option value={behChannel}>{behChannel}</option>
+                    ) : null}
+                    {CONTACT_CHANNEL_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {t(`crm.profile.contactChannelOption.${o.value}`)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-beh-time">{t('crm.profile.preferredTime')}</Label>
+                  <Input
+                    id="pf-beh-time"
+                    value={behTime}
+                    onChange={(ev) => setBehTime(ev.target.value)}
+                    placeholder={t('crm.profile.preferredTimeHint')}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-beh-team">{t('crm.profile.footballTeam')}</Label>
+                  <Input
+                    id="pf-beh-team"
+                    value={behTeam}
+                    onChange={(ev) => setBehTeam(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-beh-dates">{t('crm.profile.relevantDates')}</Label>
+                  <textarea
+                    id="pf-beh-dates"
+                    className="border-input bg-background min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+                    value={behDates}
+                    onChange={(ev) => setBehDates(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-beh-comm">{t('crm.profile.communicationPrefs')}</Label>
+                  <textarea
+                    id="pf-beh-comm"
+                    className="border-input bg-background min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+                    value={behComm}
+                    onChange={(ev) => setBehComm(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="pf-beh-life">{t('crm.profile.lifeEvents')}</Label>
+                  <textarea
+                    id="pf-beh-life"
+                    className="border-input bg-background min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+                    value={behLifeEvents}
+                    onChange={(ev) => setBehLifeEvents(ev.target.value)}
+                  />
+                </div>
+
                 <div className="sm:col-span-2">
                   <Button type="submit" disabled={savingProfile}>
                     {savingProfile ? t('crm.profile.saving') : t('crm.profile.save')}

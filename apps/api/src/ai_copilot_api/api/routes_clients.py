@@ -22,6 +22,7 @@ from ai_copilot_api.db.models import (
     User,
 )
 from ai_copilot_api.db.session import get_db
+from ai_copilot_api.domain.adequacy_rules import evaluate_adequacy
 from ai_copilot_api.domain.client_profile import (
     completeness_score,
     merge_profile_dict,
@@ -35,6 +36,7 @@ from ai_copilot_api.domain.crm_audit import (
 )
 from ai_copilot_api.schemas.client_profile import ClientInsuranceProfile, ClientProfileOut
 from ai_copilot_api.schemas.crm import (
+    ClientAdequacyReviewBrief,
     ClientCreate,
     ClientDetailOut,
     ClientHeldProductCreate,
@@ -64,6 +66,8 @@ _CLIENT_AUDIT_KEYS = (
     "client_kind",
     "company_legal_name",
     "company_tax_id",
+    "marketing_opt_in",
+    "preferred_marketing_channel",
 )
 
 
@@ -78,6 +82,8 @@ def _client_audit_dict(row: Client) -> dict:
         "client_kind": row.client_kind.value,
         "company_legal_name": row.company_legal_name,
         "company_tax_id": row.company_tax_id,
+        "marketing_opt_in": row.marketing_opt_in,
+        "preferred_marketing_channel": row.preferred_marketing_channel,
     }
 
 
@@ -172,6 +178,42 @@ def list_clients(
     return [ClientOut.model_validate(r) for r in rows]
 
 
+@router.get("/adequacy-review-queue", response_model=list[ClientAdequacyReviewBrief])
+def list_adequacy_review_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
+) -> list[ClientAdequacyReviewBrief]:
+    """Clients with non-GREEN adequacy (§5.8 review queue) — MVP scan."""
+    stmt = (
+        select(Client)
+        .options(
+            selectinload(Client.held_products).selectinload(ClientHeldProduct.product),
+        )
+        .where(Client.organization_id == current_user.organization_id)
+        .order_by(Client.updated_at.desc())
+        .limit(limit * 4)
+    )
+    rows = db.scalars(stmt).unique().all()
+    out: list[ClientAdequacyReviewBrief] = []
+    for row in rows:
+        ad = evaluate_adequacy(row)
+        if not ad.needs_human_review:
+            continue
+        out.append(
+            ClientAdequacyReviewBrief(
+                client_id=row.id,
+                full_name=row.full_name,
+                traffic_light=ad.traffic_light,
+                summary=ad.summary,
+                needs_human_review=ad.needs_human_review,
+            ),
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
 @router.post("", response_model=ClientOut, status_code=status.HTTP_201_CREATED)
 def create_client(
     body: ClientCreate,
@@ -192,6 +234,8 @@ def create_client(
         client_kind=body.client_kind,
         company_legal_name=body.company_legal_name,
         company_tax_id=body.company_tax_id,
+        marketing_opt_in=body.marketing_opt_in,
+        preferred_marketing_channel=body.preferred_marketing_channel,
     )
     db.add(row)
     try:

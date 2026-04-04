@@ -9,6 +9,7 @@
 | [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md) | Locked MVP technical decisions |
 | [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) | Phased engineering tasks and exit criteria |
 | [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) | Maps insurance brokerage strategic brief (modules, accelerator vs build) to repo status and phases |
+| [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md) | Pre–Phase 6 delivery: PRODUCT §5.6–§5.9 (catalog, recommendations, semáforo, campanhas) |
 
 This roadmap describes **product and technical progression** from the first shippable MVP through a **full commercial intelligence platform**, including how **client lines of business** and **held products** must flow from every CRM ingress path.
 
@@ -18,7 +19,7 @@ This roadmap describes **product and technical progression** from the first ship
 
 Regardless of how data enters the platform, the system must converge on a **canonical view** of:
 
-1. **Lines of business (LOB)** the client participates in — e.g. motor, life, health, pension (normalized codes aligned to the brokerage’s taxonomy).
+1. **Lines of business (LOB)** the client participates in — e.g. motor, life, health (normalized codes aligned to the brokerage’s taxonomy).
 2. **Products the client holds** — policies or financial products already placed: link to internal `Product` catalog where possible, plus insurer, status (active/lapsed/cancelled), effective/expiry dates, and optional premium or sum assured (as available).
 
 **Ingress paths (full vision):**
@@ -76,7 +77,7 @@ MVP (design partner)  →  Growth  →  Platform scale  →  Full intelligent pr
 | Foundation | Python API, React + shadcn, PostgreSQL, local/S3 storage, auth, org scope | **Done** (Phases 0–1; see [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md)) |
 | CRM core | `Client`, `Opportunity`, pipeline UI | **Done** (Phase 2; see [`PHASE-2-CRM.md`](./PHASE-2-CRM.md)) |
 | **Portfolio** | `LineOfBusiness`, `ClientLineOfBusiness`, `ClientHeldProduct`; CRUD in UI; **`ingestion_source`** | **Done** (Phase 2) |
-| **Enriched profile** | Insurance-oriented client attributes (blocks), completeness, alerts ([`PRODUCT.md`](./PRODUCT.md) §5.3) | **Done** ([`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md); [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) **Phase 3**) |
+| **Enriched profile** | Insurance-oriented client attributes (blocks), completeness, alerts ([`PRODUCT.md`](./PRODUCT.md) §5.3) | **Partial** — API + schema A–H e score; UI só subconjunto; alertas e §5.3 funcional/governança incompletos ([`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)) |
 | **Interactions** | Timeline, types, agenda/day panel ([`PRODUCT.md`](./PRODUCT.md) §5.5) | **Done** ([`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md); **Phase 4**) |
 | Bulk ingest | **CSV + Excel** import for clients **including** LOB / held-product columns per template; upsert: `external_id` → email | Planned (**Phase 5**) |
 | Catalog & rules | `Product` + LOB **catalog CRUD**; **rule engine** uses client attributes **and** LOB / held products / profile | **Partial** — catalog in Phase 2; rules **Phase 6** |

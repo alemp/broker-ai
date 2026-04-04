@@ -11,6 +11,8 @@ def status_for_stage(
         return OpportunityStatus.WON
     if stage == OpportunityStage.CLOSED_LOST:
         return OpportunityStatus.LOST
+    if stage == OpportunityStage.POST_SALE:
+        return OpportunityStatus.WON
     if prior_status in (OpportunityStatus.WON, OpportunityStatus.LOST):
         return OpportunityStatus.OPEN
     return prior_status

@@ -315,3 +315,121 @@ def test_module52_org_users_leads_convert_insured_audit(client: TestClient) -> N
         headers=headers,
     )
     assert del_ins.status_code == 204
+
+
+def test_opportunity_product_54_rules_and_metrics(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = client.get("/v1/me", headers=headers)
+    assert me.status_code == 200
+    user_id = me.json()["user"]["id"]
+
+    products = client.get("/v1/products", headers=headers)
+    assert products.status_code == 200
+    product_id = products.json()[0]["id"]
+
+    create_client = client.post(
+        "/v1/clients",
+        headers=headers,
+        json={"full_name": "Opp S54", "email": f"s54-{uuid.uuid4().hex}@example.com"},
+    )
+    assert create_client.status_code == 201
+    client_id = create_client.json()["id"]
+
+    opp = client.post(
+        "/v1/opportunities",
+        headers=headers,
+        json={
+            "client_id": client_id,
+            "owner_id": user_id,
+            "product_id": product_id,
+            "stage": "LEAD",
+            "status": "OPEN",
+        },
+    )
+    assert opp.status_code == 201, opp.text
+    opp_id = opp.json()["id"]
+
+    no_action = client.patch(
+        f"/v1/opportunities/{opp_id}",
+        headers=headers,
+        json={"stage": "NEGOTIATION"},
+    )
+    assert no_action.status_code == 422
+
+    with_action = client.patch(
+        f"/v1/opportunities/{opp_id}",
+        headers=headers,
+        json={"stage": "NEGOTIATION", "next_action": "Rever proposta com o cliente"},
+    )
+    assert with_action.status_code == 200, with_action.text
+
+    lost_no_reason = client.post(
+        f"/v1/opportunities/{opp_id}/stage",
+        headers=headers,
+        json={"stage": "CLOSED_LOST"},
+    )
+    assert lost_no_reason.status_code == 422
+
+    lost_ok = client.post(
+        f"/v1/opportunities/{opp_id}/stage",
+        headers=headers,
+        json={"stage": "CLOSED_LOST", "loss_reason": "Preço acima do orçamento"},
+    )
+    assert lost_ok.status_code == 200, lost_ok.text
+    assert lost_ok.json()["loss_reason"] == "Preço acima do orçamento"
+
+    metrics = client.get("/v1/opportunities/metrics/summary", headers=headers)
+    assert metrics.status_code == 200, metrics.text
+    summary = metrics.json()
+    assert "by_stage" in summary and "CLOSED_LOST" in summary["by_stage"]
+    assert summary["open_total"] >= 0
+
+    opp_open = client.post(
+        "/v1/opportunities",
+        headers=headers,
+        json={
+            "client_id": client_id,
+            "owner_id": user_id,
+            "product_id": product_id,
+            "stage": "LEAD",
+            "status": "OPEN",
+        },
+    )
+    assert opp_open.status_code == 201
+    open_id = opp_open.json()["id"]
+    post_sale_early = client.post(
+        f"/v1/opportunities/{open_id}/stage",
+        headers=headers,
+        json={"stage": "POST_SALE"},
+    )
+    assert post_sale_early.status_code == 422
+
+    won = client.post(
+        f"/v1/opportunities/{open_id}/stage",
+        headers=headers,
+        json={"stage": "CLOSED_WON"},
+    )
+    assert won.status_code == 200
+    post_sale_ok = client.post(
+        f"/v1/opportunities/{open_id}/stage",
+        headers=headers,
+        json={"stage": "POST_SALE"},
+    )
+    assert post_sale_ok.status_code == 200
+    assert post_sale_ok.json()["stage"] == "POST_SALE"
+
+    deal_fields = client.patch(
+        f"/v1/opportunities/{open_id}",
+        headers=headers,
+        json={
+            "preferred_insurer_name": "ACME Seguros",
+            "expected_close_at": "2026-12-15T10:00:00+00:00",
+        },
+    )
+    assert deal_fields.status_code == 200, deal_fields.text
+    assert deal_fields.json()["preferred_insurer_name"] == "ACME Seguros"
+
+    mine = client.get(f"/v1/opportunities?owner_id={user_id}&status=OPEN", headers=headers)
+    assert mine.status_code == 200

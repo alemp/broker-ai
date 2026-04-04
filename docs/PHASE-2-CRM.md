@@ -9,9 +9,11 @@
 - `**Client**` — `organization_id`, optional `external_id` / `email` (partial unique indexes per org), `full_name`, contact fields, notes.
 - `**ClientLineOfBusiness**` — Client ↔ LOB with `**ingestion_source**` (e.g. `internal_crm`).
 - `**ClientHeldProduct**` — Optional FK to `**Product**`, insurer, policy dates/status, `**ingestion_source**`.
-- `**Opportunity**` — `client_id`, `owner_id` (user), optional `product_id`, value, probability, `**OpportunityStage**` / `**OpportunityStatus**`, source, `next_action`, timestamps.
+- `**Opportunity**` — `client_id`, `owner_id` (user), optional `product_id`, value, probability, `**OpportunityStage**` / `**OpportunityStatus**`, source, `next_action` / `next_action_due_at`, `preferred_insurer_name`, `expected_close_at`, `loss_reason`, timestamps.
 
-Enums match `docs/OPPORTUNITY.md` stages (`LEAD` … `CLOSED_LOST`) and open/won/lost status. `POST /v1/opportunities/{id}/stage` aligns **status** with terminal stages (e.g. `CLOSED_WON` → `WON`).
+Enums: stages `LEAD` … `CLOSED_LOST` plus `POST_SALE` (pós-venda após ganho). `POST /v1/opportunities/{id}/stage` aligns **status** with terminal stages (`CLOSED_WON` / `POST_SALE` → `WON`, `CLOSED_LOST` → `LOST`).
+
+**PRODUCT.md §5.4 (MVP nesta fase):** validação de próxima ação em `QUALIFIED`, `PROPOSAL_SENT`, `NEGOTIATION` com estado `OPEN`; `POST_SALE` só após `CLOSED_WON`+`WON`; fecho perdido exige `loss_reason`; `GET /v1/opportunities/metrics/summary` para contagens por estágio e por corretor (abertas); filtros `stage`, `status`, `owner_id` na listagem. Migração **`opp_product54_011`** adiciona colunas de negócio. Dashboards por produto / seguradora / região e ligação automática a apólices ficam para fases posteriores.
 
 ## API (`/v1`, Bearer JWT)
 
@@ -24,7 +26,7 @@ Enums match `docs/OPPORTUNITY.md` stages (`LEAD` … `CLOSED_LOST`) and open/won
 |               | `GET/POST /clients/{id}/held-products`, `PATCH/DELETE …/{held_id}`           |
 | LOB catalog   | `GET/POST/PATCH/DELETE /lines-of-business`                                   |
 | Products      | `GET/POST/PATCH/DELETE /products` (delete = soft `active=false`)             |
-| Opportunities | `GET/POST /clients`…, `GET/PATCH/DELETE /opportunities/{id}`, `POST …/stage` |
+| Opportunities | `GET/POST /opportunities`, `GET /opportunities/metrics/summary`, `GET/PATCH/DELETE /opportunities/{id}`, `POST …/stage` |
 
 
 All queries are scoped to `**current_user.organization_id`**.
@@ -33,13 +35,13 @@ All queries are scoped to `**current_user.organization_id`**.
 
 - **App shell** — Nav: Início, Clientes, Oportunidades; logout.
 - **Clientes** — List, create, detail with LOB + held-product sections (`internal_crm` on create).
-- **Oportunidades** — List, create (owner = current user), detail with stage buttons calling `POST …/stage`.
+- **Oportunidades** — Filtros (estágio, estado, minhas), resumo de métricas, vista lista ou kanban; detalhe com dados do negócio (seguradora, fecho previsto, próxima ação), motivo de perda ao fechar perdido, estágio `POST_SALE` após ganho.
 
 Copy uses `**common`** namespace (`pt`).
 
 ## Tests
 
-- `tests/test_crm.py` (requires `DATABASE_URL`): register → client → LOB link → held product → opportunity → stage to `CLOSED_WON` / `WON`.
+- `tests/test_crm.py` (requires `DATABASE_URL`): register → client → LOB link → held product → opportunity → stage to `CLOSED_WON` / `WON`; `test_opportunity_product_54_rules_and_metrics` cobre §5.4 (próxima ação, perda, pós-venda, métricas).
 
 ## References
 

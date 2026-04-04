@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-- Sequence work so **auth → CRM → enriched profile → interactions → import → catalog/rules → documents → extraction → batch insights → compliance** can ship incrementally.
+- Sequence work so **auth → CRM → enriched profile → interactions → catalog/rules → documents → import → extraction → batch insights → compliance** can ship incrementally (milestone **document order**: Phases 6–7, then **Phase 5** before **Phase 8** — see §4).
 - Make dependencies explicit so parallel work (e.g. UI stubs vs API contracts) does not block integration.
 - Define **milestones** the design-partner brokerage can validate.
 
@@ -21,11 +21,11 @@
 - **Client** and **Opportunity** CRUD, pipeline stages per `OPPORTUNITY.md`.
 - **Lines of business** (`LineOfBusiness`, `ClientLineOfBusiness`) and **held products** (`ClientHeldProduct`) on the client, with **`ingestion_source`**, maintained in-app and via bulk import.
 - **MVP product lines** (catalog + LOB labels): **Auto (Motor)**, **Ramos elementares** (general / multirisco), **Vida (Life)** — see Alembic `mvp_catalog_007` and `ProductCategory.GENERAL_INSURANCE`.
-- **Enriched insurance-oriented client profile** (progressive blocks, completeness score, inputs for rules and semáforo) per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3**.
+- **Enriched insurance-oriented client profile** per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3** (**partial** today: API + schema A–H + score/alerts; web só subconjunto de campos; ver [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)).
 - **Interactions** (types, timeline, link to client/opportunity, next-action and overdue signals) per [`PRODUCT.md`](./PRODUCT.md) §5.5 — **Phase 4**.
-- **CSV and Excel (`.xlsx`) import** for **clients**, including optional LOB / held-product columns per template; upsert order: `external_id` → normalized `email` → insert-only or strict error — **Phase 5**.
 - **Product** catalog and **rule-based** recommendations with explainability (which rule matched); rules consume **portfolio** data and **profile** fields where modeled (LOB + held products per spec §3.2) — **Phase 6**.
 - **PDF** upload: 100 MB max, PDF only, validation (extension, MIME, magic bytes), **100 uploads/user/day** default — **Phase 7**.
+- **CSV and Excel (`.xlsx`) import** for **clients**, including optional LOB / held-product columns per template; upsert order: `external_id` → normalized `email` → insert-only or strict error — **Phase 5** (placed before Phase 8 in §4; still depends on Phase 2).
 - **Hybrid extraction:** auto + manual review; confidence and source (`automatic` / `manual`) — **Phase 8**.
 - **Batch / near–real-time** jobs for processing pipeline and dashboard-style scoring — **Phase 9**.
 - UI: **React** + **shadcn**; **Portuguese** copy via **i18n-ready** keys.
@@ -107,7 +107,9 @@
 
 ### Phase 3 — Enriched client profile ([`PRODUCT.md`](./PRODUCT.md) §5.3)
 
-**Implementation:** [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md).
+**Status:** **Partial** — backend schema (A–H), persistence, merge API, completeness score, and a **small** web form subset are in place; full §5.3 UX, alert coverage, rule consumption, and governance remain open. Details: [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md).
+
+**Implementation (current):** [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md).
 
 **Goal:** Structured insurance-oriented attributes beyond core contact fields so recommendations, semáforo (Phase 9), and campaigns can use real propensity inputs — without forcing all fields on day one.
 
@@ -119,7 +121,9 @@
 | Import hook | Document optional **profile columns** for Phase 5 template (can ship after core profile CRUD). |
 | Governance | Document base legal / consent / visibility in operator notes; full enforcement may extend Phase 10. |
 
-**Exit criteria:** Broker can fill profile progressively; completeness score visible; at least one rule in Phase 6 can reference **at least one** new profile field in a demo scenario (or profile is demonstrably available to the rule evaluator).
+**Exit criteria (target):** Broker fills **all** blocks via UI (or API + import) with progressive UX; completeness score and **expanded** critical-gap alerts; Phase 6 rules read profile keys in production paths; governance hooks documented or enforced per Phase 10.
+
+**Currently met:** Profile persisted and patchable for all blocks via API; completeness + alerts on client detail; **partial** web editing (see [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)).
 
 **Depends on:** Phase 2.
 
@@ -157,29 +161,13 @@
 
 **Exit criteria:** Broker creates a lead, converts to client (optional oportunity), assigns **owner**, registers **COMPANY** + legal name, adds **insured persons**, and sees **audit** events on the client detail screen.
 
-**Depends on:** Phase 2. **Does not include** CSV/Excel import (that is **Phase 5**).
-
----
-
-### Phase 5 — CSV and Excel client import (including portfolio)
-
-**Goal:** Bulk bootstrap and updates without external CRM; **same canonical tables** as the UI.
-
-| Work item | Notes |
-|-----------|--------|
-| Template + docs | Required/optional columns for core client fields; **optional** LOB codes and held-product columns (or child-row convention); document for `external_id`, `email`; **optional profile columns** once Phase 3 schema is stable. |
-| Parsers | **CSV** + **Excel `.xlsx`** (shared validation pipeline; values-only for cells). |
-| Parse + validate | Row-level errors; preview API. |
-| Commit + audit | Transactional apply; log actor, timestamp, file hash; idempotent upsert rules from spec; set `ingestion_source` to `csv_import` / `excel_import`. |
-| Web | Upload → preview → confirm; accept `.csv` and `.xlsx`. |
-
-**Exit criteria:** Import 100+ rows with mixed inserts/updates **including** at least one scenario with LOB and held-product data populated; audit record exists; invalid rows reported without silent corruption.
-
-**Depends on:** Phase 2; **PRODUCT §5.2** extends client schema (owner, kind, company, segurados) — import template should align when Phase 5 ships. **Phase 3** optional for profile column mapping in template.
+**Depends on:** Phase 2. **Does not include** CSV/Excel import (that is **Phase 5** — documented before Phase 8 in §4).
 
 ---
 
 ### Phase 6 — Product catalog and rule engine
+
+**Pre–Phase 6 slice (shipped before this phase):** PRODUCT §5.6–§5.9 MVP backend + web parcial — `Insurer` master, produtos enriquecidos, `recommendation_runs` + feedback, semáforo + fila de revisão, campanhas/toques, consentimento de marketing no cliente. Ver [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md). A Fase 6 continua a focar parametrização avançada, matriz de regras e UX de explicabilidade alinhada ao plano original.
 
 **Goal:** Explainable recommendations from client attributes **and** portfolio (LOB + held products) **and profile fields** where available.
 
@@ -211,6 +199,24 @@
 **Exit criteria:** 100 MB PDF succeeds with multipart; non-PDF rejected; daily cap enforced; no full file in API memory.
 
 **Depends on:** Phase 1; Phase 0 storage abstraction.
+
+---
+
+### Phase 5 — CSV and Excel client import (including portfolio)
+
+**Goal:** Bulk bootstrap and updates without external CRM; **same canonical tables** as the UI.
+
+| Work item | Notes |
+|-----------|--------|
+| Template + docs | Required/optional columns for core client fields; **optional** LOB codes and held-product columns (or child-row convention); document for `external_id`, `email`; **optional profile columns** once Phase 3 schema is stable. |
+| Parsers | **CSV** + **Excel `.xlsx`** (shared validation pipeline; values-only for cells). |
+| Parse + validate | Row-level errors; preview API. |
+| Commit + audit | Transactional apply; log actor, timestamp, file hash; idempotent upsert rules from spec; set `ingestion_source` to `csv_import` / `excel_import`. |
+| Web | Upload → preview → confirm; accept `.csv` and `.xlsx`. |
+
+**Exit criteria:** Import 100+ rows with mixed inserts/updates **including** at least one scenario with LOB and held-product data populated; audit record exists; invalid rows reported without silent corruption.
+
+**Depends on:** Phase 2; **PRODUCT §5.2** extends client schema (owner, kind, company, segurados) — import template should align when Phase 5 ships. **Phase 3** optional for profile column mapping in template. **Independent of Phase 7** (may run in parallel with PDF pipeline / extraction work).
 
 ---
 
@@ -281,9 +287,10 @@
 ```text
 Phase 0 → Phase 1 → Phase 2 (incl. portfolio) → Phase 3 (enriched profile)
                                             → Phase 4 (interactions)
-                                            → Phase 5 (CSV + XLS)
                                             → Phase 6 (rules)
-              Phase 0 → Phase 7 → Phase 8 (extraction)
+              Phase 0 → Phase 7 (PDF pipeline)
+         Phase 2 → Phase 5 (CSV + XLS) — milestone doc order: before Phase 8
+              Phase 7 → Phase 8 (extraction)
 Phase 2 + Phase 6/7 → Phase 9 (scoring / semáforo / dashboards)
 All relevant → Phase 10
 ```
@@ -304,7 +311,7 @@ All relevant → Phase 10
 
 ## 7. MVP definition of done (product)
 
-- Design-partner user can: manage pipeline; **maintain client LOB and held products in-app**; **enrich client profile** (Phase 3) and **log interactions** (Phase 4); **import clients via CSV/Excel including portfolio columns** (Phase 5); get **portfolio- and profile-aware** recommendations (Phase 6); upload policies (Phase 7); complete extraction review (Phase 8); see refreshed scores / semáforo-style signals (Phase 9).
+- Design-partner user can: manage pipeline; **maintain client LOB and held products in-app**; **enrich client profile** (Phase 3) and **log interactions** (Phase 4); get **portfolio- and profile-aware** recommendations (Phase 6); upload policies (Phase 7); **import clients via CSV/Excel including portfolio columns** (Phase 5); complete extraction review (Phase 8); see refreshed scores / semáforo-style signals (Phase 9).
 - No committed blobs; prod uses S3; dev uses local storage.
 - Documentation: operator can deploy staging + prod from runbook (to be written in Phase 10). Implementation docs and code remain **English** per `IMPLEMENTATION-ROADMAP.md`.
 

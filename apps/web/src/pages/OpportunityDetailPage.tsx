@@ -7,7 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { apiFetch } from '@/lib/api'
 
-const STAGES = ['LEAD', 'QUALIFIED', 'PROPOSAL_SENT', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST'] as const
+const STAGES = [
+  'LEAD',
+  'QUALIFIED',
+  'PROPOSAL_SENT',
+  'NEGOTIATION',
+  'CLOSED_WON',
+  'CLOSED_LOST',
+  'POST_SALE',
+] as const
 
 const INTERACTION_TYPES = [
   'CALL',
@@ -28,10 +36,14 @@ type OpportunityDetail = {
   status: string
   closing_probability: number
   estimated_value: string | null
+  preferred_insurer_name: string | null
+  expected_close_at: string | null
+  loss_reason: string | null
   client: { id: string; full_name: string; email: string | null }
   next_action: string | null
   next_action_due_at: string | null
   last_interaction_at: string | null
+  product: { id: string; name: string } | null
 }
 
 type InteractionDto = {
@@ -40,6 +52,35 @@ type InteractionDto = {
   summary: string
   occurred_at: string
   created_by: { email: string; full_name: string | null }
+}
+
+type OppRecItem = {
+  product_id: string
+  product_name: string
+  product_category: string
+  priority: number
+  rule_ids: string[]
+  rationale: string
+  protection_gaps: string
+  predictable_objections: string
+  next_best_action: string
+}
+
+type OppRecPreview = {
+  items: OppRecItem[]
+  rule_trace: { rule_id: string; fired: boolean; detail: string }[]
+}
+
+function toDatetimeLocalValue(iso: string | null): string {
+  if (!iso) {
+    return ''
+  }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    return ''
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export function OpportunityDetailPage() {
@@ -53,6 +94,14 @@ export function OpportunityDetailPage() {
   const [ixType, setIxType] = useState<string>('CALL')
   const [ixSummary, setIxSummary] = useState('')
   const [addingIx, setAddingIx] = useState(false)
+  const [closeLossReason, setCloseLossReason] = useState('')
+  const [insurer, setInsurer] = useState('')
+  const [expectedClose, setExpectedClose] = useState('')
+  const [nextActionEdit, setNextActionEdit] = useState('')
+  const [nextDueEdit, setNextDueEdit] = useState('')
+  const [savingDeal, setSavingDeal] = useState(false)
+  const [recPreview, setRecPreview] = useState<OppRecPreview | null>(null)
+  const [recLoading, setRecLoading] = useState(false)
 
   const load = useCallback(async () => {
     if (!opportunityId) {
@@ -67,6 +116,10 @@ export function OpportunityDetailPage() {
       ])
       setDetail(d)
       setInteractions(ix)
+      setInsurer(d.preferred_insurer_name ?? '')
+      setExpectedClose(toDatetimeLocalValue(d.expected_close_at))
+      setNextActionEdit(d.next_action ?? '')
+      setNextDueEdit(toDatetimeLocalValue(d.next_action_due_at))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
       setDetail(null)
@@ -80,22 +133,80 @@ export function OpportunityDetailPage() {
     void load()
   }, [load])
 
+  const loadRecommendationsPreview = useCallback(async () => {
+    if (!opportunityId || !detail) {
+      return
+    }
+    setRecLoading(true)
+    try {
+      const p = await apiFetch<OppRecPreview>(
+        `/v1/clients/${detail.client.id}/recommendations?opportunity_id=${encodeURIComponent(opportunityId)}`,
+      )
+      setRecPreview(p)
+    } catch {
+      setRecPreview(null)
+    } finally {
+      setRecLoading(false)
+    }
+  }, [opportunityId, detail])
+
+  useEffect(() => {
+    if (detail) {
+      void loadRecommendationsPreview()
+    }
+  }, [detail, loadRecommendationsPreview])
+
   const setStage = async (stage: string) => {
     if (!opportunityId) {
+      return
+    }
+    if (stage === 'CLOSED_LOST' && !closeLossReason.trim()) {
+      setError(t('crm.opportunities.lossReasonRequired'))
       return
     }
     setBusyStage(stage)
     setError(null)
     try {
+      const json: { stage: string; loss_reason?: string } = { stage }
+      if (stage === 'CLOSED_LOST') {
+        json.loss_reason = closeLossReason.trim()
+      }
       const d = await apiFetch<OpportunityDetail>(`/v1/opportunities/${opportunityId}/stage`, {
         method: 'POST',
-        json: { stage },
+        json,
+      })
+      setDetail(d)
+      setCloseLossReason('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setBusyStage(null)
+    }
+  }
+
+  const onSaveDeal = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!opportunityId) {
+      return
+    }
+    setSavingDeal(true)
+    setError(null)
+    try {
+      const json: Record<string, string | null> = {
+        preferred_insurer_name: insurer.trim() || null,
+        expected_close_at: expectedClose ? new Date(expectedClose).toISOString() : null,
+        next_action: nextActionEdit.trim() || null,
+        next_action_due_at: nextDueEdit ? new Date(nextDueEdit).toISOString() : null,
+      }
+      const d = await apiFetch<OpportunityDetail>(`/v1/opportunities/${opportunityId}`, {
+        method: 'PATCH',
+        json,
       })
       setDetail(d)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
-      setBusyStage(null)
+      setSavingDeal(false)
     }
   }
 
@@ -129,6 +240,9 @@ export function OpportunityDetailPage() {
     return null
   }
 
+  const canPostSale =
+    detail?.stage === 'CLOSED_WON' || detail?.stage === 'POST_SALE' || detail?.status === 'WON'
+
   return (
     <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
       <div>
@@ -147,6 +261,21 @@ export function OpportunityDetailPage() {
               {t('crm.opportunities.probability')}: {detail.closing_probability}%
               {detail.estimated_value ? ` · ${detail.estimated_value}` : ''}
             </p>
+            {detail.product ? (
+              <p className="text-muted-foreground text-sm">
+                {t('crm.opportunities.productInterest')}: {detail.product.name}
+              </p>
+            ) : null}
+            {detail.preferred_insurer_name ? (
+              <p className="text-muted-foreground text-sm">
+                {t('crm.opportunities.preferredInsurer')}: {detail.preferred_insurer_name}
+              </p>
+            ) : null}
+            {detail.expected_close_at ? (
+              <p className="text-muted-foreground text-sm">
+                {t('crm.opportunities.expectedClose')}: {new Date(detail.expected_close_at).toLocaleString()}
+              </p>
+            ) : null}
             {detail.next_action ? (
               <p className="mt-2 text-sm">{detail.next_action}</p>
             ) : null}
@@ -161,6 +290,11 @@ export function OpportunityDetailPage() {
                 {new Date(detail.last_interaction_at).toLocaleString()}
               </p>
             ) : null}
+            {detail.loss_reason ? (
+              <p className="text-destructive mt-2 text-sm">
+                {t('crm.opportunities.lossReason')}: {detail.loss_reason}
+              </p>
+            ) : null}
             <p className="mt-2 text-sm">
               <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
                 {t('crm.opportunities.openClient')}
@@ -173,6 +307,125 @@ export function OpportunityDetailPage() {
       </div>
 
       {error && detail ? <p className="text-destructive text-sm">{error}</p> : null}
+
+      {detail ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('crm.opportunities.dealFields')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSaveDeal}>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="opp-insurer">{t('crm.opportunities.preferredInsurer')}</Label>
+                <input
+                  id="opp-insurer"
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={insurer}
+                  onChange={(ev) => setInsurer(ev.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="opp-close">{t('crm.opportunities.expectedClose')}</Label>
+                <input
+                  id="opp-close"
+                  type="datetime-local"
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={expectedClose}
+                  onChange={(ev) => setExpectedClose(ev.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="opp-na">{t('crm.opportunities.nextActionEdit')}</Label>
+                <input
+                  id="opp-na"
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={nextActionEdit}
+                  onChange={(ev) => setNextActionEdit(ev.target.value)}
+                />
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="opp-due">{t('crm.opportunities.nextDueEdit')}</Label>
+                <input
+                  id="opp-due"
+                  type="datetime-local"
+                  className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+                  value={nextDueEdit}
+                  onChange={(ev) => setNextDueEdit(ev.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Button type="submit" disabled={savingDeal}>
+                  {savingDeal ? t('crm.opportunities.savingDeal') : t('crm.opportunities.saveDeal')}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {detail ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('crm.opportunities.recommendationsTitle')}</CardTitle>
+            <p className="text-muted-foreground text-sm">{t('crm.opportunities.recommendationsSubtitle')}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {recLoading ? (
+              <p className="text-muted-foreground text-sm">{t('crm.opportunities.recLoading')}</p>
+            ) : recPreview && recPreview.items.length > 0 ? (
+              <>
+                <ul className="space-y-3 text-sm">
+                  {recPreview.items.map((it) => (
+                    <li key={it.product_id} className="border-b pb-3 last:border-0">
+                      <div className="font-medium">
+                        {it.product_name}{' '}
+                        <span className="text-muted-foreground font-normal">
+                          ({it.product_category}) · {t('crm.intel.itemPriority')}: {it.priority}
+                        </span>
+                      </div>
+                      <p className="mt-1">{it.rationale}</p>
+                      {it.rule_ids.length > 0 ? (
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          <span className="font-medium text-foreground">{t('crm.intel.rulesMatched')}: </span>
+                          {it.rule_ids.join(', ')}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+                {recPreview.rule_trace.length > 0 ? (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                      {t('crm.intel.ruleTraceTitle')}
+                    </summary>
+                    <ul className="mt-2 space-y-1 font-mono">
+                      {recPreview.rule_trace.map((tr) => (
+                        <li key={tr.rule_id}>
+                          <span className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}>
+                            {tr.rule_id}
+                          </span>
+                          <span className="text-muted-foreground"> — {tr.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={recLoading}
+              onClick={() => void loadRecommendationsPreview()}
+            >
+              {t('crm.opportunities.recRefresh')}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {detail ? (
         <Card>
@@ -238,21 +491,37 @@ export function OpportunityDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('crm.opportunities.stageActions')}</CardTitle>
+            <p className="text-muted-foreground text-sm">{t('crm.opportunities.lossReasonHint')}</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="opp-loss">{t('crm.opportunities.lossReason')}</Label>
+              <textarea
+                id="opp-loss"
+                className="border-input bg-background min-h-[64px] w-full rounded-md border px-3 py-2 text-sm"
+                value={closeLossReason}
+                onChange={(ev) => setCloseLossReason(ev.target.value)}
+                placeholder={t('crm.opportunities.lossReasonHint')}
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
-              {STAGES.map((s) => (
-                <Button
-                  key={s}
-                  type="button"
-                  size="sm"
-                  variant={detail.stage === s ? 'default' : 'secondary'}
-                  disabled={busyStage !== null}
-                  onClick={() => void setStage(s)}
-                >
-                  {busyStage === s ? t('crm.opportunities.updating') : s}
-                </Button>
-              ))}
+              {STAGES.map((s) => {
+                const disabled =
+                  busyStage !== null || (s === 'POST_SALE' && !canPostSale)
+                return (
+                  <Button
+                    key={s}
+                    type="button"
+                    size="sm"
+                    variant={detail.stage === s ? 'default' : 'secondary'}
+                    disabled={disabled}
+                    title={s === 'POST_SALE' && !canPostSale ? t('crm.opportunities.postSaleDisabledHint') : undefined}
+                    onClick={() => void setStage(s)}
+                  >
+                    {busyStage === s ? t('crm.opportunities.updating') : s}
+                  </Button>
+                )
+              })}
             </div>
           </CardContent>
         </Card>

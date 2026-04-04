@@ -305,31 +305,6 @@ def upgrade() -> None:
         ),
     )
 
-    op.execute(
-        sa.text(
-            """
-            INSERT INTO products (
-                organization_id, name, category, description, risk_level, active
-            )
-            SELECT id, 'Term life baseline', 'LIFE_INSURANCE',
-                'MVP catalog seed', 'MEDIUM', true
-            FROM organizations WHERE slug = 'default' LIMIT 1
-            """
-        ),
-    )
-    op.execute(
-        sa.text(
-            """
-            INSERT INTO products (
-                organization_id, name, category, description, risk_level, active
-            )
-            SELECT id, 'Private pension plan', 'PENSION',
-                'MVP catalog seed', 'LOW', true
-            FROM organizations WHERE slug = 'default' LIMIT 1
-            """
-        ),
-    )
-
 
 def downgrade() -> None:
     op.drop_index(op.f("ix_client_held_products_product_id"), table_name="client_held_products")

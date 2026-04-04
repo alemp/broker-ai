@@ -27,6 +27,12 @@ export function AppLayout() {
             <Link to="/opportunities" className={linkClass}>
               {t('nav.opportunities')}
             </Link>
+            <Link to="/insurers" className={linkClass}>
+              {t('nav.insurers')}
+            </Link>
+            <Link to="/campaigns" className={linkClass}>
+              {t('nav.campaigns')}
+            </Link>
           </nav>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground hidden text-xs sm:inline">{user?.email}</span>

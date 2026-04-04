@@ -25,6 +25,7 @@ from sqlalchemy.sql import text
 
 from ai_copilot_api.db.base import Base
 from ai_copilot_api.db.enums import (
+    CampaignTouchStatus,
     ClientKind,
     CrmAuditAction,
     CrmEntityType,
@@ -36,6 +37,7 @@ from ai_copilot_api.db.enums import (
     OpportunityStatus,
     ProductCategory,
     ProductRiskLevel,
+    RecommendationFeedbackAction,
 )
 
 
@@ -80,6 +82,8 @@ class Organization(Base):
         back_populates="organization",
     )
     leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="organization")
+    insurers: Mapped[list["Insurer"]] = relationship("Insurer", back_populates="organization")
+    campaigns: Mapped[list["Campaign"]] = relationship("Campaign", back_populates="organization")
 
 
 class User(Base):
@@ -134,6 +138,45 @@ class User(Base):
         back_populates="owner_user",
         foreign_keys="Lead.owner_id",
     )
+    recommendation_runs: Mapped[list["RecommendationRun"]] = relationship(
+        "RecommendationRun",
+        back_populates="created_by_user",
+        foreign_keys="RecommendationRun.created_by_id",
+    )
+
+
+class Insurer(Base):
+    __tablename__ = "insurers"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "code", name="uq_insurers_org_code"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="insurers",
+    )
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="insurer")
 
 
 class Product(Base):
@@ -162,6 +205,34 @@ class Product(Base):
     )
     target_tags: Mapped[str | None] = mapped_column(String(512), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    insurer_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("insurers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    line_of_business_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("lines_of_business.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    main_coverage_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    additional_coverages: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        insert_default=list,
+    )
+    exclusions_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recommended_profile_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commercial_arguments: Mapped[str | None] = mapped_column(Text, nullable=True)
+    support_materials: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        insert_default=list,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -171,6 +242,11 @@ class Product(Base):
     organization: Mapped["Organization"] = relationship(
         "Organization",
         back_populates="products",
+    )
+    insurer: Mapped["Insurer | None"] = relationship("Insurer", back_populates="products")
+    line_of_business: Mapped["LineOfBusiness | None"] = relationship(
+        "LineOfBusiness",
+        back_populates="catalog_products",
     )
     opportunities: Mapped[list["Opportunity"]] = relationship(
         "Opportunity",
@@ -220,6 +296,10 @@ class LineOfBusiness(Base):
         "ClientLineOfBusiness",
         back_populates="line_of_business",
     )
+    catalog_products: Mapped[list["Product"]] = relationship(
+        "Product",
+        back_populates="line_of_business",
+    )
 
 
 class Client(Base):
@@ -255,6 +335,8 @@ class Client(Base):
     )
     company_legal_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     company_tax_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    marketing_opt_in: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    preferred_marketing_channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     profile_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
@@ -451,6 +533,13 @@ class Opportunity(Base):
         nullable=True,
         index=True,
     )
+    preferred_insurer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    expected_close_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    loss_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -693,3 +782,210 @@ class CrmAuditEvent(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class RecommendationRun(Base):
+    __tablename__ = "recommendation_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("opportunities.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    items: Mapped[list[Any]] = mapped_column(JSONB, nullable=False)
+    rule_trace: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        insert_default=list,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    client: Mapped["Client"] = relationship("Client")
+    opportunity: Mapped["Opportunity | None"] = relationship("Opportunity")
+    created_by_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="recommendation_runs",
+        foreign_keys=[created_by_id],
+    )
+    feedback_rows: Mapped[list["RecommendationFeedback"]] = relationship(
+        "RecommendationFeedback",
+        back_populates="recommendation_run",
+    )
+
+
+class RecommendationFeedback(Base):
+    __tablename__ = "recommendation_feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    recommendation_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("recommendation_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    rule_ids: Mapped[str] = mapped_column(String(512), nullable=False)
+    action: Mapped[RecommendationFeedbackAction] = mapped_column(
+        _varchar_enum(RecommendationFeedbackAction),
+        nullable=False,
+    )
+    actor_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    client: Mapped["Client"] = relationship("Client")
+    product: Mapped["Product"] = relationship("Product")
+    recommendation_run: Mapped["RecommendationRun | None"] = relationship(
+        "RecommendationRun",
+        back_populates="feedback_rows",
+    )
+    actor_user: Mapped["User"] = relationship("User", foreign_keys=[actor_user_id])
+
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    kind: Mapped[str] = mapped_column(String(64), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    template_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    template_body: Mapped[str] = mapped_column(Text, nullable=False)
+    segment_criteria: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        insert_default=dict,
+    )
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="campaigns",
+    )
+    touches: Mapped[list["CampaignTouch"]] = relationship(
+        "CampaignTouch",
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+    )
+
+
+class CampaignTouch(Base):
+    __tablename__ = "campaign_touches"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    campaign_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    scheduled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[CampaignTouchStatus] = mapped_column(
+        _varchar_enum(CampaignTouchStatus),
+        nullable=False,
+        default=CampaignTouchStatus.PENDING,
+        insert_default=CampaignTouchStatus.PENDING,
+    )
+    channel: Mapped[str] = mapped_column(String(32), nullable=False, default="EMAIL")
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    campaign: Mapped["Campaign"] = relationship("Campaign", back_populates="touches")
+    client: Mapped["Client"] = relationship("Client")

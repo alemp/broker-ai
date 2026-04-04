@@ -4,16 +4,21 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
 from ai_copilot_api.db.enums import OpportunityStage, OpportunityStatus
 from ai_copilot_api.db.models import Client, Opportunity, Product, User
 from ai_copilot_api.db.session import get_db
+from ai_copilot_api.domain.opportunity_rules import (
+    assert_next_action_when_required,
+    assert_post_sale_only_after_win,
+)
 from ai_copilot_api.domain.opportunity_status import status_for_stage
 from ai_copilot_api.schemas.crm import (
     OpportunityCreate,
+    OpportunityMetricsSummary,
     OpportunityOut,
     OpportunityStagePatch,
     OpportunityUpdate,
@@ -68,6 +73,40 @@ def _product_in_org(db: Session, org_id: uuid.UUID, product_id: uuid.UUID | None
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
 
+@router.get("/metrics/summary", response_model=OpportunityMetricsSummary)
+def opportunity_metrics_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OpportunityMetricsSummary:
+    org_id = current_user.organization_id
+    stage_rows = db.execute(
+        select(Opportunity.stage, func.count())
+        .where(Opportunity.organization_id == org_id)
+        .group_by(Opportunity.stage),
+    ).all()
+    owner_rows = db.execute(
+        select(Opportunity.owner_id, func.count())
+        .where(
+            Opportunity.organization_id == org_id,
+            Opportunity.status == OpportunityStatus.OPEN,
+        )
+        .group_by(Opportunity.owner_id),
+    ).all()
+    open_total = db.scalar(
+        select(func.count())
+        .select_from(Opportunity)
+        .where(
+            Opportunity.organization_id == org_id,
+            Opportunity.status == OpportunityStatus.OPEN,
+        ),
+    )
+    return OpportunityMetricsSummary(
+        by_stage={str(r[0].value): int(r[1]) for r in stage_rows},
+        by_owner_open={str(r[0]): int(r[1]) for r in owner_rows},
+        open_total=int(open_total or 0),
+    )
+
+
 @router.get("", response_model=list[OpportunityOut])
 def list_opportunities(
     db: Session = Depends(get_db),
@@ -75,8 +114,14 @@ def list_opportunities(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
     stage: OpportunityStage | None = None,
+    status: OpportunityStatus | None = None,
     client_id: uuid.UUID | None = None,
+    owner_id: uuid.UUID | None = None,
     overdue_next_action: bool = Query(default=False),
+    sort: str = Query(
+        default="updated_at_desc",
+        description="updated_at_desc | propensity_desc (prob. × valor estimado)",
+    ),
 ) -> list[OpportunityOut]:
     stmt = (
         select(Opportunity)
@@ -85,8 +130,12 @@ def list_opportunities(
     )
     if stage is not None:
         stmt = stmt.where(Opportunity.stage == stage)
+    if status is not None:
+        stmt = stmt.where(Opportunity.status == status)
     if client_id is not None:
         stmt = stmt.where(Opportunity.client_id == client_id)
+    if owner_id is not None:
+        stmt = stmt.where(Opportunity.owner_id == owner_id)
     if overdue_next_action:
         now = datetime.now(UTC)
         stmt = stmt.where(
@@ -94,7 +143,17 @@ def list_opportunities(
             Opportunity.next_action_due_at.isnot(None),
             Opportunity.next_action_due_at < now,
         )
-    stmt = stmt.order_by(Opportunity.updated_at.desc()).offset(skip).limit(limit)
+    if sort == "propensity_desc":
+        propensity = Opportunity.closing_probability * func.coalesce(Opportunity.estimated_value, 0)
+        stmt = stmt.order_by(propensity.desc(), Opportunity.updated_at.desc())
+    elif sort == "updated_at_desc":
+        stmt = stmt.order_by(Opportunity.updated_at.desc())
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="sort must be updated_at_desc or propensity_desc",
+        )
+    stmt = stmt.offset(skip).limit(limit)
     rows = db.scalars(stmt).all()
     return [OpportunityOut.model_validate(r) for r in rows]
 
@@ -123,7 +182,13 @@ def create_opportunity(
         last_interaction_at=body.last_interaction_at,
         next_action=body.next_action,
         next_action_due_at=body.next_action_due_at,
+        preferred_insurer_name=body.preferred_insurer_name,
+        expected_close_at=body.expected_close_at,
+        loss_reason=body.loss_reason.strip()
+        if body.stage == OpportunityStage.CLOSED_LOST and body.loss_reason
+        else None,
     )
+    assert_next_action_when_required(row)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -158,15 +223,34 @@ def update_opportunity(
         _user_in_org(db, org_id, data["owner_id"])
     if "product_id" in data:
         _product_in_org(db, org_id, data["product_id"])
-    stage_changed = False
-    if "stage" in data:
-        row.stage = data.pop("stage")
-        stage_changed = True
-        data.pop("status", None)
+
+    prior_stage = row.stage
+    target_stage = data.pop("stage", None)
+    loss_reason_in = data.pop("loss_reason", None)
+    data.pop("status", None)
+
     for k, v in data.items():
         setattr(row, k, v)
-    if stage_changed:
-        row.status = status_for_stage(row.stage, row.status)
+
+    if target_stage is not None:
+        if target_stage == OpportunityStage.POST_SALE:
+            assert_post_sale_only_after_win(prior_stage, row.status)
+        if target_stage == OpportunityStage.CLOSED_LOST:
+            if loss_reason_in is not None and str(loss_reason_in).strip():
+                row.loss_reason = str(loss_reason_in).strip()
+            elif prior_stage != OpportunityStage.CLOSED_LOST:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="loss_reason is required when closing as lost",
+                )
+        elif prior_stage == OpportunityStage.CLOSED_LOST:
+            row.loss_reason = None
+        row.stage = target_stage
+        row.status = status_for_stage(target_stage, row.status)
+    elif loss_reason_in is not None and row.stage == OpportunityStage.CLOSED_LOST:
+        row.loss_reason = str(loss_reason_in).strip()
+
+    assert_next_action_when_required(row)
     db.commit()
     db.refresh(row)
     row = db.scalar(
@@ -185,8 +269,17 @@ def transition_opportunity_stage(
 ) -> OpportunityOut:
     org_id = current_user.organization_id
     row = _opportunity_or_404(db, org_id, opp_id)
+    prior_stage = row.stage
+    prior_status = row.status
+    if body.stage == OpportunityStage.POST_SALE:
+        assert_post_sale_only_after_win(prior_stage, prior_status)
+    if body.stage == OpportunityStage.CLOSED_LOST:
+        row.loss_reason = body.loss_reason.strip() if body.loss_reason else None
+    elif prior_stage == OpportunityStage.CLOSED_LOST:
+        row.loss_reason = None
     row.stage = body.stage
     row.status = status_for_stage(body.stage, row.status)
+    assert_next_action_when_required(row)
     db.commit()
     db.refresh(row)
     row = db.scalar(

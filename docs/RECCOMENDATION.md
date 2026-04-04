@@ -37,7 +37,7 @@ You must define a **Product Catalog** structure.
 Assume products are from:
 
 - Insurance lines (e.g., life, health, auto)
-- Financial products (e.g., pension, investments)
+- Financial products (e.g., life, health, auto)
 
 ---
 
@@ -49,7 +49,7 @@ Design a `Product` entity with:
 
 - id
 - name
-- category (e.g., LIFE_INSURANCE, HEALTH_INSURANCE, PENSION)
+- category (e.g., LIFE_INSURANCE, HEALTH_INSURANCE, AUTO_INSURANCE)
 - description
 - risk_level (LOW, MEDIUM, HIGH)
 - target_profile (optional tags)
@@ -63,7 +63,7 @@ Implement a simple rule system:
 
 Example:
 
-- IF client.age > 50 → recommend PENSION
+- IF client.age > 50 → recommend LIFE_INSURANCE
 - IF client.has_dependents = true → recommend LIFE_INSURANCE
 - IF client.income > X → recommend INVESTMENT_PRODUCTS
 
@@ -76,7 +76,7 @@ Design a flexible structure like:
 ```json
 {
   "condition": "client.age > 50",
-  "recommended_product_category": "PENSION",
+  "recommended_product_category": "LIFE_INSURANCE",
   "priority": 1
 }
 ```

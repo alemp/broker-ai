@@ -7,7 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
-from ai_copilot_api.db.enums import ClientKind, CrmAuditAction, CrmEntityType, LeadStatus
+from ai_copilot_api.db.enums import (
+    ClientKind,
+    CrmAuditAction,
+    CrmEntityType,
+    LeadStatus,
+    OpportunityStage,
+)
 from ai_copilot_api.db.models import Client, Lead, Opportunity, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.crm_audit import (
@@ -15,6 +21,7 @@ from ai_copilot_api.domain.crm_audit import (
     record_entity_snapshot_create,
     record_field_updates,
 )
+from ai_copilot_api.domain.opportunity_rules import assert_next_action_when_required
 from ai_copilot_api.domain.opportunity_status import status_for_stage
 from ai_copilot_api.schemas.crm import (
     ClientOut,
@@ -295,9 +302,15 @@ def convert_lead(
             last_interaction_at=op.last_interaction_at,
             next_action=op.next_action,
             next_action_due_at=op.next_action_due_at,
+            preferred_insurer_name=op.preferred_insurer_name,
+            expected_close_at=op.expected_close_at,
+            loss_reason=op.loss_reason.strip()
+            if op.stage == OpportunityStage.CLOSED_LOST and op.loss_reason
+            else None,
         )
         db.add(opp_row)
         db.flush()
+        assert_next_action_when_required(opp_row)
         new_opp_id = opp_row.id
         record_audit(
             db,

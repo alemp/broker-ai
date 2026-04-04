@@ -5,7 +5,6 @@ Revises: mvp_catalog_007
 Create Date: 2026-04-09
 
 Remaps existing rows so varchar values stay valid for the trimmed ProductCategory enum.
-Downgrade restores only the known phase-2 seed product name for PENSION.
 
 """
 
@@ -34,12 +33,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute(
-        sa.text(
-            """
-            UPDATE products
-            SET category = 'PENSION'
-            WHERE name = 'Private pension plan' AND category = 'LIFE_INSURANCE'
-            """
-        ),
-    )
+    # No reliable reverse without row-level history; pension seed product removed from project.
+    pass

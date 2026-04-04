@@ -1,21 +1,26 @@
 ---
-description: After API/web changes, run local compile/tests when relevant, then rebuild and recreate involved Docker services
+description: Always compile API/web and rebuild + force-recreate Docker api and web containers before finishing work
 alwaysApply: true
 ---
 
-# Build local + Docker Compose (obrigatório)
+# Compilar sempre + Docker Compose (obrigatório)
 
-No **fim de cada tarefa** que toque em `apps/api`, `apps/web`, `docker-compose.yml`, Dockerfiles ou dependências de imagem, **antes de considerar concluído**:
+No **fim de cada tarefa** que altere código, config ou dependências — **mesmo que só um serviço tenha mudado** — **antes de declarar concluído**:
 
-1. **Compilar / validar localmente** (serviços envolvidos):
-   - **API:** `cd apps/api && uv run ruff check src tests` (e `uv run pytest` se houver testes de integração com `DATABASE_URL`, quando fizer sentido).
-   - **Web:** `cd apps/web && npm run build`.
+## 1. Compilar / validar (sempre os dois quando o projeto estiver em Docker)
 
-2. **Imagens e contentores envolvidos** — na **raiz do repositório**, reconstrói e recria **só o que mudou**; se houver dúvida, faz **api** e **web**:
-   - Só API: `docker compose build api && docker compose up -d --force-recreate api`
-   - Só Web: `docker compose build web && docker compose up -d --force-recreate web`
-   - API + Web: `docker compose build api web && docker compose up -d --force-recreate api web`
+- **API:** `cd apps/api && uv run ruff check src tests` e, quando fizer sentido, `uv run pytest` com `DATABASE_URL` para o Postgres do Compose.
+- **Web:** `cd apps/web && npm run build`.
 
-3. **Postgres:** mantém a correr; só recria se a tarefa exigir (ex.: volume novo). Migrações: `alembic upgrade head` dentro do contentor API ou com `DATABASE_URL` local, conforme o fluxo do projeto.
+## 2. Imagens e contentores (sempre api + web)
 
-Não declares a tarefa pronta sem ter corrido estes passos para os serviços afetados.
+Na **raiz do repositório**, **sempre** reconstruir e recriar **api** e **web** (garante imagens alinhadas com o código e variáveis de build):
+
+```bash
+docker compose build api web && docker compose up -d --force-recreate api web
+```
+
+- **Postgres:** não recriar por defeito; mantém dados e healthcheck. Recriar só se a tarefa exigir (volume, credenciais, etc.).
+- **Migrações:** após mudanças Alembic, `alembic upgrade head` (no host com `DATABASE_URL` ou dentro do contentor API), conforme o fluxo do projeto.
+
+Não declares a tarefa pronta sem estes passos.

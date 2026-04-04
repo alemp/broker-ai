@@ -10,6 +10,8 @@ class OpportunityStage(StrEnum):
     NEGOTIATION = "NEGOTIATION"
     CLOSED_WON = "CLOSED_WON"
     CLOSED_LOST = "CLOSED_LOST"
+    # After win — relationship / pós-venda (PRODUCT.md §5.4 suggested stage 10)
+    POST_SALE = "POST_SALE"
 
 
 class OpportunityStatus(StrEnum):
@@ -84,3 +86,22 @@ class CrmAuditAction(StrEnum):
     UPDATE = "UPDATE"
     DELETE = "DELETE"
     CONVERT = "CONVERT"
+
+
+class RecommendationFeedbackAction(StrEnum):
+    ACCEPTED = "ACCEPTED"
+    DISMISSED = "DISMISSED"
+    IGNORED = "IGNORED"
+
+
+class CampaignTouchStatus(StrEnum):
+    PENDING = "PENDING"
+    SENT = "SENT"
+    SKIPPED = "SKIPPED"
+    FAILED = "FAILED"
+
+
+class AdequacyTrafficLight(StrEnum):
+    GREEN = "GREEN"
+    YELLOW = "YELLOW"
+    RED = "RED"

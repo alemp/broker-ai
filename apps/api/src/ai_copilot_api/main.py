@@ -2,7 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai_copilot_api.api.routes_auth import router as auth_router
+from ai_copilot_api.api.routes_campaigns import router as campaigns_router
 from ai_copilot_api.api.routes_clients import router as clients_router
+from ai_copilot_api.api.routes_insurers import router as insurers_router
+from ai_copilot_api.api.routes_intel import router as intel_router
 from ai_copilot_api.api.routes_interactions import router as interactions_router
 from ai_copilot_api.api.routes_leads import router as leads_router
 from ai_copilot_api.api.routes_lines_of_business import router as lob_router
@@ -34,9 +37,12 @@ app.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
 app.include_router(me_router, prefix="/v1", tags=["users"])
 app.include_router(org_router, prefix="/v1")
 app.include_router(clients_router, prefix="/v1")
+app.include_router(intel_router, prefix="/v1")
+app.include_router(insurers_router, prefix="/v1")
 app.include_router(leads_router, prefix="/v1")
 app.include_router(lob_router, prefix="/v1")
 app.include_router(products_router, prefix="/v1")
+app.include_router(campaigns_router, prefix="/v1")
 app.include_router(opportunities_router, prefix="/v1")
 app.include_router(interactions_router, prefix="/v1")
 

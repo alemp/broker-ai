@@ -2,8 +2,10 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { AppLayout } from '@/components/AppLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { CampaignsPage } from '@/pages/CampaignsPage'
 import { ClientDetailPage } from '@/pages/ClientDetailPage'
 import { ClientsPage } from '@/pages/ClientsPage'
+import { InsurersPage } from '@/pages/InsurersPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage'
@@ -31,6 +33,8 @@ export default function App() {
         <Route path="/leads/:leadId" element={<LeadDetailPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/opportunities/:opportunityId" element={<OpportunityDetailPage />} />
+        <Route path="/insurers" element={<InsurersPage />} />
+        <Route path="/campaigns" element={<CampaignsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
