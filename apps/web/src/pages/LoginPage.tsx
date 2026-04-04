@@ -44,7 +44,7 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-svh items-center justify-center px-4 py-12">
+    <main className="from-muted/40 flex min-h-svh items-center justify-center bg-gradient-to-b via-background to-background px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t('auth.login.title')}</CardTitle>

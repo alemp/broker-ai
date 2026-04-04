@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
 
 const STAGES = [
@@ -177,6 +180,7 @@ export function OpportunityDetailPage() {
       })
       setDetail(d)
       setCloseLossReason('')
+      toast.success(t('toast.stageUpdated'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -203,6 +207,7 @@ export function OpportunityDetailPage() {
         json,
       })
       setDetail(d)
+      toast.success(t('toast.saved'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -229,6 +234,7 @@ export function OpportunityDetailPage() {
       })
       setIxSummary('')
       await load()
+      toast.success(t('toast.interactionAdded'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -243,68 +249,63 @@ export function OpportunityDetailPage() {
   const canPostSale =
     detail?.stage === 'CLOSED_WON' || detail?.stage === 'POST_SALE' || detail?.status === 'WON'
 
+  const oppDescription = detail
+    ? [
+        `${t('crm.opportunities.pipeline')}: ${detail.stage} · ${detail.status}`,
+        `${t('crm.opportunities.probability')}: ${detail.closing_probability}%${
+          detail.estimated_value ? ` · ${detail.estimated_value}` : ''
+        }`,
+        detail.product
+          ? `${t('crm.opportunities.productInterest')}: ${detail.product.name}`
+          : '',
+        detail.preferred_insurer_name
+          ? `${t('crm.opportunities.preferredInsurer')}: ${detail.preferred_insurer_name}`
+          : '',
+        detail.expected_close_at
+          ? `${t('crm.opportunities.expectedClose')}: ${new Date(detail.expected_close_at).toLocaleString()}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : undefined
+
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <Link to="/opportunities" className="text-muted-foreground hover:text-foreground text-sm">
-          ← {t('crm.opportunities.back')}
-        </Link>
-        {loading ? (
-          <p className="text-muted-foreground mt-4 text-sm">{t('auth.loading')}</p>
-        ) : detail ? (
-          <>
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight">{detail.client.full_name}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {t('crm.opportunities.pipeline')}: {detail.stage} · {detail.status}
-            </p>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader
+        back={{ to: '/opportunities', label: t('crm.opportunities.back') }}
+        titleLoading={loading}
+        title={detail?.client.full_name ?? ''}
+        description={oppDescription}
+      />
+      {!loading && !detail ? (
+        <p className="text-destructive text-sm">{error ?? t('crm.error.notFound')}</p>
+      ) : null}
+      {detail && !loading ? (
+        <div className="space-y-1">
+          {detail.next_action ? <p className="mt-2 text-sm">{detail.next_action}</p> : null}
+          {detail.next_action_due_at ? (
             <p className="text-muted-foreground text-sm">
-              {t('crm.opportunities.probability')}: {detail.closing_probability}%
-              {detail.estimated_value ? ` · ${detail.estimated_value}` : ''}
+              {t('crm.opportunities.due')}: {new Date(detail.next_action_due_at).toLocaleString()}
             </p>
-            {detail.product ? (
-              <p className="text-muted-foreground text-sm">
-                {t('crm.opportunities.productInterest')}: {detail.product.name}
-              </p>
-            ) : null}
-            {detail.preferred_insurer_name ? (
-              <p className="text-muted-foreground text-sm">
-                {t('crm.opportunities.preferredInsurer')}: {detail.preferred_insurer_name}
-              </p>
-            ) : null}
-            {detail.expected_close_at ? (
-              <p className="text-muted-foreground text-sm">
-                {t('crm.opportunities.expectedClose')}: {new Date(detail.expected_close_at).toLocaleString()}
-              </p>
-            ) : null}
-            {detail.next_action ? (
-              <p className="mt-2 text-sm">{detail.next_action}</p>
-            ) : null}
-            {detail.next_action_due_at ? (
-              <p className="text-muted-foreground text-sm">
-                {t('crm.opportunities.due')}: {new Date(detail.next_action_due_at).toLocaleString()}
-              </p>
-            ) : null}
-            {detail.last_interaction_at ? (
-              <p className="text-muted-foreground text-sm">
-                {t('crm.opportunities.lastInteraction')}:{' '}
-                {new Date(detail.last_interaction_at).toLocaleString()}
-              </p>
-            ) : null}
-            {detail.loss_reason ? (
-              <p className="text-destructive mt-2 text-sm">
-                {t('crm.opportunities.lossReason')}: {detail.loss_reason}
-              </p>
-            ) : null}
-            <p className="mt-2 text-sm">
-              <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
-                {t('crm.opportunities.openClient')}
-              </Link>
+          ) : null}
+          {detail.last_interaction_at ? (
+            <p className="text-muted-foreground text-sm">
+              {t('crm.opportunities.lastInteraction')}:{' '}
+              {new Date(detail.last_interaction_at).toLocaleString()}
             </p>
-          </>
-        ) : (
-          <p className="text-destructive mt-4 text-sm">{error ?? t('crm.error.notFound')}</p>
-        )}
-      </div>
+          ) : null}
+          {detail.loss_reason ? (
+            <p className="text-destructive mt-2 text-sm">
+              {t('crm.opportunities.lossReason')}: {detail.loss_reason}
+            </p>
+          ) : null}
+          <p className="mt-2 text-sm">
+            <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
+              {t('crm.opportunities.openClient')}
+            </Link>
+          </p>
+        </div>
+      ) : null}
 
       {error && detail ? <p className="text-destructive text-sm">{error}</p> : null}
 
@@ -457,18 +458,12 @@ export function OpportunityDetailPage() {
             <form className="grid gap-3" onSubmit={onAddInteraction}>
               <div className="grid gap-2">
                 <Label htmlFor="opp-ix-type">{t('crm.interactions.type')}</Label>
-                <select
+                <FormSelect
                   id="opp-ix-type"
-                  className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                   value={ixType}
-                  onChange={(ev) => setIxType(ev.target.value)}
-                >
-                  {INTERACTION_TYPES.map((code) => (
-                    <option key={code} value={code}>
-                      {code}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setIxType}
+                  options={INTERACTION_TYPES.map((code) => ({ value: code, label: code }))}
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="opp-ix-sum">{t('crm.interactions.summary')}</Label>
@@ -526,6 +521,6 @@ export function OpportunityDetailPage() {
           </CardContent>
         </Card>
       ) : null}
-    </main>
+    </div>
   )
 }

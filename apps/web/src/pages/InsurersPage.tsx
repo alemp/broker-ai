@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api'
 
 type InsurerDto = {
@@ -56,6 +59,7 @@ export function InsurersPage() {
       setName('')
       setCode('')
       await load()
+      toast.success(t('toast.insurerCreated'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -64,11 +68,8 @@ export function InsurersPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('nav.insurers')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('crm.insurers.subtitle')}</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader title={t('nav.insurers')} description={t('crm.insurers.subtitle')} />
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
       <Card>
@@ -98,7 +99,14 @@ export function InsurersPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
+            <div className="space-y-2" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex justify-between gap-2 py-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ))}
+            </div>
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('crm.insurers.empty')}</p>
           ) : (
@@ -115,6 +123,6 @@ export function InsurersPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

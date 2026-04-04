@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
 
 const INTERACTION_TYPES = [
@@ -20,9 +23,6 @@ const INTERACTION_TYPES = [
   'POST_SALE',
   'CAMPAIGN_TOUCH',
 ] as const
-
-const PROFILE_SELECT_CLASS =
-  'border-input bg-background h-9 w-full rounded-md border px-2 text-sm'
 
 const LIFE_STAGE_OPTIONS = [
   { value: 'young_single' },
@@ -446,6 +446,7 @@ export function ClientDetailPage() {
       })
       setSelectedLob('')
       await loadAll()
+      toast.success(t('toast.lobAdded'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -472,6 +473,7 @@ export function ClientDetailPage() {
       setSelectedProduct('')
       setInsurer('')
       await loadAll()
+      toast.success(t('toast.heldAdded'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -675,6 +677,7 @@ export function ClientDetailPage() {
         json,
       })
       await loadAll()
+      toast.success(t('toast.saved'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -702,6 +705,7 @@ export function ClientDetailPage() {
         },
       })
       await loadAll()
+      toast.success(t('toast.saved'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -729,6 +733,7 @@ export function ClientDetailPage() {
       setInsuredRelation('HOLDER')
       setInsuredNotes('')
       await loadAll()
+      toast.success(t('toast.insuredAdded'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -765,6 +770,7 @@ export function ClientDetailPage() {
       setRecommendationRuns((prev) => [run, ...prev])
       const ad = await apiFetch<AdequacyDto>(`/v1/clients/${clientId}/adequacy`)
       setAdequacy(ad)
+      toast.success(t('toast.recommendationRun'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -792,6 +798,7 @@ export function ClientDetailPage() {
       setIxSummary('')
       setIxOppId('')
       await loadAll()
+      toast.success(t('toast.interactionAdded'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -803,25 +810,21 @@ export function ClientDetailPage() {
     return null
   }
 
+  const clientHeaderDescription = detail
+    ? [detail.email, detail.phone].filter(Boolean).join(' · ') || t('crm.clients.noContact')
+    : undefined
+
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <Link to="/clients" className="text-muted-foreground hover:text-foreground text-sm">
-          ← {t('crm.clients.back')}
-        </Link>
-        {loading ? (
-          <p className="text-muted-foreground mt-4 text-sm">{t('auth.loading')}</p>
-        ) : detail ? (
-          <>
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight">{detail.full_name}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {[detail.email, detail.phone].filter(Boolean).join(' · ') || t('crm.clients.noContact')}
-            </p>
-          </>
-        ) : (
-          <p className="text-destructive mt-4 text-sm">{error ?? t('crm.error.notFound')}</p>
-        )}
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader
+        back={{ to: '/clients', label: t('crm.clients.back') }}
+        titleLoading={loading}
+        title={detail?.full_name ?? (loading ? '' : t('crm.error.notFound'))}
+        description={clientHeaderDescription}
+      />
+      {!loading && !detail ? (
+        <p className="text-destructive text-sm">{error ?? t('crm.error.notFound')}</p>
+      ) : null}
 
       {error && detail ? <p className="text-destructive text-sm">{error}</p> : null}
 
@@ -836,31 +839,30 @@ export function ClientDetailPage() {
               <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSaveCrmCore}>
                 <div className="grid gap-2">
                   <Label htmlFor="crm-owner">{t('crm.core.owner')}</Label>
-                  <select
+                  <FormSelect
                     id="crm-owner"
-                    className={PROFILE_SELECT_CLASS}
                     value={crmOwnerId}
-                    onChange={(ev) => setCrmOwnerId(ev.target.value)}
-                  >
-                    <option value="">{t('crm.core.noOwner')}</option>
-                    {orgUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name ?? u.email}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setCrmOwnerId}
+                    allowEmpty
+                    emptyLabel={t('crm.core.noOwner')}
+                    placeholder={t('crm.core.noOwner')}
+                    options={orgUsers.map((u) => ({
+                      value: u.id,
+                      label: u.full_name ?? u.email,
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="crm-kind">{t('crm.core.kind')}</Label>
-                  <select
+                  <FormSelect
                     id="crm-kind"
-                    className={PROFILE_SELECT_CLASS}
                     value={crmKind}
-                    onChange={(ev) => setCrmKind(ev.target.value)}
-                  >
-                    <option value="INDIVIDUAL">{t('crm.core.kindIndividual')}</option>
-                    <option value="COMPANY">{t('crm.core.kindCompany')}</option>
-                  </select>
+                    onValueChange={setCrmKind}
+                    options={[
+                      { value: 'INDIVIDUAL', label: t('crm.core.kindIndividual') },
+                      { value: 'COMPANY', label: t('crm.core.kindCompany') },
+                    ]}
+                  />
                 </div>
                 {crmKind === 'COMPANY' ? (
                   <>
@@ -880,15 +882,15 @@ export function ClientDetailPage() {
                 ) : null}
                 <div className="grid gap-2">
                   <Label htmlFor="crm-mkt-opt">{t('crm.core.marketingOptIn')}</Label>
-                  <select
+                  <FormSelect
                     id="crm-mkt-opt"
-                    className={PROFILE_SELECT_CLASS}
                     value={crmMarketingOptIn}
-                    onChange={(ev) => setCrmMarketingOptIn(ev.target.value)}
-                  >
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setCrmMarketingOptIn}
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="crm-mkt-ch">{t('crm.core.marketingChannel')}</Label>
@@ -1056,16 +1058,16 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="ins-rel">{t('crm.insured.relation')}</Label>
-                  <select
+                  <FormSelect
                     id="ins-rel"
-                    className={PROFILE_SELECT_CLASS}
                     value={insuredRelation}
-                    onChange={(ev) => setInsuredRelation(ev.target.value)}
-                  >
-                    <option value="HOLDER">{t('crm.insured.relationHolder')}</option>
-                    <option value="DEPENDENT">{t('crm.insured.relationDependent')}</option>
-                    <option value="OTHER">{t('crm.insured.relationOther')}</option>
-                  </select>
+                    onValueChange={setInsuredRelation}
+                    options={[
+                      { value: 'HOLDER', label: t('crm.insured.relationHolder') },
+                      { value: 'DEPENDENT', label: t('crm.insured.relationDependent') },
+                      { value: 'OTHER', label: t('crm.insured.relationOther') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="ins-notes">{t('crm.insured.notesOptional')}</Label>
@@ -1143,23 +1145,24 @@ export function ClientDetailPage() {
               <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSaveProfile}>
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="pf-life">{t('crm.profile.lifeStage')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-life"
-                    className={PROFILE_SELECT_CLASS}
                     value={lifeStage}
-                    onChange={(ev) => setLifeStage(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {lifeStage &&
-                    !LIFE_STAGE_OPTIONS.some((o) => o.value === lifeStage) ? (
-                      <option value={lifeStage}>{lifeStage}</option>
-                    ) : null}
-                    {LIFE_STAGE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.lifeStageOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setLifeStage}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      lifeStage &&
+                      !LIFE_STAGE_OPTIONS.some((o) => o.value === lifeStage)
+                        ? [{ value: lifeStage, label: lifeStage }]
+                        : undefined
+                    }
+                    options={LIFE_STAGE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.lifeStageOption.${o.value}`),
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-children">{t('crm.profile.children')}</Label>
@@ -1173,69 +1176,73 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-owns-prop">{t('crm.profile.ownsProperty')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-owns-prop"
-                    className={PROFILE_SELECT_CLASS}
                     value={ownsProperty}
-                    onChange={(ev) => setOwnsProperty(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setOwnsProperty}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="pf-prop-type">{t('crm.profile.propertyType')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-prop-type"
-                    className={PROFILE_SELECT_CLASS}
                     value={propertyType}
-                    onChange={(ev) => setPropertyType(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {propertyType &&
-                    !PROPERTY_TYPE_OPTIONS.some((o) => o.value === propertyType) ? (
-                      <option value={propertyType}>{propertyType}</option>
-                    ) : null}
-                    {PROPERTY_TYPE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.propertyTypeOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setPropertyType}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      propertyType &&
+                      !PROPERTY_TYPE_OPTIONS.some((o) => o.value === propertyType)
+                        ? [{ value: propertyType, label: propertyType }]
+                        : undefined
+                    }
+                    options={PROPERTY_TYPE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.propertyTypeOption.${o.value}`),
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-owns-veh">{t('crm.profile.ownsVehicle')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-owns-veh"
-                    className={PROFILE_SELECT_CLASS}
                     value={ownsVehicle}
-                    onChange={(ev) => setOwnsVehicle(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setOwnsVehicle}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-veh-use">{t('crm.profile.vehicleUse')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-veh-use"
-                    className={PROFILE_SELECT_CLASS}
                     value={vehicleUse}
-                    onChange={(ev) => setVehicleUse(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {vehicleUse &&
-                    !VEHICLE_PRIMARY_USE_OPTIONS.some((o) => o.value === vehicleUse) ? (
-                      <option value={vehicleUse}>{vehicleUse}</option>
-                    ) : null}
-                    {VEHICLE_PRIMARY_USE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.vehicleUseOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setVehicleUse}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      vehicleUse &&
+                      !VEHICLE_PRIMARY_USE_OPTIONS.some((o) => o.value === vehicleUse)
+                        ? [{ value: vehicleUse, label: vehicleUse }]
+                        : undefined
+                    }
+                    options={VEHICLE_PRIMARY_USE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.vehicleUseOption.${o.value}`),
+                    }))}
+                  />
                 </div>
 
                 <div className="grid gap-2 sm:col-span-2">
@@ -1253,23 +1260,24 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-emp">{t('crm.profile.employmentType')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-emp"
-                    className={PROFILE_SELECT_CLASS}
                     value={profEmployment}
-                    onChange={(ev) => setProfEmployment(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {profEmployment &&
-                    !EMPLOYMENT_TYPE_OPTIONS.some((o) => o.value === profEmployment) ? (
-                      <option value={profEmployment}>{profEmployment}</option>
-                    ) : null}
-                    {EMPLOYMENT_TYPE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.employmentTypeOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setProfEmployment}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      profEmployment &&
+                      !EMPLOYMENT_TYPE_OPTIONS.some((o) => o.value === profEmployment)
+                        ? [{ value: profEmployment, label: profEmployment }]
+                        : undefined
+                    }
+                    options={EMPLOYMENT_TYPE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.employmentTypeOption.${o.value}`),
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-inc">{t('crm.profile.incomeBand')}</Label>
@@ -1298,16 +1306,17 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-stake">{t('crm.profile.hasCompanyStake')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-stake"
-                    className={PROFILE_SELECT_CLASS}
                     value={profHasStake}
-                    onChange={(ev) => setProfHasStake(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setProfHasStake}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
 
                 <div className="grid gap-2 sm:col-span-2">
@@ -1317,36 +1326,38 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-hlth-plan">{t('crm.profile.hasHealthPlan')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-hlth-plan"
-                    className={PROFILE_SELECT_CLASS}
                     value={hlthHasPlan}
-                    onChange={(ev) => setHlthHasPlan(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setHlthHasPlan}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-hlth-type">{t('crm.profile.healthPlanType')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-hlth-type"
-                    className={PROFILE_SELECT_CLASS}
                     value={hlthPlanType}
-                    onChange={(ev) => setHlthPlanType(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {hlthPlanType &&
-                    !HEALTH_PLAN_TYPE_OPTIONS.some((o) => o.value === hlthPlanType) ? (
-                      <option value={hlthPlanType}>{hlthPlanType}</option>
-                    ) : null}
-                    {HEALTH_PLAN_TYPE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.healthPlanTypeOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setHlthPlanType}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      hlthPlanType &&
+                      !HEALTH_PLAN_TYPE_OPTIONS.some((o) => o.value === hlthPlanType)
+                        ? [{ value: hlthPlanType, label: hlthPlanType }]
+                        : undefined
+                    }
+                    options={HEALTH_PLAN_TYPE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.healthPlanTypeOption.${o.value}`),
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-hlth-lives">{t('crm.profile.healthLivesCount')}</Label>
@@ -1390,16 +1401,17 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-bus-own">{t('crm.profile.ownsBusiness')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-bus-own"
-                    className={PROFILE_SELECT_CLASS}
                     value={busOwns}
-                    onChange={(ev) => setBusOwns(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setBusOwns}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="pf-bus-seg">{t('crm.profile.businessSegment')}</Label>
@@ -1429,42 +1441,45 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-bus-bids">{t('crm.profile.participatesBids')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-bus-bids"
-                    className={PROFILE_SELECT_CLASS}
                     value={busBids}
-                    onChange={(ev) => setBusBids(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setBusBids}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-bus-guar">{t('crm.profile.contractsGuarantee')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-bus-guar"
-                    className={PROFILE_SELECT_CLASS}
                     value={busGuarantee}
-                    onChange={(ev) => setBusGuarantee(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setBusGuarantee}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-bus-bond">{t('crm.profile.needsPerformanceBond')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-bus-bond"
-                    className={PROFILE_SELECT_CLASS}
                     value={busBond}
-                    onChange={(ev) => setBusBond(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setBusBond}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
 
                 <div className="grid gap-2 sm:col-span-2">
@@ -1474,16 +1489,17 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-pet-has">{t('crm.profile.hasPet')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-pet-has"
-                    className={PROFILE_SELECT_CLASS}
                     value={petHas}
-                    onChange={(ev) => setPetHas(ev.target.value)}
-                  >
-                    <option value="">—</option>
-                    <option value="yes">{t('crm.profile.yes')}</option>
-                    <option value="no">{t('crm.profile.no')}</option>
-                  </select>
+                    onValueChange={setPetHas}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-pet-spec">{t('crm.profile.petSpecies')}</Label>
@@ -1521,22 +1537,23 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="pf-pet-vet">{t('crm.profile.vetUsage')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-pet-vet"
-                    className={PROFILE_SELECT_CLASS}
                     value={petVetFreq}
-                    onChange={(ev) => setPetVetFreq(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {petVetFreq && !VET_USAGE_OPTIONS.some((o) => o.value === petVetFreq) ? (
-                      <option value={petVetFreq}>{petVetFreq}</option>
-                    ) : null}
-                    {VET_USAGE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.vetUsageOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setPetVetFreq}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      petVetFreq && !VET_USAGE_OPTIONS.some((o) => o.value === petVetFreq)
+                        ? [{ value: petVetFreq, label: petVetFreq }]
+                        : undefined
+                    }
+                    options={VET_USAGE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.vetUsageOption.${o.value}`),
+                    }))}
+                  />
                 </div>
 
                 <div className="grid gap-2 sm:col-span-2">
@@ -1546,22 +1563,23 @@ export function ClientDetailPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-beh-ch">{t('crm.profile.preferredChannel')}</Label>
-                  <select
+                  <FormSelect
                     id="pf-beh-ch"
-                    className={PROFILE_SELECT_CLASS}
                     value={behChannel}
-                    onChange={(ev) => setBehChannel(ev.target.value)}
-                  >
-                    <option value="">{t('crm.profile.selectPlaceholder')}</option>
-                    {behChannel && !CONTACT_CHANNEL_OPTIONS.some((o) => o.value === behChannel) ? (
-                      <option value={behChannel}>{behChannel}</option>
-                    ) : null}
-                    {CONTACT_CHANNEL_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {t(`crm.profile.contactChannelOption.${o.value}`)}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setBehChannel}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      behChannel && !CONTACT_CHANNEL_OPTIONS.some((o) => o.value === behChannel)
+                        ? [{ value: behChannel, label: behChannel }]
+                        : undefined
+                    }
+                    options={CONTACT_CHANNEL_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.contactChannelOption.${o.value}`),
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pf-beh-time">{t('crm.profile.preferredTime')}</Label>
@@ -1648,34 +1666,30 @@ export function ClientDetailPage() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="ix-type">{t('crm.interactions.type')}</Label>
-                    <select
+                    <FormSelect
                       id="ix-type"
-                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                       value={ixType}
-                      onChange={(ev) => setIxType(ev.target.value)}
-                    >
-                      {INTERACTION_TYPES.map((code) => (
-                        <option key={code} value={code}>
-                          {code}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={setIxType}
+                      options={INTERACTION_TYPES.map((code) => ({
+                        value: code,
+                        label: code,
+                      }))}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="ix-opp">{t('crm.interactions.opportunityOptional')}</Label>
-                    <select
+                    <FormSelect
                       id="ix-opp"
-                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                       value={ixOppId}
-                      onChange={(ev) => setIxOppId(ev.target.value)}
-                    >
-                      <option value="">{t('crm.interactions.noOpp')}</option>
-                      {clientOpportunities.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.stage} ({o.status})
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={setIxOppId}
+                      allowEmpty
+                      emptyLabel={t('crm.interactions.noOpp')}
+                      placeholder={t('crm.interactions.noOpp')}
+                      options={clientOpportunities.map((o) => ({
+                        value: o.id,
+                        label: `${o.stage} (${o.status})`,
+                      }))}
+                    />
                   </div>
                 </div>
                 <div className="grid gap-2">
@@ -1716,19 +1730,18 @@ export function ClientDetailPage() {
               <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={onAddLob}>
                 <div className="grid flex-1 gap-2">
                   <Label htmlFor="add-lob">{t('crm.portfolio.addLob')}</Label>
-                  <select
+                  <FormSelect
                     id="add-lob"
-                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                     value={selectedLob}
-                    onChange={(ev) => setSelectedLob(ev.target.value)}
-                  >
-                    <option value="">{t('crm.portfolio.selectLob')}</option>
-                    {lobs.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.code} — {l.name}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setSelectedLob}
+                    allowEmpty
+                    emptyLabel={t('crm.portfolio.selectLob')}
+                    placeholder={t('crm.portfolio.selectLob')}
+                    options={lobs.map((l) => ({
+                      value: l.id,
+                      label: `${l.code} — ${l.name}`,
+                    }))}
+                  />
                 </div>
                 <Button type="submit" disabled={addingLob || !selectedLob}>
                   {addingLob ? t('crm.portfolio.adding') : t('crm.action.add')}
@@ -1760,19 +1773,18 @@ export function ClientDetailPage() {
               <form className="grid gap-4 sm:grid-cols-2" onSubmit={onAddHeld}>
                 <div className="grid gap-2">
                   <Label htmlFor="held-product">{t('crm.portfolio.catalogProduct')}</Label>
-                  <select
+                  <FormSelect
                     id="held-product"
-                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                     value={selectedProduct}
-                    onChange={(ev) => setSelectedProduct(ev.target.value)}
-                  >
-                    <option value="">{t('crm.portfolio.optionalProduct')}</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={setSelectedProduct}
+                    allowEmpty
+                    emptyLabel={t('crm.portfolio.optionalProduct')}
+                    placeholder={t('crm.portfolio.optionalProduct')}
+                    options={products.map((p) => ({
+                      value: p.id,
+                      label: p.name,
+                    }))}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="held-insurer">{t('crm.portfolio.insurerOptional')}</Label>
@@ -1792,6 +1804,6 @@ export function ClientDetailPage() {
           </Card>
         </>
       ) : null}
-    </main>
+    </div>
   )
 }

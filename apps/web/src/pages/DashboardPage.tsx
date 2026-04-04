@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
+import { cn } from '@/lib/utils'
 import { apiFetch, getApiBaseUrl } from '@/lib/api'
 
 type ApiState = 'loading' | 'ok' | 'error'
@@ -95,30 +98,49 @@ export function DashboardPage() {
   const statusLabel =
     state === 'loading' ? t('apiStatus.checking') : state === 'ok' ? t('apiStatus.ok') : t('apiStatus.error')
 
+  const statusDotClass =
+    state === 'loading'
+      ? 'bg-muted-foreground animate-pulse'
+      : state === 'ok'
+        ? 'bg-emerald-600 dark:bg-emerald-500'
+        : 'bg-destructive'
+
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('appTitle')}</h1>
-        <p className="text-muted-foreground text-sm">{t('dashboard.welcome', { email: user?.email ?? '' })}</p>
-        <p className="text-muted-foreground text-xs">
-          {t('dashboard.organization', {
-            name: user?.organization.name ?? '',
-            slug: user?.organization.slug ?? '',
-          })}
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader
+        title={t('appTitle')}
+        description={t('dashboard.welcome', { email: user?.email ?? '' })}
+      >
+        <Button type="button" variant="secondary" size="sm" onClick={onRefresh}>
+          {t('action.refresh')}
+        </Button>
+      </PageHeader>
+      <p className="text-muted-foreground -mt-4 text-xs sm:-mt-6">
+        {t('dashboard.organization', {
+          name: user?.organization.name ?? '',
+          slug: user?.organization.slug ?? '',
+        })}
+      </p>
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
-        <p className="text-sm" data-testid="api-status">
-          {statusLabel}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            {t('dashboard.systemStatus')}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={cn('size-2 shrink-0 rounded-full', statusDotClass)}
+            aria-hidden
+          />
+          <p className="text-sm font-medium" data-testid="api-status">
+            {statusLabel}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={onRefresh}>
-            {t('action.refresh')}
-          </Button>
-          <Button type="button" variant="outline" asChild>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link to="/clients">{t('nav.clients')}</Link>
           </Button>
-          <Button type="button" variant="outline" asChild>
+          <Button type="button" variant="outline" size="sm" asChild>
             <Link to="/opportunities">{t('nav.opportunities')}</Link>
           </Button>
         </div>
@@ -129,7 +151,14 @@ export function DashboardPage() {
           <h2 className="text-base font-semibold">{t('crm.dashboard.overdueTitle')}</h2>
           <p className="text-muted-foreground mt-1 text-sm">{t('crm.dashboard.overdueSubtitle')}</p>
           {panelLoading ? (
-            <p className="text-muted-foreground mt-4 text-sm">{t('auth.loading')}</p>
+            <div className="mt-4 space-y-3" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2 border-b pb-3 last:border-0">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              ))}
+            </div>
           ) : overdue.length === 0 ? (
             <p className="text-muted-foreground mt-4 text-sm">{t('crm.dashboard.overdueEmpty')}</p>
           ) : (
@@ -155,7 +184,14 @@ export function DashboardPage() {
           <h2 className="text-base font-semibold">{t('crm.dashboard.todayIxTitle')}</h2>
           <p className="text-muted-foreground mt-1 text-sm">{t('crm.dashboard.todayIxSubtitle')}</p>
           {panelLoading ? (
-            <p className="text-muted-foreground mt-4 text-sm">{t('auth.loading')}</p>
+            <div className="mt-4 space-y-3" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2 border-b pb-3 last:border-0">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              ))}
+            </div>
           ) : todayIx.length === 0 ? (
             <p className="text-muted-foreground mt-4 text-sm">{t('crm.dashboard.todayIxEmpty')}</p>
           ) : (
@@ -181,6 +217,6 @@ export function DashboardPage() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   )
 }

@@ -213,7 +213,7 @@ def test_phase6_recommendations_lob_and_profile_rules(client: TestClient) -> Non
     lobs = client.get("/v1/lines-of-business", headers=headers)
     assert lobs.status_code == 200
     lob_list = lobs.json()
-    motor_id = next(l["id"] for l in lob_list if l.get("code") == "MOTOR")
+    motor_id = next(row["id"] for row in lob_list if row.get("code") == "MOTOR")
 
     cli = client.post(
         "/v1/clients",
@@ -251,7 +251,8 @@ def test_phase6_recommendations_lob_and_profile_rules(client: TestClient) -> Non
     body = prev.json()
     assert any("RULE_LOB_AUTO_PORTFOLIO_GAP" in (it.get("rule_ids") or []) for it in body["items"])
     assert any(
-        t.get("rule_id") == "RULE_LOB_AUTO_PORTFOLIO_GAP" and t.get("fired") for t in body["rule_trace"]
+        t.get("rule_id") == "RULE_LOB_AUTO_PORTFOLIO_GAP" and t.get("fired")
+        for t in body["rule_trace"]
     )
 
     prof_patch = client.patch(
@@ -277,4 +278,7 @@ def test_phase6_recommendations_lob_and_profile_rules(client: TestClient) -> Non
     prev2 = client.get(f"/v1/clients/{client_id}/recommendations", headers=headers)
     assert prev2.status_code == 200, prev2.text
     body2 = prev2.json()
-    assert any("RULE_PROFILE_HIGH_EARNER_PROTECTION" in (it.get("rule_ids") or []) for it in body2["items"])
+    assert any(
+        "RULE_PROFILE_HIGH_EARNER_PROTECTION" in (it.get("rule_ids") or [])
+        for it in body2["items"]
+    )

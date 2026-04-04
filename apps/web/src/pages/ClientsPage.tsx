@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api'
 
 type ClientRow = {
@@ -89,6 +93,7 @@ export function ClientsPage() {
       setCompanyLegal('')
       setCompanyTax('')
       await load()
+      toast.success(t('toast.clientCreated'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -97,11 +102,8 @@ export function ClientsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('crm.clients.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('crm.clients.subtitle')}</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader title={t('crm.clients.title')} description={t('crm.clients.subtitle')} />
 
       <Card>
         <CardHeader>
@@ -131,31 +133,30 @@ export function ClientsPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="client-owner">{t('crm.core.owner')}</Label>
-              <select
+              <FormSelect
                 id="client-owner"
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                 value={ownerId}
-                onChange={(ev) => setOwnerId(ev.target.value)}
-              >
-                <option value="">{t('crm.core.noOwner')}</option>
-                {orgUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name ?? u.email}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setOwnerId}
+                allowEmpty
+                emptyLabel={t('crm.core.noOwner')}
+                placeholder={t('crm.core.noOwner')}
+                options={orgUsers.map((u) => ({
+                  value: u.id,
+                  label: u.full_name ?? u.email,
+                }))}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="client-kind">{t('crm.core.kind')}</Label>
-              <select
+              <FormSelect
                 id="client-kind"
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                 value={clientKind}
-                onChange={(ev) => setClientKind(ev.target.value)}
-              >
-                <option value="INDIVIDUAL">{t('crm.core.kindIndividual')}</option>
-                <option value="COMPANY">{t('crm.core.kindCompany')}</option>
-              </select>
+                onValueChange={setClientKind}
+                options={[
+                  { value: 'INDIVIDUAL', label: t('crm.core.kindIndividual') },
+                  { value: 'COMPANY', label: t('crm.core.kindCompany') },
+                ]}
+              />
             </div>
             {clientKind === 'COMPANY' ? (
               <>
@@ -197,7 +198,17 @@ export function ClientsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
+            <div className="space-y-2 rounded-md border p-2" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2">
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-56" />
+                  </div>
+                  <Skeleton className="h-3 w-8" />
+                </div>
+              ))}
+            </div>
           ) : items.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('crm.clients.empty')}</p>
           ) : (
@@ -224,6 +235,6 @@ export function ClientsPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

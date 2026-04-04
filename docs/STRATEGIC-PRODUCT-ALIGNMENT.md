@@ -22,7 +22,7 @@ The strategic brief recommends an **accelerator** model: adopt mature CRM, marke
 
 **Product narrative:** For the first release we **defer CRM/marketing accelerators** and ship a **unified thin CRM + portfolio** so recommendations and future semáforo/scoring read one truth. **External CRM sync** remains explicit **post-MVP** ([`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) Phase 11, [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) Stage 2).
 
-**MVP insurance lines (catalog focus):** **Auto (Motor)**, **Ramos elementares** (general / multirisco), **Vida (Life)** — DB seed and LOB labels via Alembic `mvp_catalog_007`; API enum `ProductCategory.GENERAL_INSURANCE` for elementares.
+**MVP insurance lines (catalog focus):** **Auto**, **Ramos elementares** (general / multirisco), **Vida (Life)** — DB seed and LOB labels via Alembic `mvp_catalog_007`; API enum `ProductCategory.GENERAL_INSURANCE` for elementares.
 
 ---
 

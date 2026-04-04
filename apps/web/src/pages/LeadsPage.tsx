@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api'
 
 type UserBrief = {
@@ -75,6 +79,7 @@ export function LeadsPage() {
       setEmail('')
       setOwnerId('')
       await load()
+      toast.success(t('toast.leadCreated'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -83,11 +88,8 @@ export function LeadsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('crm.leads.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('crm.leads.subtitle')}</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader title={t('crm.leads.title')} description={t('crm.leads.subtitle')} />
 
       <Card>
         <CardHeader>
@@ -115,19 +117,18 @@ export function LeadsPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="lead-owner">{t('crm.leads.ownerOptional')}</Label>
-              <select
+              <FormSelect
                 id="lead-owner"
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                 value={ownerId}
-                onChange={(ev) => setOwnerId(ev.target.value)}
-              >
-                <option value="">{t('crm.leads.noOwner')}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name ?? u.email}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setOwnerId}
+                allowEmpty
+                emptyLabel={t('crm.leads.noOwner')}
+                placeholder={t('crm.leads.noOwner')}
+                options={users.map((u) => ({
+                  value: u.id,
+                  label: u.full_name ?? u.email,
+                }))}
+              />
             </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={creating}>
@@ -149,7 +150,17 @@ export function LeadsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
+            <div className="space-y-2 rounded-md border p-2" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2">
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
           ) : items.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('crm.leads.empty')}</p>
           ) : (
@@ -177,6 +188,6 @@ export function LeadsPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

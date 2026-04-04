@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
 
@@ -123,6 +127,7 @@ export function OpportunitiesPage() {
       })
       setClientId('')
       await load()
+      toast.success(t('toast.opportunityCreated'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -131,11 +136,11 @@ export function OpportunitiesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('crm.opportunities.title')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('crm.opportunities.subtitle')}</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader
+        title={t('crm.opportunities.title')}
+        description={t('crm.opportunities.subtitle')}
+      />
 
       {metrics ? (
         <Card>
@@ -163,20 +168,15 @@ export function OpportunitiesPage() {
           <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={onCreate}>
             <div className="grid flex-1 gap-2">
               <Label htmlFor="opp-client">{t('crm.opportunities.client')}</Label>
-              <select
+              <FormSelect
                 id="opp-client"
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                 value={clientId}
-                onChange={(ev) => setClientId(ev.target.value)}
-                required
-              >
-                <option value="">{t('crm.opportunities.selectClient')}</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setClientId}
+                allowEmpty
+                emptyLabel={t('crm.opportunities.selectClient')}
+                placeholder={t('crm.opportunities.selectClient')}
+                options={clients.map((c) => ({ value: c.id, label: c.full_name }))}
+              />
             </div>
             <Button type="submit" disabled={creating || !clientId}>
               {creating ? t('crm.opportunities.creating') : t('crm.opportunities.create')}
@@ -189,43 +189,44 @@ export function OpportunitiesPage() {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="grid gap-4 sm:grid-cols-3 sm:flex-1">
             <div className="grid gap-2">
-              <Label>{t('crm.opportunities.filterStage')}</Label>
-              <select
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+              <Label htmlFor="opp-filter-stage">{t('crm.opportunities.filterStage')}</Label>
+              <FormSelect
+                id="opp-filter-stage"
                 value={filterStage}
-                onChange={(ev) => setFilterStage(ev.target.value)}
-              >
-                <option value="">{t('crm.opportunities.filterAll')}</option>
-                {PIPELINE_STAGES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setFilterStage}
+                allowEmpty
+                emptyLabel={t('crm.opportunities.filterAll')}
+                placeholder={t('crm.opportunities.filterAll')}
+                options={PIPELINE_STAGES.map((s) => ({ value: s, label: s }))}
+              />
             </div>
             <div className="grid gap-2">
-              <Label>{t('crm.opportunities.filterStatus')}</Label>
-              <select
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+              <Label htmlFor="opp-filter-status">{t('crm.opportunities.filterStatus')}</Label>
+              <FormSelect
+                id="opp-filter-status"
                 value={filterStatus}
-                onChange={(ev) => setFilterStatus(ev.target.value)}
-              >
-                <option value="">{t('crm.opportunities.filterAll')}</option>
-                <option value="OPEN">OPEN</option>
-                <option value="WON">WON</option>
-                <option value="LOST">LOST</option>
-              </select>
+                onValueChange={setFilterStatus}
+                allowEmpty
+                emptyLabel={t('crm.opportunities.filterAll')}
+                placeholder={t('crm.opportunities.filterAll')}
+                options={[
+                  { value: 'OPEN', label: 'OPEN' },
+                  { value: 'WON', label: 'WON' },
+                  { value: 'LOST', label: 'LOST' },
+                ]}
+              />
             </div>
             <div className="grid gap-2">
-              <Label>{t('crm.opportunities.filterOwner')}</Label>
-              <select
-                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+              <Label htmlFor="opp-filter-owner">{t('crm.opportunities.filterOwner')}</Label>
+              <FormSelect
+                id="opp-filter-owner"
                 value={filterOwner}
-                onChange={(ev) => setFilterOwner(ev.target.value as 'all' | 'mine')}
-              >
-                <option value="all">{t('crm.opportunities.filterAll')}</option>
-                <option value="mine">{t('crm.opportunities.filterMine')}</option>
-              </select>
+                onValueChange={(v) => setFilterOwner(v as 'all' | 'mine')}
+                options={[
+                  { value: 'all', label: t('crm.opportunities.filterAll') },
+                  { value: 'mine', label: t('crm.opportunities.filterMine') },
+                ]}
+              />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -243,7 +244,17 @@ export function OpportunitiesPage() {
         <CardContent>
           {error ? <p className="text-destructive mb-4 text-sm">{error}</p> : null}
           {loading ? (
-            <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
+            <div className="space-y-2 rounded-md border p-2" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2">
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-44" />
+                    <Skeleton className="h-3 w-52" />
+                  </div>
+                  <Skeleton className="h-3 w-8" />
+                </div>
+              ))}
+            </div>
           ) : items.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('crm.opportunities.empty')}</p>
           ) : view === 'list' ? (
@@ -295,6 +306,6 @@ export function OpportunitiesPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

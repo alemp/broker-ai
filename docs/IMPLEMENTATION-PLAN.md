@@ -20,7 +20,7 @@
 - **Email/password** authentication; users belong to the org.
 - **Client** and **Opportunity** CRUD, pipeline stages per `OPPORTUNITY.md`.
 - **Lines of business** (`LineOfBusiness`, `ClientLineOfBusiness`) and **held products** (`ClientHeldProduct`) on the client, with **`ingestion_source`**, maintained in-app and via bulk import.
-- **MVP product lines** (catalog + LOB labels): **Auto (Motor)**, **Ramos elementares** (general / multirisco), **Vida (Life)** — see Alembic `mvp_catalog_007` and `ProductCategory.GENERAL_INSURANCE`.
+- **MVP product lines** (catalog + LOB labels): **Auto**, **Ramos elementares** (general / multirisco), **Vida (Life)** — see Alembic `mvp_catalog_007` and `ProductCategory.GENERAL_INSURANCE`.
 - **Enriched insurance-oriented client profile** per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3** (**partial** today: API + schema A–H + score/alerts; web só subconjunto de campos; ver [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)).
 - **Interactions** (types, timeline, link to client/opportunity, next-action and overdue signals) per [`PRODUCT.md`](./PRODUCT.md) §5.5 — **Phase 4**.
 - **Product** catalog and **rule-based** recommendations with explainability (which rule matched); rules consume **portfolio** data and **profile** fields where modeled (LOB + held products per spec §3.2) — **Phase 6**.

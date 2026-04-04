@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import { apiFetch } from '@/lib/api'
 
 type CampaignDto = {
@@ -65,6 +68,7 @@ export function CampaignsPage() {
       setName('')
       setBody('')
       await load()
+      toast.success(t('toast.campaignCreated'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -80,6 +84,7 @@ export function CampaignsPage() {
         method: 'POST',
         json: { channel: 'EMAIL' },
       })
+      toast.success(t('toast.segmentRefreshed'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -88,11 +93,8 @@ export function CampaignsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t('nav.campaigns')}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t('crm.campaigns.subtitle')}</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader title={t('nav.campaigns')} description={t('crm.campaigns.subtitle')} />
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
       <Card>
@@ -133,7 +135,14 @@ export function CampaignsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
+            <div className="space-y-4" aria-busy="true" aria-label={t('auth.loading')}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="border-b pb-4">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="mt-2 h-3 w-64" />
+                </div>
+              ))}
+            </div>
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t('crm.campaigns.empty')}</p>
           ) : (
@@ -163,6 +172,6 @@ export function CampaignsPage() {
           )}
         </CardContent>
       </Card>
-    </main>
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-"""MVP catalog — Auto (Motor), Ramos elementares, Vida (Life)
+"""MVP catalog — Auto, Ramos elementares, Vida (Life)
 
 Revision ID: mvp_catalog_007
 Revises: module52_006
@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.text(
             """
             UPDATE lines_of_business lob
-            SET name = 'Auto (Motor)',
+            SET name = 'Auto',
                 description = 'Seguros automóveis — âmbito MVP.'
             FROM organizations o
             WHERE lob.organization_id = o.id
@@ -82,7 +82,7 @@ def upgrade() -> None:
             SELECT o.id, v.name, v.category, v.description, v.risk, '{_MVP_TAG}', true
             FROM organizations o
             CROSS JOIN (VALUES
-                ('Auto (Motor)', 'AUTO_INSURANCE', 'Catálogo MVP — automóvel', 'MEDIUM'),
+                ('Auto', 'AUTO_INSURANCE', 'Catálogo MVP — automóvel', 'MEDIUM'),
                 (
                   'Ramos elementares', 'GENERAL_INSURANCE',
                   'Catálogo MVP — multirisco / danos / RC', 'MEDIUM'

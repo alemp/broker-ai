@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
 
 type UserBrief = {
@@ -120,27 +122,23 @@ export function LeadDetailPage() {
     return null
   }
 
+  const leadDescription = lead
+    ? [lead.status, lead.email, lead.owner ? lead.owner.full_name ?? lead.owner.email : '']
+        .filter(Boolean)
+        .join(' · ')
+    : undefined
+
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      <div>
-        <Link to="/leads" className="text-muted-foreground hover:text-foreground text-sm">
-          ← {t('crm.leads.back')}
-        </Link>
-        {loading ? (
-          <p className="text-muted-foreground mt-4 text-sm">{t('auth.loading')}</p>
-        ) : lead ? (
-          <>
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight">{lead.full_name}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {lead.status}
-              {lead.email ? ` · ${lead.email}` : ''}
-              {lead.owner ? ` · ${lead.owner.full_name ?? lead.owner.email}` : ''}
-            </p>
-          </>
-        ) : (
-          <p className="text-destructive mt-4 text-sm">{error ?? t('crm.error.notFound')}</p>
-        )}
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+      <PageHeader
+        back={{ to: '/leads', label: t('crm.leads.back') }}
+        titleLoading={loading}
+        title={lead?.full_name ?? ''}
+        description={leadDescription}
+      />
+      {!loading && !lead ? (
+        <p className="text-destructive text-sm">{error ?? t('crm.error.notFound')}</p>
+      ) : null}
 
       {error && lead ? <p className="text-destructive text-sm">{error}</p> : null}
 
@@ -175,34 +173,27 @@ export function LeadDetailPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="conv-owner">{t('crm.leads.oppOwner')}</Label>
-                    <select
+                    <FormSelect
                       id="conv-owner"
-                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                       value={oppOwnerId}
-                      onChange={(ev) => setOppOwnerId(ev.target.value)}
-                    >
-                      {orgUsers.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.full_name ?? u.email}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={setOppOwnerId}
+                      options={orgUsers.map((u) => ({
+                        value: u.id,
+                        label: u.full_name ?? u.email,
+                      }))}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="conv-prod">{t('crm.portfolio.catalogProduct')}</Label>
-                    <select
+                    <FormSelect
                       id="conv-prod"
-                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                       value={oppProductId}
-                      onChange={(ev) => setOppProductId(ev.target.value)}
-                    >
-                      <option value="">{t('crm.portfolio.optionalProduct')}</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={setOppProductId}
+                      allowEmpty
+                      emptyLabel={t('crm.portfolio.optionalProduct')}
+                      placeholder={t('crm.portfolio.optionalProduct')}
+                      options={products.map((p) => ({ value: p.id, label: p.name }))}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="conv-val">{t('crm.leads.estimatedValue')}</Label>
@@ -233,6 +224,6 @@ export function LeadDetailPage() {
           </CardContent>
         </Card>
       ) : null}
-    </main>
+    </div>
   )
 }
