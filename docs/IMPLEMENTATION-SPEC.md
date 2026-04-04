@@ -189,7 +189,8 @@ Information about **lines of business (LOB)** and **products the client already 
 | `IMPLEMENTATION-PLAN.md` | Phased delivery plan (tasks, dependencies, exit criteria) |
 | `IMPLEMENTATION-ROADMAP.md` | MVP → final product; CRM ingress and portfolio requirements |
 | `PHASE-0-STACK.md` | Locked Phase 0 tooling (Vite, uv, Compose, CI) |
-| `DEVELOPMENT.md` | Local runbook (Postgres, API, web) |
+| `DEVELOPMENT.md` | Local runbook (Postgres, API, web, Docker Compose) |
+| `PHASE-1-AUTH.md` | Phase 1 JWT auth, default org, Compose runtime |
 | `DESIGN-PARTNER.md` | Prompt + resolved: single brokerage |
 | `MVP-CRM-STRATEGY.md` | Prompt + resolved: internal CRM + CSV |
 | `OPPORTUNITY.md` | Domain spec for Opportunity |

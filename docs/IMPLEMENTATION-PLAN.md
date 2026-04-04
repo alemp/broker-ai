@@ -1,6 +1,6 @@
 # Implementation plan (MVP)
 
-**Status:** **Phase 0** (skeleton) is implemented in-repo; later phases remain planning until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md) and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phase 0** (skeleton) and **Phase 1** (identity + Docker Compose for api/web/postgres) are implemented in-repo; later phases remain planning until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
 ---
@@ -68,12 +68,14 @@
 
 **Goal:** Secure access scoped to one brokerage org.
 
+**Implemented:** [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md) — JWT (HS256) access token, Argon2 passwords, default org slug `default`, routes `/v1/auth/*` and `/v1/me`. **API + web + Postgres** run via **`docker compose up`** (see [`DEVELOPMENT.md`](./DEVELOPMENT.md)).
+
 | Work item | Notes |
 |-----------|--------|
-| `Organization`, `User`, membership | Seed or bootstrap first org + admin. |
-| Registration / login | Email + password; password hashing (e.g. Argon2/bcrypt). |
-| Session or JWT | Document choice; refresh/expiry policy. |
-| Middleware | Every mutating route resolves `organization_id` from membership. |
+| `Organization`, `User`, membership | Alembic `phase1_002`; default org seeded in migration; `users.organization_id` FK. |
+| Registration / login | `POST /v1/auth/register`, `POST /v1/auth/login`; Argon2 via `argon2-cffi`. |
+| Session or JWT | **JWT** bearer; `JWT_SECRET`, `JWT_EXPIRE_HOURS`; no refresh token (Phase 1). |
+| Middleware / deps | `get_current_user` loads user + org; `org_id` claim must match row. |
 
 **Exit criteria:** User can sign up (or admin-created), log in, and call an authenticated endpoint that enforces org scope.
 

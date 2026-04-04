@@ -1,64 +1,70 @@
 # Local development
 
-Phase 0 runbook for the **ai-copilot** monorepo. Stack details: [`PHASE-0-STACK.md`](./PHASE-0-STACK.md).
+Monorepo runbook for **ai-copilot**. Stack overview: [`PHASE-0-STACK.md`](./PHASE-0-STACK.md). Phase 1 auth and Compose: [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md).
 
-## Prerequisites
+## Recommended: full stack in Docker Compose
 
-- **Node.js** 20+
-- **pnpm** 10+ (root `packageManager` field pins a version)
-- **Docker** (for PostgreSQL via Compose)
-- **uv** ([install](https://docs.astral.sh/uv/getting-started/installation/))
-- **Python** 3.12+
+From the repository root (requires **Docker**):
 
-## 1. PostgreSQL (Docker Compose)
+```bash
+docker compose up --build
+```
 
-From the repository root:
+- **Web (static build + nginx):** [http://localhost:8080](http://localhost:8080) — register, login, dashboard (`WEB_PORT`).
+- **API:** [http://localhost:8000](http://localhost:8000) — OpenAPI at `/docs` (`API_PORT`).
+- **Postgres:** `localhost:5432` (`POSTGRES_PORT`) if you need host access.
+
+The API container runs **`alembic upgrade head`** on start, then **uvicorn**. Set a strong **`JWT_SECRET`** in production (see [`.env.example`](../.env.example)).
+
+The web bundle is built with **`VITE_API_BASE_URL`** (default `http://localhost:8000`) so the **browser** can reach the API from your machine. If you change published API ports or use another hostname, set `VITE_API_BASE_URL` before `docker compose build`.
+
+## Optional: hybrid local tooling (API / web on host, Postgres in Docker)
+
+### 1. PostgreSQL only
 
 ```bash
 docker compose up -d postgres
 ```
 
-Default connection (matches `apps/api` defaults unless overridden):
+Defaults: user / password / database `ai_copilot` / `ai_copilot_dev` / `ai_copilot`.
 
-- Host: `localhost`
-- Port: `5432`
-- User / password / database: `ai_copilot` / `ai_copilot_dev` / `ai_copilot`
+### 2. API (`apps/api`)
 
-Copy [`.env.example`](../.env.example) to `.env` at the root if you want to customize Compose variables.
-
-## 2. API (`apps/api`)
-
-Python **3.12** is pinned via [`apps/api/.python-version`](../apps/api/.python-version) for `uv` (install: [Astral `uv`](https://docs.astral.sh/uv/getting-started/installation/)).
+Python **3.12** — [`apps/api/.python-version`](../apps/api/.python-version). Install **uv**: [Astral docs](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```bash
 cd apps/api
 uv sync --group dev
 ```
 
-Optional: create `apps/api/.env` to override defaults (see [`.env.example`](../.env.example)). At minimum, ensure `DATABASE_URL` matches your Postgres instance, for example:
+Example `apps/api/.env` or shell exports:
 
 ```env
 DATABASE_URL=postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
 APP_ENV=development
+JWT_SECRET=local-dev-only
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080
 STORAGE_BACKEND=local
 LOCAL_STORAGE_PATH=.local-storage/objects
 ```
 
-Run migrations:
-
 ```bash
-export DATABASE_URL=postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
 uv run alembic upgrade head
-```
-
-Start the server:
-
-```bash
 uv run uvicorn ai_copilot_api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- OpenAPI: `http://localhost:8000/docs`
-- Health: `http://localhost:8000/health`
+### 3. Web (`apps/web`) — Vite dev server
+
+```bash
+pnpm install
+pnpm dev:web
+```
+
+`apps/web/.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
 
 ### API tests and lint
 
@@ -68,22 +74,7 @@ uv run ruff check src tests
 uv run pytest
 ```
 
-## 3. Web (`apps/web`)
-
-From the repository root:
-
-```bash
-pnpm install
-pnpm dev:web
-```
-
-Or from `apps/web`: `pnpm dev`.
-
-The app expects the API at **`http://localhost:8000`** by default. To override, set in `apps/web/.env`:
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-```
+Integration tests in `tests/test_auth.py` run when **`DATABASE_URL`** is set (e.g. CI or local Postgres after `alembic upgrade head`). Other tests do not require a database.
 
 ### Web lint and build
 
@@ -92,12 +83,8 @@ pnpm lint:web
 pnpm build:web
 ```
 
-## 4. Phase 0 exit checks
+For **`pnpm build:web`**, set `VITE_API_BASE_URL` in the environment if the default is wrong (CI sets it to `http://localhost:8000`).
 
-- API and web start locally.
-- `alembic upgrade head` succeeds against Docker Postgres.
-- Local storage writes under `.local-storage/` (gitignored) — verified in API tests; do not commit blobs.
+## CI
 
-## 5. CI
-
-On push and pull request, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs API and web checks. Ensure secrets are **not** committed; use `.env` locally only.
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs API checks (with Postgres) and web lint/build. Do not commit secrets; use `.env` locally only.

@@ -13,6 +13,22 @@ class Settings(BaseSettings):
     )
 
     app_env: str = Field(default="development", validation_alias="APP_ENV")
+    jwt_secret: str = Field(
+        default="local-dev-only-jwt-secret-min-32-chars!",
+        validation_alias="JWT_SECRET",
+    )
+    jwt_expire_hours: int = Field(default=24, validation_alias="JWT_EXPIRE_HOURS")
+    cors_origins_raw: str = Field(
+        default=(
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:8080,http://127.0.0.1:8080"
+        ),
+        validation_alias="CORS_ORIGINS",
+    )
+    default_organization_slug: str = Field(
+        default="default",
+        validation_alias="DEFAULT_ORGANIZATION_SLUG",
+    )
     database_url: PostgresDsn = Field(
         default="postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot",
         validation_alias="DATABASE_URL",
@@ -41,6 +57,11 @@ class Settings(BaseSettings):
     @classmethod
     def expand_path(cls, value: str | Path) -> Path:
         return Path(value).expanduser() if not isinstance(value, Path) else value
+
+    @property
+    def cors_origins(self) -> list[str]:
+        parts = self.cors_origins_raw.split(",")
+        return [p.strip() for p in parts if p.strip()]
 
 
 @lru_cache

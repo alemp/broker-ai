@@ -7,6 +7,7 @@ Monorepo for the intelligent sales copilot MVP (brokerage design partner).
 - **Local setup (API, web, Postgres):** [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
 
 ```bash
-docker compose up -d postgres
-# then follow docs/DEVELOPMENT.md for apps/api and apps/web
+docker compose up --build
 ```
+
+Then open **http://localhost:8080** (web) and **http://localhost:8000/docs** (API). For Postgres-only or hybrid local dev, see [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).

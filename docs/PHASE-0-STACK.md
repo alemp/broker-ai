@@ -16,6 +16,7 @@ This document records **concrete choices** for [Phase 0 — Project skeleton and
 | Migrations | **Alembic** (SQLAlchemy); `DATABASE_URL` via environment |
 | Object storage | **Abstraction** with **`local`** (default) and **`s3`** backends; local root **gitignored** (see root `.gitignore`) |
 | CI | **GitHub Actions** — API: `uv sync`, `ruff check`, `pytest`; Web: `pnpm install`, `lint`, `build` |
+| Runtime (Phase 1+) | **Docker Compose** — `postgres`, `api` (uvicorn + Alembic on start), `web` (nginx static build). See [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md) and [`DEVELOPMENT.md`](./DEVELOPMENT.md). |
 
 ## Repository layout
 

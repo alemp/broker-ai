@@ -167,3 +167,4 @@ Use one row per epic; update **Status** (`Planned` / `In progress` / `Done` / `D
 | `IMPLEMENTATION-PLAN.md` | Engineering phases (updated for portfolio + Excel) |
 | `PHASE-0-STACK.md` | Locked Phase 0 tooling (Vite, uv, Docker Compose, GitHub Actions) |
 | `DEVELOPMENT.md` | Local development runbook (Postgres, API, web) |
+| `PHASE-1-AUTH.md` | Phase 1 JWT auth and Docker Compose (api + web + postgres) |
