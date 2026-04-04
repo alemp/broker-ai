@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
-from ai_copilot_api.db.enums import OpportunityStage
+from ai_copilot_api.db.enums import OpportunityStage, OpportunityStatus
 from ai_copilot_api.db.models import Client, Opportunity, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.opportunity_status import status_for_stage
@@ -75,6 +76,7 @@ def list_opportunities(
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
     stage: OpportunityStage | None = None,
     client_id: uuid.UUID | None = None,
+    overdue_next_action: bool = Query(default=False),
 ) -> list[OpportunityOut]:
     stmt = (
         select(Opportunity)
@@ -85,6 +87,13 @@ def list_opportunities(
         stmt = stmt.where(Opportunity.stage == stage)
     if client_id is not None:
         stmt = stmt.where(Opportunity.client_id == client_id)
+    if overdue_next_action:
+        now = datetime.now(UTC)
+        stmt = stmt.where(
+            Opportunity.status == OpportunityStatus.OPEN,
+            Opportunity.next_action_due_at.isnot(None),
+            Opportunity.next_action_due_at < now,
+        )
     stmt = stmt.order_by(Opportunity.updated_at.desc()).offset(skip).limit(limit)
     rows = db.scalars(stmt).all()
     return [OpportunityOut.model_validate(r) for r in rows]
@@ -113,6 +122,7 @@ def create_opportunity(
         source=body.source,
         last_interaction_at=body.last_interaction_at,
         next_action=body.next_action,
+        next_action_due_at=body.next_action_due_at,
     )
     db.add(row)
     db.commit()

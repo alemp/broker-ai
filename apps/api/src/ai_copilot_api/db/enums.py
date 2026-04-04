@@ -39,3 +39,16 @@ class ProductRiskLevel(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
+
+
+class InteractionType(StrEnum):
+    CALL = "CALL"
+    WHATSAPP = "WHATSAPP"
+    EMAIL = "EMAIL"
+    MEETING = "MEETING"
+    VISIT = "VISIT"
+    PROPOSAL_SENT = "PROPOSAL_SENT"
+    CLIENT_REPLY = "CLIENT_REPLY"
+    NOTE = "NOTE"
+    POST_SALE = "POST_SALE"
+    CAMPAIGN_TOUCH = "CAMPAIGN_TOUCH"

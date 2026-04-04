@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from ai_copilot_api.db.enums import (
     IngestionSource,
+    InteractionType,
     OpportunityStage,
     OpportunityStatus,
     ProductCategory,
@@ -183,6 +184,7 @@ class OpportunityCreate(BaseModel):
     source: str | None = Field(default=None, max_length=255)
     last_interaction_at: datetime | None = None
     next_action: str | None = None
+    next_action_due_at: datetime | None = None
 
 
 class OpportunityUpdate(BaseModel):
@@ -195,6 +197,7 @@ class OpportunityUpdate(BaseModel):
     source: str | None = Field(default=None, max_length=255)
     last_interaction_at: datetime | None = None
     next_action: str | None = None
+    next_action_due_at: datetime | None = None
 
 
 class OpportunityStagePatch(BaseModel):
@@ -232,8 +235,41 @@ class OpportunityOut(BaseModel):
     source: str | None
     last_interaction_at: datetime | None
     next_action: str | None
+    next_action_due_at: datetime | None
     created_at: datetime
     updated_at: datetime
     client: ClientBrief
     owner: UserBrief
     product: ProductBrief | None
+
+
+class InteractionCreate(BaseModel):
+    client_id: uuid.UUID
+    opportunity_id: uuid.UUID | None = None
+    interaction_type: InteractionType
+    summary: str = Field(min_length=1)
+    occurred_at: datetime | None = None
+    opportunity_next_action: str | None = None
+    opportunity_next_action_due_at: datetime | None = None
+
+
+class InteractionUpdate(BaseModel):
+    interaction_type: InteractionType | None = None
+    summary: str | None = Field(default=None, min_length=1)
+    occurred_at: datetime | None = None
+    opportunity_id: uuid.UUID | None = None
+
+
+class InteractionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    client_id: uuid.UUID
+    opportunity_id: uuid.UUID | None
+    created_by_id: uuid.UUID
+    interaction_type: InteractionType
+    summary: str
+    occurred_at: datetime
+    created_at: datetime
+    created_by: UserBrief = Field(validation_alias="created_by_user")

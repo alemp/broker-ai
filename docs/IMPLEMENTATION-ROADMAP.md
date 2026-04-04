@@ -77,7 +77,7 @@ MVP (design partner)  →  Growth  →  Platform scale  →  Full intelligent pr
 | CRM core | `Client`, `Opportunity`, pipeline UI | **Done** (Phase 2; see [`PHASE-2-CRM.md`](./PHASE-2-CRM.md)) |
 | **Portfolio** | `LineOfBusiness`, `ClientLineOfBusiness`, `ClientHeldProduct`; CRUD in UI; **`ingestion_source`** | **Done** (Phase 2) |
 | **Enriched profile** | Insurance-oriented client attributes (blocks), completeness, alerts ([`PRODUCT.md`](./PRODUCT.md) §5.3) | **Done** ([`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md); [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) **Phase 3**) |
-| **Interactions** | Timeline, types, agenda/day panel ([`PRODUCT.md`](./PRODUCT.md) §5.5) | Planned (**Phase 4**) |
+| **Interactions** | Timeline, types, agenda/day panel ([`PRODUCT.md`](./PRODUCT.md) §5.5) | **Done** ([`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md); **Phase 4**) |
 | Bulk ingest | **CSV + Excel** import for clients **including** LOB / held-product columns per template; upsert: `external_id` → email | Planned (**Phase 5**) |
 | Catalog & rules | `Product` + LOB **catalog CRUD**; **rule engine** uses client attributes **and** LOB / held products / profile | **Partial** — catalog in Phase 2; rules **Phase 6** |
 | Documents | PDF upload (limits per spec); hybrid extraction; link to client/opportunity | Planned (**Phases 7–8**) |

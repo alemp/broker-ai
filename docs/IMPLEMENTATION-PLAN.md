@@ -1,6 +1,6 @@
 # Implementation plan (MVP)
 
-**Status:** **Phases 0–3** are implemented in-repo (foundation, auth, CRM/portfolio/pipeline, enriched client profile). Phase 4+ remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phases 0–4** are implemented in-repo (foundation, auth, CRM/portfolio/pipeline, enriched client profile, interactions and overdue/next-action signals). Phase 5+ remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
 **Living checklist:** Stakeholder scope from [`PRODUCT.md`](./PRODUCT.md) vs repo status is maintained in [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) — update that file when phases ship or scope shifts.  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
@@ -127,6 +127,8 @@
 ---
 
 ### Phase 4 — Interactions, agenda, and history ([`PRODUCT.md`](./PRODUCT.md) §5.5)
+
+**Status:** **Done** — see [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md).
 
 **Goal:** Cadence and relationship memory — adoption driver for brokers (value, not only bureaucracy).
 

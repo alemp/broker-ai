@@ -34,7 +34,7 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 | **5.2** Leads, clients, opportunities, import | **Partial** | `Client` + `Opportunity` + owner; no separate **Lead** entity. **Bulk import** → **Phase 5** |
 | **5.3** Enriched insurance profile (blocks A–H) | **Done (core)** | [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md): JSONB `profile_data`, Pydantic blocks, merge `PATCH`, score + alerts, detail UI subset; bulk import mapping **Phase 5**; consent enforcement **Phase 10** |
 | **5.4** Commercial funnel | **Partial** | Pipeline exists with **6** stages — see [`enums.py`](../apps/api/src/ai_copilot_api/db/enums.py). Brief: **10** steps + post-sale fields. Missing on `Opportunity`: insurer considered, expected close, loss reason; enforce next-action/loss rules — backlog (can straddle Phase 2 follow-up or Phase 4) |
-| **5.5** Interactions, agenda, history | **Planned** | **Phase 4** — `Interaction` model, timeline, day panel, sync `last_interaction_at` |
+| **5.5** Interactions, agenda, history | **Done (core)** | [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md): `Interaction` + API, timeline (client/opp), dashboard overdue + today; `last_interaction_at` sync; `next_action_due_at` + overdue filter — push notifications / full calendar later |
 | **5.6** Insurer/product/coverage catalog | **Partial** | `Product`, `LineOfBusiness`, `ClientHeldProduct` (`insurer_name` on held rows). Missing: partner **Insurer** master, **coverage** hierarchy, commercial **arguments**, attachments — enrich through **Phase 6** and catalog epics |
 | **5.7** Consultative recommendation | **Planned** | **Phase 6** — rule engine + explainability + UI; add accept/ignore/history in same phase or follow-on |
 | **5.8** Adequacy semáforo (green/yellow/red) | **Planned** | **Phase 9** — batch scoring + explicit adequacy UX + explanation |
@@ -48,7 +48,7 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 
 | Strategic brief roadmap ([`PRODUCT.md`](./PRODUCT.md) §9) | Engineering plan ([`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md)) |
 |----------------------------------------------------------|------------------------------------------------------------------------|
-| Phase 1 — Operational MVP (CRM, basic profile, interactions, dashboards) | **Phases 0–2** done (foundation + CRM + portfolio). **Phase 3** profile + **Phase 4** interactions complete the operational layer; **Phase 9** dashboards |
+| Phase 1 — Operational MVP (CRM, basic profile, interactions, dashboards) | **Phases 0–4** done (foundation + CRM + portfolio + profile + interactions). **Phase 9** dashboards |
 | Phase 2 — Intelligent MVP (enriched profile, catalog, rule recommendations, basic régua) | **Phase 3** enriched profile; **Phase 6** catalog/rules; régua still external or post-MVP |
 | Phase 3 — Monetize book (semáforo, upsell queue, contextual campaigns) | **Phase 9** (semáforo/scoring) + **Phase 11 / Stage 2** (campaigns) |
 | Phase 4 — AI acceleration (arguments, summaries, copilot, predictive NBA) | **Phase 8** hybrid extraction + **Stage 4** copilot / gen-AI |

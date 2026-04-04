@@ -26,6 +26,7 @@ from sqlalchemy.sql import text
 from ai_copilot_api.db.base import Base
 from ai_copilot_api.db.enums import (
     IngestionSource,
+    InteractionType,
     OpportunityStage,
     OpportunityStatus,
     ProductCategory,
@@ -69,6 +70,10 @@ class Organization(Base):
         "Opportunity",
         back_populates="organization",
     )
+    interactions: Mapped[list["Interaction"]] = relationship(
+        "Interaction",
+        back_populates="organization",
+    )
 
 
 class User(Base):
@@ -107,6 +112,11 @@ class User(Base):
         "Opportunity",
         back_populates="owner",
         foreign_keys="Opportunity.owner_id",
+    )
+    created_interactions: Mapped[list["Interaction"]] = relationship(
+        "Interaction",
+        back_populates="created_by_user",
+        foreign_keys="Interaction.created_by_id",
     )
 
 
@@ -251,6 +261,11 @@ class Client(Base):
         back_populates="client",
         cascade="all, delete-orphan",
     )
+    interactions: Mapped[list["Interaction"]] = relationship(
+        "Interaction",
+        back_populates="client",
+        cascade="all, delete-orphan",
+    )
 
 
 class ClientLineOfBusiness(Base):
@@ -391,6 +406,11 @@ class Opportunity(Base):
         nullable=True,
     )
     next_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_action_due_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -416,4 +436,73 @@ class Opportunity(Base):
     product: Mapped["Product | None"] = relationship(
         "Product",
         back_populates="opportunities",
+    )
+    interactions: Mapped[list["Interaction"]] = relationship(
+        "Interaction",
+        back_populates="opportunity",
+        cascade="all, delete-orphan",
+    )
+
+
+class Interaction(Base):
+    __tablename__ = "interactions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("opportunities.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    interaction_type: Mapped[InteractionType] = mapped_column(
+        _varchar_enum(InteractionType),
+        nullable=False,
+    )
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="interactions",
+    )
+    client: Mapped["Client"] = relationship("Client", back_populates="interactions")
+    opportunity: Mapped["Opportunity | None"] = relationship(
+        "Opportunity",
+        back_populates="interactions",
+    )
+    created_by_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="created_interactions",
+        foreign_keys=[created_by_id],
     )

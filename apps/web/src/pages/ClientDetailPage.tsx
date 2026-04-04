@@ -8,6 +8,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { apiFetch } from '@/lib/api'
 
+const INTERACTION_TYPES = [
+  'CALL',
+  'WHATSAPP',
+  'EMAIL',
+  'MEETING',
+  'VISIT',
+  'PROPOSAL_SENT',
+  'CLIENT_REPLY',
+  'NOTE',
+  'POST_SALE',
+  'CAMPAIGN_TOUCH',
+] as const
+
 type LineOfBusinessDto = {
   id: string
   code: string
@@ -51,6 +64,21 @@ type ClientDetail = {
   profile_alerts: string[]
 }
 
+type InteractionDto = {
+  id: string
+  interaction_type: string
+  summary: string
+  occurred_at: string
+  opportunity_id: string | null
+  created_by: { email: string; full_name: string | null }
+}
+
+type ClientOppRow = {
+  id: string
+  stage: string
+  status: string
+}
+
 export function ClientDetailPage() {
   const { t } = useTranslation('common')
   const { clientId } = useParams<{ clientId: string }>()
@@ -71,6 +99,12 @@ export function ClientDetailPage() {
   const [ownsVehicle, setOwnsVehicle] = useState('')
   const [vehicleUse, setVehicleUse] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
+  const [interactions, setInteractions] = useState<InteractionDto[]>([])
+  const [clientOpportunities, setClientOpportunities] = useState<ClientOppRow[]>([])
+  const [ixType, setIxType] = useState<string>('CALL')
+  const [ixSummary, setIxSummary] = useState('')
+  const [ixOppId, setIxOppId] = useState('')
+  const [addingIx, setAddingIx] = useState(false)
 
   const loadAll = useCallback(async () => {
     if (!clientId) {
@@ -79,11 +113,15 @@ export function ClientDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [d, catalog, plist] = await Promise.all([
+      const [d, catalog, plist, ixList, oppList] = await Promise.all([
         apiFetch<ClientDetail>(`/v1/clients/${clientId}`),
         apiFetch<LineOfBusinessDto[]>('/v1/lines-of-business'),
         apiFetch<ProductBrief[]>('/v1/products'),
+        apiFetch<InteractionDto[]>(`/v1/interactions?client_id=${clientId}&limit=100`),
+        apiFetch<ClientOppRow[]>(`/v1/opportunities?client_id=${clientId}&limit=50`),
       ])
+      setInteractions(ixList)
+      setClientOpportunities(oppList)
       setDetail(d)
       const per = d.profile.personal as Record<string, unknown> | null | undefined
       const res = d.profile.residence as Record<string, unknown> | null | undefined
@@ -229,6 +267,33 @@ export function ClientDetailPage() {
     }
   }
 
+  const onAddInteraction = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!clientId || !ixSummary.trim()) {
+      return
+    }
+    setAddingIx(true)
+    setError(null)
+    try {
+      await apiFetch('/v1/interactions', {
+        method: 'POST',
+        json: {
+          client_id: clientId,
+          interaction_type: ixType,
+          summary: ixSummary.trim(),
+          ...(ixOppId ? { opportunity_id: ixOppId } : {}),
+        },
+      })
+      setIxSummary('')
+      setIxOppId('')
+      await loadAll()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setAddingIx(false)
+    }
+  }
+
   if (!clientId) {
     return null
   }
@@ -345,6 +410,83 @@ export function ClientDetailPage() {
                     {savingProfile ? t('crm.profile.saving') : t('crm.profile.save')}
                   </Button>
                 </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('crm.interactions.title')}</CardTitle>
+              <p className="text-muted-foreground text-sm">{t('crm.interactions.subtitle')}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {interactions.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('crm.interactions.empty')}</p>
+              ) : (
+                <ul className="space-y-3 text-sm">
+                  {interactions.map((row) => (
+                    <li key={row.id} className="border-b pb-3 last:border-0">
+                      <div className="font-medium">
+                        {row.interaction_type}{' '}
+                        <span className="text-muted-foreground font-normal">
+                          · {new Date(row.occurred_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap">{row.summary}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {row.created_by.full_name ?? row.created_by.email}
+                        {row.opportunity_id ? ` · ${t('crm.interactions.linkedOpp')}` : ''}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form className="grid gap-3" onSubmit={onAddInteraction}>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="ix-type">{t('crm.interactions.type')}</Label>
+                    <select
+                      id="ix-type"
+                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+                      value={ixType}
+                      onChange={(ev) => setIxType(ev.target.value)}
+                    >
+                      {INTERACTION_TYPES.map((code) => (
+                        <option key={code} value={code}>
+                          {code}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="ix-opp">{t('crm.interactions.opportunityOptional')}</Label>
+                    <select
+                      id="ix-opp"
+                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+                      value={ixOppId}
+                      onChange={(ev) => setIxOppId(ev.target.value)}
+                    >
+                      <option value="">{t('crm.interactions.noOpp')}</option>
+                      {clientOpportunities.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.stage} ({o.status})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="ix-sum">{t('crm.interactions.summary')}</Label>
+                  <textarea
+                    id="ix-sum"
+                    className="border-input bg-background min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
+                    value={ixSummary}
+                    onChange={(ev) => setIxSummary(ev.target.value)}
+                  />
+                </div>
+                <Button type="submit" disabled={addingIx || !ixSummary.trim()}>
+                  {addingIx ? t('crm.interactions.adding') : t('crm.interactions.add')}
+                </Button>
               </form>
             </CardContent>
           </Card>
