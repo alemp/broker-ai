@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
@@ -90,6 +90,7 @@ def list_leads(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
     status_filter: LeadStatus | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=200),
 ) -> list[LeadOut]:
     stmt = (
         select(Lead)
@@ -98,6 +99,9 @@ def list_leads(
     )
     if status_filter is not None:
         stmt = stmt.where(Lead.status == status_filter)
+    if q and q.strip():
+        pat = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Lead.full_name.ilike(pat), Lead.email.ilike(pat)))
     stmt = stmt.order_by(Lead.updated_at.desc()).offset(skip).limit(limit)
     rows = db.scalars(stmt).all()
     return [LeadOut.model_validate(r) for r in rows]

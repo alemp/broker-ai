@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { apiFetch } from '@/lib/api'
 
 const PIPELINE_STAGES = [
@@ -21,11 +22,6 @@ const PIPELINE_STAGES = [
   'CLOSED_LOST',
   'POST_SALE',
 ] as const
-
-type ClientRow = {
-  id: string
-  full_name: string
-}
 
 type OpportunityRow = {
   id: string
@@ -45,16 +41,15 @@ export function OpportunitiesPage() {
   const { t } = useTranslation('common')
   const { user } = useAuth()
   const [items, setItems] = useState<OpportunityRow[]>([])
-  const [clients, setClients] = useState<ClientRow[]>([])
   const [metrics, setMetrics] = useState<MetricsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [clientId, setClientId] = useState('')
-  const [creating, setCreating] = useState(false)
   const [view, setView] = useState<'list' | 'kanban'>('list')
   const [filterStage, setFilterStage] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterOwner, setFilterOwner] = useState<'all' | 'mine'>('all')
+  const [listSearch, setListSearch] = useState('')
+  const debouncedListSearch = useDebouncedValue(listSearch, 350)
 
   const querySuffix = useMemo(() => {
     const p = new URLSearchParams()
@@ -67,21 +62,23 @@ export function OpportunitiesPage() {
     if (filterOwner === 'mine' && user?.id) {
       p.set('owner_id', user.id)
     }
+    const q = debouncedListSearch.trim()
+    if (q) {
+      p.set('q', q)
+    }
     const s = p.toString()
     return s ? `?${s}` : ''
-  }, [filterStage, filterStatus, filterOwner, user?.id])
+  }, [filterStage, filterStatus, filterOwner, user?.id, debouncedListSearch])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [opps, cl, m] = await Promise.all([
+      const [opps, m] = await Promise.all([
         apiFetch<OpportunityRow[]>(`/v1/opportunities${querySuffix}`),
-        apiFetch<ClientRow[]>('/v1/clients'),
         apiFetch<MetricsSummary>('/v1/opportunities/metrics/summary'),
       ])
       setItems(opps)
-      setClients(cl)
       setMetrics(m)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
@@ -106,41 +103,16 @@ export function OpportunitiesPage() {
     return map
   }, [items])
 
-  const onCreate = async (ev: React.FormEvent) => {
-    ev.preventDefault()
-    if (!user || !clientId) {
-      return
-    }
-    setCreating(true)
-    setError(null)
-    try {
-      await apiFetch('/v1/opportunities', {
-        method: 'POST',
-        json: {
-          client_id: clientId,
-          owner_id: user.id,
-          stage: 'LEAD',
-          status: 'OPEN',
-          closing_probability: 10,
-          next_action: 'Primeiro contacto com o cliente',
-        },
-      })
-      setClientId('')
-      await load()
-      toast.success(t('toast.opportunityCreated'))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('crm.error.generic'))
-    } finally {
-      setCreating(false)
-    }
-  }
-
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
       <PageHeader
         title={t('crm.opportunities.title')}
         description={t('crm.opportunities.subtitle')}
-      />
+      >
+        <Button asChild>
+          <Link to="/opportunities/new">{t('action.newRecord')}</Link>
+        </Button>
+      </PageHeader>
 
       {metrics ? (
         <Card>
@@ -159,31 +131,6 @@ export function OpportunitiesPage() {
           </CardContent>
         </Card>
       ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('crm.opportunities.new')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={onCreate}>
-            <div className="grid flex-1 gap-2">
-              <Label htmlFor="opp-client">{t('crm.opportunities.client')}</Label>
-              <FormSelect
-                id="opp-client"
-                value={clientId}
-                onValueChange={setClientId}
-                allowEmpty
-                emptyLabel={t('crm.opportunities.selectClient')}
-                placeholder={t('crm.opportunities.selectClient')}
-                options={clients.map((c) => ({ value: c.id, label: c.full_name }))}
-              />
-            </div>
-            <Button type="submit" disabled={creating || !clientId}>
-              {creating ? t('crm.opportunities.creating') : t('crm.opportunities.create')}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -226,6 +173,20 @@ export function OpportunitiesPage() {
                   { value: 'all', label: t('crm.opportunities.filterAll') },
                   { value: 'mine', label: t('crm.opportunities.filterMine') },
                 ]}
+              />
+            </div>
+            <div className="grid gap-2 sm:col-span-3">
+              <Label htmlFor="opp-list-search" className="sr-only">
+                {t('crm.opportunities.listSearchAria')}
+              </Label>
+              <Input
+                id="opp-list-search"
+                type="search"
+                value={listSearch}
+                onChange={(ev) => setListSearch(ev.target.value)}
+                placeholder={t('crm.opportunities.listSearch')}
+                aria-label={t('crm.opportunities.listSearchAria')}
+                autoComplete="off"
               />
             </div>
           </div>

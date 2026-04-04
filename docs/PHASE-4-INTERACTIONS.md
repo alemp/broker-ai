@@ -2,7 +2,7 @@
 
 ## Estado
 
-Implementado: modelo `Interaction` (tipo enum, resumo, `occurred_at`, `client_id`, `opportunity_id` opcional, `created_by`), migração `phase4_005`, `GET/POST/PATCH/DELETE /v1/interactions` com filtros (`client_id`, `opportunity_id`, `interaction_type`, `occurred_from` / `occurred_to`), sincronização de `Opportunity.last_interaction_at` a partir do máximo de `occurred_at` das interações ligadas, campos opcionais no registo para atualizar `next_action` e `next_action_due_at` da oportunidade, coluna `opportunities.next_action_due_at`, filtro `GET /v1/opportunities?overdue_next_action=true` (abertas com prazo &lt; agora). Web: timeline na ficha do cliente e da oportunidade; painel no dashboard (atrasadas + interações de hoje).
+Implementado: modelo `Interaction` (tipo enum, resumo, `occurred_at`, `client_id`, `opportunity_id` opcional, `created_by`), migração `phase4_005`, `GET/POST/PATCH/DELETE /v1/interactions` com filtros (`client_id`, `opportunity_id`, `interaction_type`, `occurred_from` / `occurred_to`), sincronização de `Opportunity.last_interaction_at` a partir do máximo de `occurred_at` das interações ligadas, campos opcionais no registro para atualizar `next_action` e `next_action_due_at` da oportunidade, coluna `opportunities.next_action_due_at`, filtro `GET /v1/opportunities?overdue_next_action=true` (abertas com prazo &lt; agora). Web: timeline na ficha do cliente e da oportunidade; painel no dashboard (atrasadas + interações de hoje).
 
 ## Contrato API (resumo)
 

@@ -118,6 +118,7 @@ def list_opportunities(
     client_id: uuid.UUID | None = None,
     owner_id: uuid.UUID | None = None,
     overdue_next_action: bool = Query(default=False),
+    q: str | None = Query(default=None, max_length=200),
     sort: str = Query(
         default="updated_at_desc",
         description="updated_at_desc | propensity_desc (prob. × valor estimado)",
@@ -126,8 +127,12 @@ def list_opportunities(
     stmt = (
         select(Opportunity)
         .options(*_opp_options())
+        .join(Client, Client.id == Opportunity.client_id)
         .where(Opportunity.organization_id == current_user.organization_id)
     )
+    if q and q.strip():
+        pat = f"%{q.strip()}%"
+        stmt = stmt.where(Client.full_name.ilike(pat))
     if stage is not None:
         stmt = stmt.where(Opportunity.stage == stage)
     if status is not None:

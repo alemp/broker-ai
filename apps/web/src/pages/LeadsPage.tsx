@@ -1,22 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
 
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { FormSelect } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { apiFetch } from '@/lib/api'
-
-type UserBrief = {
-  id: string
-  email: string
-  full_name: string | null
-}
 
 type LeadRow = {
   id: string
@@ -29,124 +22,66 @@ type LeadRow = {
 export function LeadsPage() {
   const { t } = useTranslation('common')
   const [items, setItems] = useState<LeadRow[]>([])
-  const [users, setUsers] = useState<UserBrief[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
-  const [ownerId, setOwnerId] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [listSearch, setListSearch] = useState('')
+  const debouncedListSearch = useDebouncedValue(listSearch, 350)
 
-  const load = useCallback(async () => {
+  const loadLeads = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [leads, orgUsers] = await Promise.all([
-        apiFetch<LeadRow[]>('/v1/leads'),
-        apiFetch<UserBrief[]>('/v1/org/users'),
-      ])
+      const params = new URLSearchParams()
+      const q = debouncedListSearch.trim()
+      if (q) {
+        params.set('q', q)
+      }
+      const qs = params.toString()
+      const leads = await apiFetch<LeadRow[]>(qs ? `/v1/leads?${qs}` : '/v1/leads')
       setItems(leads)
-      setUsers(orgUsers)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
       setLoading(false)
     }
-  }, [t])
+  }, [debouncedListSearch, t])
 
   useEffect(() => {
-    void load()
-  }, [load])
-
-  const onCreate = async (ev: React.FormEvent) => {
-    ev.preventDefault()
-    if (!fullName.trim()) {
-      return
-    }
-    setCreating(true)
-    setError(null)
-    try {
-      await apiFetch('/v1/leads', {
-        method: 'POST',
-        json: {
-          full_name: fullName.trim(),
-          email: email.trim() || undefined,
-          owner_id: ownerId || undefined,
-          status: 'NEW',
-        },
-      })
-      setFullName('')
-      setEmail('')
-      setOwnerId('')
-      await load()
-      toast.success(t('toast.leadCreated'))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('crm.error.generic'))
-    } finally {
-      setCreating(false)
-    }
-  }
+    void loadLeads()
+  }, [loadLeads])
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-      <PageHeader title={t('crm.leads.title')} description={t('crm.leads.subtitle')} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('crm.leads.new')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4 sm:grid-cols-2" onSubmit={onCreate}>
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="lead-name">{t('crm.clients.field.name')}</Label>
-              <Input
-                id="lead-name"
-                value={fullName}
-                onChange={(ev) => setFullName(ev.target.value)}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-email">{t('crm.clients.field.emailOptional')}</Label>
-              <Input
-                id="lead-email"
-                type="email"
-                value={email}
-                onChange={(ev) => setEmail(ev.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-owner">{t('crm.leads.ownerOptional')}</Label>
-              <FormSelect
-                id="lead-owner"
-                value={ownerId}
-                onValueChange={setOwnerId}
-                allowEmpty
-                emptyLabel={t('crm.leads.noOwner')}
-                placeholder={t('crm.leads.noOwner')}
-                options={users.map((u) => ({
-                  value: u.id,
-                  label: u.full_name ?? u.email,
-                }))}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <Button type="submit" disabled={creating}>
-                {creating ? t('crm.leads.creating') : t('crm.leads.create')}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <PageHeader title={t('crm.leads.title')} description={t('crm.leads.subtitle')}>
+        <Button asChild>
+          <Link to="/leads/new">{t('action.newRecord')}</Link>
+        </Button>
+      </PageHeader>
 
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">{t('crm.leads.list')}</CardTitle>
-          <Button type="button" variant="secondary" size="sm" onClick={() => void load()} disabled={loading}>
-            {t('action.refresh')}
-          </Button>
+        <CardHeader className="flex flex-col gap-4 space-y-0">
+          <div className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-base">{t('crm.leads.list')}</CardTitle>
+            <Button type="button" variant="secondary" size="sm" onClick={() => void loadLeads()} disabled={loading}>
+              {t('action.refresh')}
+            </Button>
+          </div>
+          <div className="w-full max-w-md">
+            <Label htmlFor="leads-list-search" className="sr-only">
+              {t('crm.leads.listSearchAria')}
+            </Label>
+            <Input
+              id="leads-list-search"
+              type="search"
+              value={listSearch}
+              onChange={(ev) => setListSearch(ev.target.value)}
+              placeholder={t('crm.leads.listSearch')}
+              aria-label={t('crm.leads.listSearchAria')}
+              autoComplete="off"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

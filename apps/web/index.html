@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Copilot</title>
+    <!-- Keep storage key in sync with THEME_STORAGE_KEY in src/contexts/ThemeContext.tsx -->
+    <script>
+      (function () {
+        try {
+          var k = 'ai-copilot:theme'
+          var v = localStorage.getItem(k)
+          var d = document.documentElement
+          var mq = window.matchMedia('(prefers-color-scheme: dark)')
+          var dark = v === 'dark' || ((v === 'system' || v == null) && mq.matches)
+          d.classList.toggle('dark', dark)
+          d.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

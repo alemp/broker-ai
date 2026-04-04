@@ -439,11 +439,13 @@ Transformar a carteira vendida em base ativa de revisão e monetização.
 
 #### Lógica do semáforo
 
-| Cor      | Significado |
-| -------- | ----------- |
-| **Verde** | Cobertura adequada ao perfil e à necessidade identificada. |
-| **Amarelo** | Cobertura parcialmente adequada ou com oportunidade complementar. |
+
+| Cor          | Significado                                                                         |
+| ------------ | ----------------------------------------------------------------------------------- |
+| **Verde**    | Cobertura adequada ao perfil e à necessidade identificada.                          |
+| **Amarelo**  | Cobertura parcialmente adequada ou com oportunidade complementar.                   |
 | **Vermelho** | Cobertura inadequada ou ausência de proteção relevante frente ao perfil do cliente. |
+
 
 #### Exemplos de aplicação
 
@@ -683,12 +685,14 @@ A escolha deve observar custos, familiaridade interna, governança e integraçõ
 
 ## 8. Arquitetura funcional recomendada
 
-| Camada | Conteúdo |
-| ------ | -------- |
-| **1 — Sistemas de base** | CRM, cadastro, pipeline, atividades e campanhas. |
-| **2 — Integração** | APIs, conectores, orquestração de dados, mensageria e sincronização com BI. |
-| **3 — Inteligência** | Catálogo, motor de regras, recomendador, semáforo, priorização, copiloto. |
+
+| Camada                     | Conteúdo                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| **1 — Sistemas de base**   | CRM, cadastro, pipeline, atividades e campanhas.                                  |
+| **2 — Integração**         | APIs, conectores, orquestração de dados, mensageria e sincronização com BI.       |
+| **3 — Inteligência**       | Catálogo, motor de regras, recomendador, semáforo, priorização, copiloto.         |
 | **4 — Analytics e gestão** | Dashboards gerenciais, visão do corretor, acompanhamento de adoção e performance. |
+
 
 ### Exemplo de arranjo pragmático
 

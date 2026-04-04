@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
+import { UserProfileMenu } from '@/components/UserProfileMenu'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
@@ -27,7 +28,7 @@ function navLinkClassName(isActive: boolean) {
 
 export function AppLayout() {
   const { t } = useTranslation('common')
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
@@ -86,12 +87,7 @@ export function AppLayout() {
             >
               {mobileNavOpen ? <X className="size-4" /> : <Menu className="size-4" />}
             </Button>
-            <span className="text-muted-foreground hidden max-w-[12rem] truncate text-xs lg:inline">
-              {user?.email}
-            </span>
-            <Button type="button" variant="outline" size="sm" onClick={logout}>
-              {t('auth.logout')}
-            </Button>
+            {user ? <UserProfileMenu /> : null}
           </div>
         </div>
         {mobileNavOpen ? (
