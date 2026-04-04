@@ -1,0 +1,28 @@
+# Local object storage (development only — do not commit blobs or bucket state)
+.local-storage/
+minio-data/
+*.minio/
+
+# Env and secrets (use .env.example for templates)
+.env
+.env.local
+.env.*.local
+
+# Dependencies / build
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+apps/api/.venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/

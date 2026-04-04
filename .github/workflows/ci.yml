@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ai_copilot
+          POSTGRES_PASSWORD: ai_copilot_dev
+          POSTGRES_DB: ai_copilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_copilot -d ai_copilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.11.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Sync dependencies
+        run: uv sync --group dev
+      - name: Ruff
+        run: uv run ruff check src tests
+      - name: Pytest
+        run: uv run pytest
+        env:
+          DATABASE_URL: postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
+      - name: Alembic upgrade
+        run: uv run alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm --filter web lint
+      - name: Build
+        run: pnpm --filter web build

@@ -1,0 +1,20 @@
+# Local development only. PostgreSQL for API + future migrations.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ai_copilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_copilot_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_copilot}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-ai_copilot} -d ${POSTGRES_DB:-ai_copilot}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
