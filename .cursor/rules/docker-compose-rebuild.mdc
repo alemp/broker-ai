@@ -1,0 +1,18 @@
+---
+description: After API/web code or Docker changes, rebuild images and recreate containers
+alwaysApply: true
+---
+
+# Docker Compose — build e reinício
+
+Quando alterares código em `apps/api`, `apps/web`, `docker-compose.yml`, Dockerfiles ou dependências que entram na imagem, **no fim da tarefa** (e antes de dizer que está pronto), executa na **raiz do repositório**:
+
+```bash
+docker compose build api web && docker compose up -d --force-recreate api web
+```
+
+- Isto **compila** as imagens (API com `uv sync`, web com `pnpm build` no Dockerfile) e **reinicia** os contentores `api` e `web`.
+- O **postgres** pode ficar a correr; só recria se for necessário para a tarefa.
+- Se a stack não estiver levantada, o mesmo comando cria e inicia os serviços.
+
+Alternativa equivalente para subir tudo com build: `docker compose up -d --build --force-recreate`.

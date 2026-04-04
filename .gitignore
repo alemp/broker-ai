@@ -15,6 +15,7 @@ dist/
 *.tsbuildinfo
 
 # Python
+apps/api/src/*.egg-info/
 __pycache__/
 *.py[cod]
 .pytest_cache/

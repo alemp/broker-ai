@@ -8,6 +8,7 @@
 |----------|---------|
 | [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md) | Locked MVP technical decisions |
 | [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) | Phased engineering tasks and exit criteria |
+| [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) | Maps insurance brokerage strategic brief (modules, accelerator vs build) to repo status and phases |
 
 This roadmap describes **product and technical progression** from the first shippable MVP through a **full commercial intelligence platform**, including how **client lines of business** and **held products** must flow from every CRM ingress path.
 
@@ -72,14 +73,16 @@ MVP (design partner)  →  Growth  →  Platform scale  →  Full intelligent pr
 
 | Area | Deliverables | Status (track in tickets) |
 |------|----------------|---------------------------|
-| Foundation | Python API, React + shadcn, PostgreSQL, local/S3 storage, auth, org scope | Planned |
-| CRM core | `Client`, `Opportunity`, pipeline UI | Planned |
-| **Portfolio** | `LineOfBusiness`, `ClientLineOfBusiness`, `ClientHeldProduct`; CRUD in UI; **`ingestion_source`** | Planned |
-| Bulk ingest | **CSV + Excel** import for clients **including** LOB / held-product columns per template; upsert: `external_id` → email | Planned |
-| Catalog & rules | `Product` catalog; rule engine uses client attributes **and** LOB / held products | Planned |
-| Documents | PDF upload (limits per spec); hybrid extraction; link to client/opportunity | Planned |
-| Intelligence | Batch scoring / “high potential”; dashboard refresh | Planned |
-| Compliance | LGPD-oriented audit, retention story, subprocessors list | Planned |
+| Foundation | Python API, React + shadcn, PostgreSQL, local/S3 storage, auth, org scope | **Done** (Phases 0–1; see [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md)) |
+| CRM core | `Client`, `Opportunity`, pipeline UI | **Done** (Phase 2; see [`PHASE-2-CRM.md`](./PHASE-2-CRM.md)) |
+| **Portfolio** | `LineOfBusiness`, `ClientLineOfBusiness`, `ClientHeldProduct`; CRUD in UI; **`ingestion_source`** | **Done** (Phase 2) |
+| **Enriched profile** | Insurance-oriented client attributes (blocks), completeness, alerts ([`PRODUCT.md`](./PRODUCT.md) §5.3) | **Done** ([`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md); [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) **Phase 3**) |
+| **Interactions** | Timeline, types, agenda/day panel ([`PRODUCT.md`](./PRODUCT.md) §5.5) | Planned (**Phase 4**) |
+| Bulk ingest | **CSV + Excel** import for clients **including** LOB / held-product columns per template; upsert: `external_id` → email | Planned (**Phase 5**) |
+| Catalog & rules | `Product` + LOB **catalog CRUD**; **rule engine** uses client attributes **and** LOB / held products / profile | **Partial** — catalog in Phase 2; rules **Phase 6** |
+| Documents | PDF upload (limits per spec); hybrid extraction; link to client/opportunity | Planned (**Phases 7–8**) |
+| Intelligence | Batch scoring / “high potential”; dashboard refresh; adequacy semáforo (see [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md)) | Planned (**Phase 9**) |
+| Compliance | LGPD-oriented audit, retention story, subprocessors list | Planned (**Phase 10**) |
 
 **MVP exit:** Partner users maintain portfolio in-app or via import; recommendations reflect gaps/overlays in LOB/products; PDF flow does not bypass confirmed data rules.
 
@@ -163,8 +166,10 @@ Use one row per epic; update **Status** (`Planned` / `In progress` / `Done` / `D
 | Document | Role |
 |----------|------|
 | `IMPLEMENTATION-ROADMAP.md` | **This file** — MVP → final product + CRM portfolio requirement |
+| `STRATEGIC-PRODUCT-ALIGNMENT.md` | Strategic brief ↔ repository modules and phases |
 | `IMPLEMENTATION-SPEC.md` | MVP decisions (updated for LOB / held products / Excel) |
 | `IMPLEMENTATION-PLAN.md` | Engineering phases (updated for portfolio + Excel) |
 | `PHASE-0-STACK.md` | Locked Phase 0 tooling (Vite, uv, Docker Compose, GitHub Actions) |
+| `PHASE-2-CRM.md` | Phase 2 CRM + portfolio implementation summary |
 | `DEVELOPMENT.md` | Local development runbook (Postgres, API, web) |
 | `PHASE-1-AUTH.md` | Phase 1 JWT auth and Docker Compose (api + web + postgres) |

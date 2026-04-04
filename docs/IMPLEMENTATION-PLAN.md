@@ -1,13 +1,14 @@
 # Implementation plan (MVP)
 
-**Status:** **Phase 0** (skeleton) and **Phase 1** (identity + Docker Compose for api/web/postgres) are implemented in-repo; later phases remain planning until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phases 0–3** are implemented in-repo (foundation, auth, CRM/portfolio/pipeline, enriched client profile). Phase 4+ remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Living checklist:** Stakeholder scope from [`PRODUCT.md`](./PRODUCT.md) vs repo status is maintained in [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) — update that file when phases ship or scope shifts.  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
 ---
 
 ## 1. Purpose
 
-- Sequence work so **auth → CRM → import → catalog/rules → documents → extraction → batch insights → compliance** can ship incrementally.
+- Sequence work so **auth → CRM → enriched profile → interactions → import → catalog/rules → documents → extraction → batch insights → compliance** can ship incrementally.
 - Make dependencies explicit so parallel work (e.g. UI stubs vs API contracts) does not block integration.
 - Define **milestones** the design-partner brokerage can validate.
 
@@ -19,21 +20,22 @@
 - **Email/password** authentication; users belong to the org.
 - **Client** and **Opportunity** CRUD, pipeline stages per `OPPORTUNITY.md`.
 - **Lines of business** (`LineOfBusiness`, `ClientLineOfBusiness`) and **held products** (`ClientHeldProduct`) on the client, with **`ingestion_source`**, maintained in-app and via bulk import.
-- **CSV and Excel (`.xlsx`) import** for **clients**, including optional LOB / held-product columns per template; upsert order: `external_id` → normalized `email` → insert-only or strict error.
-- **Product** catalog and **rule-based** recommendations with explainability (which rule matched); rules consume **portfolio** data (LOB + held products) per spec §3.2.
-- **PDF** upload: 100 MB max, PDF only, validation (extension, MIME, magic bytes), **100 uploads/user/day** default.
-- **Production storage:** S3; **development:** local / S3-compatible, **not** in git (see `.gitignore`).
-- **Hybrid extraction:** auto + manual review; confidence and source (`automatic` / `manual`).
-- **Batch / near–real-time** jobs for processing pipeline and dashboard-style scoring.
+- **Enriched insurance-oriented client profile** (progressive blocks, completeness score, inputs for rules and semáforo) per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3**.
+- **Interactions** (types, timeline, link to client/opportunity, next-action and overdue signals) per [`PRODUCT.md`](./PRODUCT.md) §5.5 — **Phase 4**.
+- **CSV and Excel (`.xlsx`) import** for **clients**, including optional LOB / held-product columns per template; upsert order: `external_id` → normalized `email` → insert-only or strict error — **Phase 5**.
+- **Product** catalog and **rule-based** recommendations with explainability (which rule matched); rules consume **portfolio** data and **profile** fields where modeled (LOB + held products per spec §3.2) — **Phase 6**.
+- **PDF** upload: 100 MB max, PDF only, validation (extension, MIME, magic bytes), **100 uploads/user/day** default — **Phase 7**.
+- **Hybrid extraction:** auto + manual review; confidence and source (`automatic` / `manual`) — **Phase 8**.
+- **Batch / near–real-time** jobs for processing pipeline and dashboard-style scoring — **Phase 9**.
 - UI: **React** + **shadcn**; **Portuguese** copy via **i18n-ready** keys.
-- **LGPD-oriented** design: audit-sensitive actions, retention story, subprocessors list (iterate to full operational compliance).
+- **LGPD-oriented** design: audit-sensitive actions, retention story, subprocessors list (iterate to full operational compliance) — **Phase 10**.
 
 ---
 
 ## 3. Out of scope (MVP)
 
 - External CRM **API** sync.
-- **CSV import for opportunities** (Phase 2).
+- **CSV import for opportunities** (post-MVP; see Phase 11).
 - **Virus/malware** scanning on upload (revisit before wider production).
 - **Kafka**; complex ML training pipelines.
 - **Multi-tenant** SaaS onboarding for many unrelated orgs (schema ready, product flow not).
@@ -87,6 +89,8 @@
 
 **Goal:** Core CRM and pipeline per `OPPORTUNITY.md`, plus **lines of business** and **held products** as first-class data (`IMPLEMENTATION-SPEC.md` §3.2).
 
+**Implemented:** [`PHASE-2-CRM.md`](./PHASE-2-CRM.md) — Alembic `phase2_003`, `/v1` routes for clients, portfolio, LOB catalog, products, opportunities; web shell + client/opportunity flows; `tests/test_crm.py`.
+
 | Work item | Notes |
 |-----------|--------|
 | Schema | `Client`, `Opportunity` with `organization_id`; enums for stage/status. |
@@ -100,13 +104,55 @@
 
 ---
 
-### Phase 3 — CSV and Excel client import (including portfolio)
+### Phase 3 — Enriched client profile ([`PRODUCT.md`](./PRODUCT.md) §5.3)
+
+**Implementation:** [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md).
+
+**Goal:** Structured insurance-oriented attributes beyond core contact fields so recommendations, semáforo (Phase 9), and campaigns can use real propensity inputs — without forcing all fields on day one.
+
+| Work item | Notes |
+|-----------|--------|
+| Domain model | Persist profile data aligned to brief blocks A–H (personal/family, professional/financial, property, mobility, health, business/guarantee, pet, behavior/preferences). Start with **JSON column or normalized tables** per engineering preference; version fields in OpenAPI. |
+| Progressive UX | Client detail: sections/blocs; optional fields; **completeness score**; **alerts** for critical gaps (configurable rules). |
+| API | `GET/PATCH` profile (or merge into client with clear schema); org-scoped; respect LGPD-oriented consent flags if introduced here or in Phase 10. |
+| Import hook | Document optional **profile columns** for Phase 5 template (can ship after core profile CRUD). |
+| Governance | Document base legal / consent / visibility in operator notes; full enforcement may extend Phase 10. |
+
+**Exit criteria:** Broker can fill profile progressively; completeness score visible; at least one rule in Phase 6 can reference **at least one** new profile field in a demo scenario (or profile is demonstrably available to the rule evaluator).
+
+**Depends on:** Phase 2.
+
+**Checklist row:** [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) §5.3.
+
+---
+
+### Phase 4 — Interactions, agenda, and history ([`PRODUCT.md`](./PRODUCT.md) §5.5)
+
+**Goal:** Cadence and relationship memory — adoption driver for brokers (value, not only bureaucracy).
+
+| Work item | Notes |
+|-----------|--------|
+| Model | `Interaction` (org, type enum: call, WhatsApp, email, meeting, visit, proposal sent, client reply, note, post-sale, campaign touch, …); body/summary; `occurred_at`; links to `client_id` and optional `opportunity_id`; `created_by` user. |
+| API | CRUD + list by client/opportunity; filter by type/date; optional “due” or next-step linkage. |
+| Opportunity sync | Updating `last_interaction_at` / `next_action` on opportunity when an interaction is logged (rule in API or domain service). |
+| Web | Client and opportunity detail: **chronological timeline**; create interaction; **day panel** / “today’s actions” (minimal first version). |
+| Alerts | MVP: list/filter overdue **next_action**; optional notifications later. |
+
+**Exit criteria:** Broker logs interactions; timeline visible on client; opportunity `last_interaction_at` stays consistent with latest logged interaction when wired.
+
+**Depends on:** Phase 2.
+
+**Checklist row:** [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) §5.5.
+
+---
+
+### Phase 5 — CSV and Excel client import (including portfolio)
 
 **Goal:** Bulk bootstrap and updates without external CRM; **same canonical tables** as the UI.
 
 | Work item | Notes |
 |-----------|--------|
-| Template + docs | Required/optional columns for core client fields; **optional** LOB codes and held-product columns (or child-row convention); document for `external_id`, `email`. |
+| Template + docs | Required/optional columns for core client fields; **optional** LOB codes and held-product columns (or child-row convention); document for `external_id`, `email`; **optional profile columns** once Phase 3 schema is stable. |
 | Parsers | **CSV** + **Excel `.xlsx`** (shared validation pipeline; values-only for cells). |
 | Parse + validate | Row-level errors; preview API. |
 | Commit + audit | Transactional apply; log actor, timestamp, file hash; idempotent upsert rules from spec; set `ingestion_source` to `csv_import` / `excel_import`. |
@@ -114,28 +160,28 @@
 
 **Exit criteria:** Import 100+ rows with mixed inserts/updates **including** at least one scenario with LOB and held-product data populated; audit record exists; invalid rows reported without silent corruption.
 
-**Depends on:** Phase 2.
+**Depends on:** Phase 2. **Phase 3** optional for profile column mapping in template.
 
 ---
 
-### Phase 4 — Product catalog and rule engine
+### Phase 6 — Product catalog and rule engine
 
-**Goal:** Explainable recommendations from client attributes **and** portfolio (LOB + held products).
+**Goal:** Explainable recommendations from client attributes **and** portfolio (LOB + held products) **and profile fields** where available.
 
 | Work item | Notes |
 |-----------|--------|
 | `Product` model | As in `RECCOMENDATION.md`; admin or seed data for MVP. |
-| Rules | Safe evaluation (no string `eval`); priority ordering; conditions may reference **LOB membership** and **held** `Product` / status; store “matched rule ids” on output. |
+| Rules | Safe evaluation (no string `eval`); priority ordering; conditions may reference **LOB membership**, **held** `Product` / status, and **Phase 3 profile** keys; store “matched rule ids” on output. |
 | API | `GET` recommendations for client (and optionally opportunity). |
 | Web | Surface recommendations on client/opportunity views. |
 
-**Exit criteria:** Changing a rule changes output predictably; UI shows why a product was suggested; **at least one** demo rule uses portfolio data (e.g. cross-sell gap).
+**Exit criteria:** Changing a rule changes output predictably; UI shows why a product was suggested; **at least one** demo rule uses portfolio data (e.g. cross-sell gap); **at least one** demo rule uses a profile field **or** documented fallback when profile not yet populated.
 
-**Depends on:** Phase 2 (portfolio model); Phase 3 optional for bulk-loaded clients.
+**Depends on:** Phase 2 (portfolio model); **Phase 3** recommended before production cut of rules-rich MVP; Phase 5 optional for bulk-loaded clients.
 
 ---
 
-### Phase 5 — PDF upload pipeline
+### Phase 7 — PDF upload pipeline
 
 **Goal:** Durable uploads within limits; async processing hook.
 
@@ -153,7 +199,7 @@
 
 ---
 
-### Phase 6 — Hybrid extraction
+### Phase 8 — Hybrid extraction
 
 **Goal:** Structured fields + confidence + manual override.
 
@@ -167,28 +213,28 @@
 
 **Exit criteria:** Happy path auto-fills; failure path allows save after user edit; confirmed extraction can feed **portfolio** rows for recommendations.
 
-**Depends on:** Phase 5; Phase 2 for linking.
+**Depends on:** Phase 7; Phase 2 for linking.
 
 ---
 
-### Phase 7 — Batch scoring and dashboard
+### Phase 9 — Batch scoring and dashboard
 
-**Goal:** “High potential” and similar flags without real-time streaming.
+**Goal:** “High potential” and similar flags without real-time streaming; **adequacy semáforo** (green/yellow/red) per [`PRODUCT.md`](./PRODUCT.md) §5.8 as explicit scored output + explanation where feasible.
 
 | Work item | Notes |
 |-----------|--------|
 | Job scheduler | Cron or queue worker on interval. |
-| Scoring rules | Versionable; log inputs snapshot or hash for debugging. |
+| Scoring rules | Versionable; log inputs snapshot or hash for debugging; map to **adequacy** states + human-readable reason. |
 | API | Expose scores/flags on list endpoints or dedicated resource. |
 | Web | Dashboard widgets / filters on opportunities or clients. |
 
-**Exit criteria:** Scores refresh on schedule; UI reflects last job run time.
+**Exit criteria:** Scores refresh on schedule; UI reflects last job run time; semáforo or equivalent flags documented for stakeholders.
 
-**Depends on:** Phase 2; Phase 4 optional for richer signals.
+**Depends on:** Phase 2; Phase 6 optional for richer signals; **Phase 3** improves signal quality.
 
 ---
 
-### Phase 8 — LGPD hardening and release readiness
+### Phase 10 — LGPD hardening and release readiness
 
 **Goal:** Operational minimum for design-partner go-live.
 
@@ -206,7 +252,7 @@
 
 ---
 
-### Phase 9 — Post-MVP (tracked, not MVP commitment)
+### Phase 11 — Post-MVP (tracked, not MVP commitment)
 
 - File import (**CSV / Excel**) for **opportunities** (if still desired).
 - Optional **virus scan** step before `processed`.
@@ -218,11 +264,13 @@
 ## 5. Dependency graph (summary)
 
 ```text
-Phase 0 → Phase 1 → Phase 2 (incl. portfolio) → Phase 3 (CSV + XLS)
-                                            → Phase 4
-              Phase 0 → Phase 5 → Phase 6
-Phase 2 + Phase 4/5 → Phase 7
-All relevant → Phase 8
+Phase 0 → Phase 1 → Phase 2 (incl. portfolio) → Phase 3 (enriched profile)
+                                            → Phase 4 (interactions)
+                                            → Phase 5 (CSV + XLS)
+                                            → Phase 6 (rules)
+              Phase 0 → Phase 7 → Phase 8 (extraction)
+Phase 2 + Phase 6/7 → Phase 9 (scoring / semáforo / dashboards)
+All relevant → Phase 10
 ```
 
 ---
@@ -241,9 +289,9 @@ All relevant → Phase 8
 
 ## 7. MVP definition of done (product)
 
-- Design-partner user can: manage pipeline; **maintain client LOB and held products in-app**; **import clients via CSV/Excel including portfolio columns**; get **portfolio-aware** recommendations; upload policies; complete extraction review; see refreshed scores.
+- Design-partner user can: manage pipeline; **maintain client LOB and held products in-app**; **enrich client profile** (Phase 3) and **log interactions** (Phase 4); **import clients via CSV/Excel including portfolio columns** (Phase 5); get **portfolio- and profile-aware** recommendations (Phase 6); upload policies (Phase 7); complete extraction review (Phase 8); see refreshed scores / semáforo-style signals (Phase 9).
 - No committed blobs; prod uses S3; dev uses local storage.
-- Documentation: operator can deploy staging + prod from runbook (to be written in Phase 8). Implementation docs and code remain **English** per `IMPLEMENTATION-ROADMAP.md`.
+- Documentation: operator can deploy staging + prod from runbook (to be written in Phase 10). Implementation docs and code remain **English** per `IMPLEMENTATION-ROADMAP.md`.
 
 ---
 
@@ -253,7 +301,9 @@ All relevant → Phase 8
 |----------|------|
 | [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md) | Locked decisions |
 | [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) | MVP → final product; CRM ingress |
-| **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan (execution not started)** |
+| [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) | **Living checklist:** stakeholder scope ([`PRODUCT.md`](./PRODUCT.md)) ↔ repo; update when phases complete |
+| [`PRODUCT.md`](./PRODUCT.md) | Stakeholder product brief (Portuguese); §5.3 / §5.5 referenced by Phases 3–4 |
+| **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan (Phases 0–2 executed in-repo)** |
 | [`OPPORTUNITY.md`](./OPPORTUNITY.md) | Opportunity domain attributes |
 | [`PDF-UPLOAD.md`](./PDF-UPLOAD.md), [`EXTRACTION.md`](./EXTRACTION.md) | Document flows |
 
@@ -261,6 +311,6 @@ All relevant → Phase 8
 
 ## 9. Next step when implementation starts
 
-1. Confirm monorepo vs polyrepo and exact folder names.  
-2. Execute **Phase 0** only; gate review before Phase 1.  
+1. Use [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) to track **§5.x** rows against phase delivery.  
+2. Execute **Phase 3** and **Phase 4** (or Phase 5 first if import is higher priority for the partner — note Phase 6 rules benefit from Phase 3).  
 3. Track progress as tickets mapped to phases above.

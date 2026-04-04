@@ -1,6 +1,6 @@
 # Local development
 
-Monorepo runbook for **ai-copilot**. Stack overview: [`PHASE-0-STACK.md`](./PHASE-0-STACK.md). Phase 1 auth and Compose: [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md).
+Monorepo runbook for **ai-copilot**. Stack overview: [`PHASE-0-STACK.md`](./PHASE-0-STACK.md). Phase 1 auth and Compose: [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md). Phase 2 CRM and portfolio: [`PHASE-2-CRM.md`](./PHASE-2-CRM.md).
 
 ## Recommended: full stack in Docker Compose
 
@@ -10,7 +10,7 @@ From the repository root (requires **Docker**):
 docker compose up --build
 ```
 
-- **Web (static build + nginx):** [http://localhost:8080](http://localhost:8080) — register, login, dashboard (`WEB_PORT`).
+- **Web (static build + nginx):** [http://localhost:8080](http://localhost:8080) — register, login, dashboard, clients, opportunities (`WEB_PORT`).
 - **API:** [http://localhost:8000](http://localhost:8000) — OpenAPI at `/docs` (`API_PORT`).
 - **Postgres:** `localhost:5432` (`POSTGRES_PORT`) if you need host access.
 

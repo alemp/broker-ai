@@ -27,9 +27,9 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/pages/DashboardPage.tsx'],
+    files: ['src/pages/**/*.{ts,tsx}'],
     rules: {
-      // Mount-time health fetch; state updates occur only after the network response.
+      // Data loads on mount; state updates follow async fetch completion.
       'react-hooks/set-state-in-effect': 'off',
     },
   },

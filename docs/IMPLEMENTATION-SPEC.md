@@ -33,7 +33,7 @@ Canonical technical and product decisions for the intelligent sales copilot MVP.
 | Decision | Value |
 |----------|--------|
 | **A — Internal minimal CRM** | Source of truth for **Client**, **Opportunity**, pipeline, owners |
-| **C — File import** | Bootstrap and bulk update **clients** in MVP via **CSV and Excel (`.xlsx`)**; **opportunities via file import → Phase 2** (not MVP) |
+| **C — File import** | Bootstrap and bulk update **clients** in MVP via **CSV and Excel (`.xlsx`)** ([`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) Phase 5); **opportunities via file import** → Phase 11 (post-MVP) |
 | Import UX | Upload → validate → preview → dry-run errors → commit; **audit** (who, when, file hash) |
 | **Upsert (resolved)** | **(1)** `external_id` when present and non-empty → upsert; **(2)** else normalized **email** → upsert; **(3)** else insert-only or strict validation error (configurable). |
 
@@ -174,7 +174,7 @@ Information about **lines of business (LOB)** and **products the client already 
 | Topic | Resolution |
 |-------|------------|
 | CSV upsert key | **`external_id` first, else normalized `email`**; otherwise insert-only or strict validation error |
-| Opportunities in CSV | **Phase 2** (not MVP) |
+| Opportunities in CSV | **Phase 11** (post-MVP; see [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md)) |
 | Virus scanning | **Not in MVP** |
 | Uploads per user per day | **100** (default cap, configurable) |
 
@@ -188,6 +188,8 @@ Information about **lines of business (LOB)** and **products the client already 
 | `IMPLEMENTATION-SPEC.md` | **This file — locked MVP decisions** |
 | `IMPLEMENTATION-PLAN.md` | Phased delivery plan (tasks, dependencies, exit criteria) |
 | `IMPLEMENTATION-ROADMAP.md` | MVP → final product; CRM ingress and portfolio requirements |
+| `PRODUCT.md` | Stakeholder product brief and MVP functional scope (Portuguese) |
+| `STRATEGIC-PRODUCT-ALIGNMENT.md` | Stakeholder commercial-intelligence scope ↔ repo modules and engineering phases |
 | `PHASE-0-STACK.md` | Locked Phase 0 tooling (Vite, uv, Compose, CI) |
 | `DEVELOPMENT.md` | Local runbook (Postgres, API, web, Docker Compose) |
 | `PHASE-1-AUTH.md` | Phase 1 JWT auth, default org, Compose runtime |

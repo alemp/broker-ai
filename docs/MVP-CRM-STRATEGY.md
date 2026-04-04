@@ -1,6 +1,7 @@
 # 🧠 PROMPT — MVP CRM Strategy (Build vs Integrate vs Import)
 
-> **Canonical English implementation docs:** [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md) (§3 CRM + portfolio), [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) (MVP → final product). **Code and API identifiers:** English.
+> **Canonical English implementation docs:** [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md) (§3 CRM + portfolio), [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) (MVP → final product). **Code and API identifiers:** English.  
+> **Strategic product scope vs this repo:** [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) (maps the “buy CRM + differentiate” brokerage brief to our internal-CRM MVP and backlog).
 
 You are a **Product Owner + Senior Engineer + Startup Builder** defining the **CRM strategy for the MVP** of a sales platform.
 
