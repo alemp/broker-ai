@@ -1,5 +1,6 @@
 # Render Blueprint — test deployment (Neon Postgres + this repo).
-# Production is out of scope for now; local development stays on Docker Compose.
+# API: native Python on Render (no container). Local development stays on Docker Compose.
+# Static sites are served from a global CDN and cannot set `region` in Blueprint.
 #
 # Setup: docs/DEPLOY-TEST.md
 #
@@ -9,12 +10,15 @@
 services:
   - type: web
     name: ai-copilot-api-test
-    runtime: docker
+    runtime: python
     region: sa-east-1
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: ./apps/api
+    rootDir: apps/api
+    buildCommand: pip install --upgrade pip && pip install .
+    startCommand: alembic upgrade head && uvicorn ai_copilot_api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
       - key: APP_ENV
         value: test
       - key: JWT_EXPIRE_HOURS
@@ -35,7 +39,6 @@ services:
   - type: web
     name: ai-copilot-web-test
     runtime: static
-    region: sa-east-1
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:web
     staticPublishPath: apps/web/dist
     envVars:

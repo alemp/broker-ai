@@ -1,14 +1,14 @@
 # Test deployment (Neon + Render)
 
-This describes the **test** environment only. **Local development** is unchanged: use Docker Compose from the repo root ([`DEVELOPMENT.md`](./DEVELOPMENT.md)).
+This describes the **test** environment only. **Local development** is unchanged: use Docker Compose from the repo root ([`DEVELOPMENT.md`](./DEVELOPMENT.md)) — API and Postgres still run in containers there.
 
 ## Architecture
 
 | Layer    | Provider | Role |
 |----------|----------|------|
 | Postgres | [Neon](https://neon.tech) | Serverless PostgreSQL; use a dedicated branch or project for test. |
-| API      | [Render](https://render.com) Web Service (`runtime: docker`) | Runs `apps/api` Dockerfile: `alembic upgrade head`, then Uvicorn. |
-| Web      | Render Static Site | Builds the Vite app with `VITE_API_BASE_URL` pointing at the test API. |
+| API      | [Render](https://render.com) Web Service (`runtime: python`, `rootDir: apps/api`) | `pip install .`, then `alembic upgrade head` and Uvicorn on each start — **no Docker image** on Render. |
+| Web      | Render Static Site | Global CDN (Blueprint **must not** set `region` on static sites). Builds Vite with `VITE_API_BASE_URL` pointing at the test API. |
 
 Infrastructure as code: [`render.yaml`](../render.yaml) at the repository root.
 
@@ -46,18 +46,19 @@ You may paste Neon’s URI as either `postgresql://…` or `postgres://…`. The
 | `CORS_ORIGINS` | API | Must include the browser origin of the static site. |
 | `VITE_API_BASE_URL` | Web (build-time) | Public API URL; requires a **rebuild** when it changes. |
 | `STORAGE_BACKEND` | API | `local` with `LOCAL_STORAGE_PATH=/tmp/ai-copilot-storage` (ephemeral on Render; fine for MVP test). |
+| `PYTHON_VERSION` | API | `3.12.8` in `render.yaml` (must match [`apps/api`](../apps/api) `requires-python`). |
 
 ## 4. Migrations
 
-The API container entrypoint runs **`alembic upgrade head`** on every start, so new deploys apply migrations against Neon automatically.
+The API **`startCommand`** runs **`alembic upgrade head`** before Uvicorn on every deploy/start, so migrations apply against Neon automatically.
 
 ## 5. Health check
 
-Render uses **`GET /health`** for the Docker web service (see `render.yaml`).
+Render uses **`GET /health`** for the API web service (see `render.yaml`).
 
-## 6. Naming and regions
+## 6. Regions
 
-Service names and `region` in [`render.yaml`](../render.yaml) are defaults (e.g. `sa-east-1`); adjust in the file or in the dashboard to match your team.
+Only the **API** web service sets `region` (e.g. `sa-east-1`) in [`render.yaml`](../render.yaml). **Static sites** are edge-cached globally and do not support a Blueprint `region` field.
 
 ## 7. Production
 
