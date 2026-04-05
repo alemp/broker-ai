@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Integer,
     Numeric,
     SmallInteger,
     String,
@@ -85,6 +86,10 @@ class Organization(Base):
     leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="organization")
     insurers: Mapped[list["Insurer"]] = relationship("Insurer", back_populates="organization")
     campaigns: Mapped[list["Campaign"]] = relationship("Campaign", back_populates="organization")
+    client_import_batches: Mapped[list["ClientImportBatch"]] = relationship(
+        "ClientImportBatch",
+        back_populates="organization",
+    )
 
 
 class User(Base):
@@ -828,6 +833,49 @@ class CrmAuditEvent(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class ClientImportBatch(Base):
+    """Audit row for Phase 5 bulk client import (CSV / Excel)."""
+
+    __tablename__ = "client_import_batches"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    actor_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_format: Mapped[str] = mapped_column(String(16), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    inserted_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    organization: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="client_import_batches",
+    )
+    actor_user: Mapped["User"] = relationship("User")
 
 
 class RecommendationRun(Base):

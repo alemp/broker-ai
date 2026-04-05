@@ -155,10 +155,10 @@ As decisões abaixo substituem as opções genéricas da stack para o **MVP atua
 | Backend | **Python** |
 | Frontend | **React** + **shadcn/ui** |
 | Infraestrutura | **AWS** (PostgreSQL, S3, etc.) |
-| Armazenamento de ficheiros (dev) | **Local** (S3-compatível ou filesystem); **não versionado** no Git — ver `.gitignore` e `IMPLEMENTATION-SPEC.md` |
+| Armazenamento de arquivos (dev) | **Local** (S3-compatível ou filesystem); **não versionado** no Git — ver `.gitignore` e `IMPLEMENTATION-SPEC.md` |
 | Autenticação | **E-mail e senha** |
 | Dashboard / scoring | **Batch** ou **quase tempo real** (jobs agendados) |
-| Idioma (UI) | **Português** no MVP; projeto **preparado para i18n** |
+| Idioma (UI) | **Português do Brasil** no MVP; projeto **preparado para i18n** |
 | Residência de dados | **Não obrigatória nesta fase**; decisão posterior |
 | LGPD | **By design** (governança, retenção, minimização, audit trail) |
 

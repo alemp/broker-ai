@@ -80,9 +80,14 @@ export function ClientsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
       <PageHeader title={t('crm.clients.title')} description={t('crm.clients.subtitle')}>
-        <Button asChild>
-          <Link to="/clients/new">{t('action.newRecord')}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/clients/import">{t('crm.import.navShort')}</Link>
+          </Button>
+          <Button asChild>
+            <Link to="/clients/new">{t('action.newRecord')}</Link>
+          </Button>
+        </div>
       </PageHeader>
 
       {error ? <p className="text-destructive text-sm">{error}</p> : null}

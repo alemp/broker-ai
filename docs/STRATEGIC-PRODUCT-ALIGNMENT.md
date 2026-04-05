@@ -33,8 +33,8 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 | Strategic module (brief §5) | In-repo status | Phase / notes |
 |------------------------------|----------------|---------------|
 | **5.1** Users, roles, permissions, org structure | **Partial** | JWT auth, org scope, users ([`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md)). Missing: broker/manager/admin **roles**, regional/team/supervisor, password recovery, module permissions, **audit log** — extend over time; LGPD audit Phase 10 |
-| **5.2** Leads, clients, opportunities, import | **Partial** | **Done (pre–Phase 5 slice):** `Lead`, `Client.owner_id`, `ClientKind` + company fields, `InsuredPerson`, `CrmAuditEvent`, lead→client convert + optional opp, org users list, web — see [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) §5.2 block. **Still planned:** **bulk import** → [**Phase 5**](./IMPLEMENTATION-PLAN.md); full **roles**/hierarchy still §5.1 |
-| **5.3** Enriched insurance profile (blocks A–H) | **Partial** | **In repo:** JSONB `profile_data`, Pydantic models for A–H, merge `PATCH`, `completeness_score`, limited `profile_alerts` (subset of gap rules), scores/alerts on client detail. **Gaps vs brief:** web só edita parte de A/C/D (vida, filhos, imóvel, veículo); blocos B, E, F, G, H sem formulário; sem campos obrigatórios mínimos configuráveis; alertas não cobrem todos os “faltantes críticos”; consumo por motor de regras / semáforo / campanhas → **Phase 6+**; observação de governança (consentimento, visibilidade) → **Phase 10**. Import em massa do perfil → **Phase 5**. Ver [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md). |
+| **5.2** Leads, clients, opportunities, import | **Partial** | **Done:** same as pre–Phase 5 slice **plus** [**Phase 5**](./PHASE-5.md) CSV/Excel import (`/v1/clients/import/*`, `client_import_batches`, LOB/held/profile/segurados columns). **Still:** full **roles**/hierarchy still §5.1 |
+| **5.3** Enriched insurance profile (blocks A–H) | **Partial** | **In repo:** JSONB `profile_data`, Pydantic models for A–H, merge `PATCH`, `completeness_score`, limited `profile_alerts` (subset of gap rules), scores/alerts on client detail. **Gaps vs brief:** web só edita parte de A/C/D (vida, filhos, imóvel, veículo); blocos B, E, F, G, H sem formulário; sem campos obrigatórios mínimos configuráveis; alertas não cobrem todos os “faltantes críticos”; consumo por motor de regras / semáforo / campanhas → **Phase 6+**; observação de governança (consentimento, visibilidade) → **Phase 10**. Import em massa do perfil → coluna `profile_json` em [**Phase 5**](./PHASE-5.md). Ver [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md). |
 | **5.4** Commercial funnel | **Partial** | Pipeline exists with **6** stages — see [`enums.py`](../apps/api/src/ai_copilot_api/db/enums.py). Brief: **10** steps + post-sale fields. Missing on `Opportunity`: insurer considered, expected close, loss reason; enforce next-action/loss rules — backlog (can straddle Phase 2 follow-up or Phase 4) |
 | **5.5** Interactions, agenda, history | **Done (core)** | [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md): `Interaction` + API, timeline (client/opp), dashboard overdue + today; `last_interaction_at` sync; `next_action_due_at` + overdue filter — push notifications / full calendar later |
 | **5.6** Insurer/product/coverage catalog | **Partial** | **Pre–Phase 6:** `Insurer` CRUD, produtos com texto de cobertura, argumentos comerciais, JSONB para coberturas adicionais/materiais — see [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md). **Still:** hierarquia formal de coberturas, anexos binários, governança de catálogo avançada → **Phase 6+** |
@@ -53,14 +53,14 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 | — | **Lead** entity | **Yes** — `Lead` + CRUD + status; convert creates `Client` and optional `Opportunity` |
 | — | **Segurado** / **Empresa** | **Yes** — **Empresa** = `ClientKind.COMPANY` + legal/tax fields; **Segurado** = `InsuredPerson` under `Client` |
 | 1 | Manual lead registration | **Yes** — leads API + web |
-| 2 | Bulk spreadsheet import | **No** — [**Phase 5**](./IMPLEMENTATION-PLAN.md) |
+| 2 | Bulk spreadsheet import | **Yes** — [`PHASE-5.md`](./PHASE-5.md) |
 | 3 | Progressive enrichment | **Partial** — profile JSONB + portfolio + interactions; §5.3 UI still incremental |
 | 4 | Convert lead → client or opportunity | **Yes** — `POST /v1/leads/{id}/convert` |
 | 5 | Assign responsible broker | **Partial** — `Client.owner_id` + `Lead.owner_id`; org-wide **roles** still §5.1 |
 | 6 | Data update history | **Partial** — append-only `crm_audit_events` for client, lead, insured, opportunity (create path); broad LGPD retention still **Phase 10** |
 | 7 | Single view with multiple products | **Partial** — client detail: held products + LOB + new CRM/segurados/audit sections |
 
-**Remaining** for full §5.2: **Phase 5** import; optional hardening (roles, richer audit filters, empresa as separate party if product demands it beyond `ClientKind`).
+**Remaining** for full §5.2: optional hardening (roles, richer audit filters, empresa as separate party if product demands it beyond `ClientKind`).
 
 ---
 
@@ -80,7 +80,7 @@ Legend: **Done** = shipped in repo through the phase noted (e.g. [`PHASE-2-CRM.m
 
 1. **Phase 3 — Enriched profile (§5.3)** — unblocks semáforo and strong rules.
 2. **Phase 4 — Interactions (§5.5)** — adoption and “memory” for brokers.
-3. **Phase 5 — Import** — scale data entry and LOB/held rows (+ optional profile columns).
+3. ~~**Phase 5 — Import**~~ **Done** — see [`PHASE-5.md`](./PHASE-5.md).
 4. **Phase 6 — Rule engine** — explainable recommendations per spec.
 5. **Opportunity fields + funnel rules (§5.4)** — insurer, expected close, loss reason; optional stage expansion vs brief’s 10 steps.
 6. **Phase 9 — Semáforo** — explicit UX + explanations on scoring output.

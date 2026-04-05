@@ -1,6 +1,6 @@
 # Implementation plan (MVP)
 
-**Status:** **Phases 0–4** are implemented in-repo, plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 5** (CSV/Excel bulk import) and later phases remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phases 0–5** are implemented in-repo (Phase 5: [`PHASE-5.md`](./PHASE-5.md)), plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 6+** remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
 **Living checklist:** Stakeholder scope from [`PRODUCT.md`](./PRODUCT.md) vs repo status is maintained in [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) — update that file when phases ship or scope shifts.  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
@@ -204,6 +204,8 @@
 
 ### Phase 5 — CSV and Excel client import (including portfolio)
 
+**Status:** **Done** — see [`PHASE-5.md`](./PHASE-5.md).
+
 **Goal:** Bulk bootstrap and updates without external CRM; **same canonical tables** as the UI.
 
 | Work item | Notes |
@@ -325,7 +327,8 @@ All relevant → Phase 10
 | [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) | MVP → final product; CRM ingress |
 | [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) | **Living checklist:** stakeholder scope ([`PRODUCT.md`](./PRODUCT.md)) ↔ repo; update when phases complete |
 | [`PRODUCT.md`](./PRODUCT.md) | Stakeholder product brief (Portuguese); §5.3 / §5.5 referenced by Phases 3–4 |
-| **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan (Phases 0–2 executed in-repo)** |
+| [`PHASE-5.md`](./PHASE-5.md) | CSV/Excel client import (Phase 5) |
+| **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan** |
 | [`OPPORTUNITY.md`](./OPPORTUNITY.md) | Opportunity domain attributes |
 | [`PDF-UPLOAD.md`](./PDF-UPLOAD.md), [`EXTRACTION.md`](./EXTRACTION.md) | Document flows |
 

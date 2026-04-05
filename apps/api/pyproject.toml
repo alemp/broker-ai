@@ -1,7 +1,7 @@
 [project]
 name = "ai-copilot-api"
 version = "0.1.0"
-description = "AI Copilot HTTP API (MVP through Phase 2 CRM)."
+description = "AI Copilot HTTP API (MVP through Phase 5 client import)."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -9,8 +9,10 @@ dependencies = [
     "argon2-cffi>=23.1.0",
     "boto3>=1.35.0",
     "email-validator>=2.2.0",
+    "openpyxl>=3.1.0",
     "fastapi>=0.115.0",
     "pydantic-settings>=2.6.0",
+    "python-multipart>=0.0.9",
     "psycopg[binary]>=3.2.0",
     "pyjwt>=2.10.0",
     "sqlalchemy>=2.0.36",

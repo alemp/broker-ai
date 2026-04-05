@@ -54,7 +54,7 @@ Authenticated shell (`AppLayout`):
 
 | State | Pattern |
 |-------|---------|
-| Loading | `Skeleton` blocks or `aria-busy` where appropriate; short labels (“A carregar…”) where skeletons are not worth it. |
+| Loading | `Skeleton` blocks or `aria-busy` where appropriate; short labels (“Carregando…”) where skeletons are not worth it. |
 | Empty | Muted text explaining what is empty and, if useful, a single CTA (e.g. create client). |
 | Error | `text-destructive`, one line + retry if applicable; form errors next to fields. |
 | Success / system health | Non-blocking; use a **status indicator** (dot + label) for API health on the dashboard. |

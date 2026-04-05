@@ -34,9 +34,33 @@ function formatErrorDetail(data: unknown): string {
     if (typeof detail === 'string') {
       return detail
     }
+    if (Array.isArray(detail)) {
+      return JSON.stringify(detail)
+    }
     return JSON.stringify(detail)
   }
   return 'Request failed'
+}
+
+export async function apiUpload<T>(path: string, file: File): Promise<T> {
+  const token = getStoredAccessToken()
+  const headers = new Headers()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+  const body = new FormData()
+  body.append('file', file)
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: 'POST',
+    headers,
+    body,
+  })
+  const text = await response.text()
+  const data = parseJsonSafe(text)
+  if (!response.ok) {
+    throw new Error(formatErrorDetail(data) || `Request failed (${response.status})`)
+  }
+  return data as T
 }
 
 export async function apiFetch<T>(

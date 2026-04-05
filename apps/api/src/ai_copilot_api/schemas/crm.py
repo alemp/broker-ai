@@ -249,6 +249,30 @@ class InsuredPersonOut(BaseModel):
     updated_at: datetime
 
 
+class ClientImportRowErrorOut(BaseModel):
+    row_number: int
+    message: str
+
+
+class ClientImportPreviewOut(BaseModel):
+    file_sha256: str
+    source_format: str
+    total_data_rows: int
+    valid_row_count: int
+    error_count: int
+    errors: list[ClientImportRowErrorOut]
+    preview_rows: list[dict[str, Any]]
+
+
+class ClientImportCommitOut(BaseModel):
+    batch_id: uuid.UUID
+    file_sha256: str
+    source_format: str
+    row_count: int
+    inserted_count: int
+    updated_count: int
+
+
 class CrmAuditEventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

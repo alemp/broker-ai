@@ -18,6 +18,7 @@ import {
   translateOpportunityStage,
   translateOpportunityStatus,
 } from '@/lib/crmEnumLabels'
+import { cn } from '@/lib/utils'
 
 const LIST_VIEW_STORAGE_KEY = 'ai-copilot:list-view:opportunities'
 
@@ -168,14 +169,31 @@ export function OpportunitiesPage() {
             <p className="text-muted-foreground text-sm">
               {t('crm.opportunities.metricsOpen')}:{' '}
               <span className="text-foreground font-medium">{metrics.open_total}</span>
+              <span className="mt-1 block">{t('crm.opportunities.metricsStageFilterHint')}</span>
             </p>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2 text-xs">
-            {PIPELINE_STAGES.map((s) => (
-              <span key={s} className="bg-muted rounded-md px-2 py-1">
-                {translateOpportunityStage(s, t)}: {metrics.by_stage[s] ?? 0}
-              </span>
-            ))}
+            {PIPELINE_STAGES.map((s) => {
+              const count = metrics.by_stage[s] ?? 0
+              const selected = filterStage === s
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setFilterStage((prev) => (prev === s ? '' : s))}
+                  className={cn(
+                    'rounded-md border border-transparent px-2 py-1 transition-colors',
+                    'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+                    selected
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-foreground hover:bg-muted/80',
+                  )}
+                >
+                  {translateOpportunityStage(s, t)}: {count}
+                </button>
+              )
+            })}
           </CardContent>
         </Card>
       ) : null}

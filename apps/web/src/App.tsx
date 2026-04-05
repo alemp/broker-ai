@@ -6,6 +6,7 @@ import { CampaignNewPage } from '@/pages/CampaignNewPage'
 import { CampaignsPage } from '@/pages/CampaignsPage'
 import { ClientCreatePage } from '@/pages/ClientCreatePage'
 import { ClientDetailPage } from '@/pages/ClientDetailPage'
+import { ClientImportPage } from '@/pages/ClientImportPage'
 import { ClientsPage } from '@/pages/ClientsPage'
 import { InsurerNewPage } from '@/pages/InsurerNewPage'
 import { InsurersPage } from '@/pages/InsurersPage'
@@ -33,6 +34,7 @@ export default function App() {
       >
         <Route path="/" element={<DashboardPage />} />
         <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/clients/import" element={<ClientImportPage />} />
         <Route path="/clients/new" element={<ClientCreatePage />} />
         <Route path="/clients/:clientId" element={<ClientDetailPage />} />
         <Route path="/leads" element={<LeadsPage />} />

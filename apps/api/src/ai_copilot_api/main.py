@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai_copilot_api.api.routes_auth import router as auth_router
 from ai_copilot_api.api.routes_campaigns import router as campaigns_router
+from ai_copilot_api.api.routes_client_import import router as client_import_router
 from ai_copilot_api.api.routes_clients import router as clients_router
 from ai_copilot_api.api.routes_insurers import router as insurers_router
 from ai_copilot_api.api.routes_intel import router as intel_router
@@ -21,7 +22,7 @@ app = FastAPI(
         "MVP API — CRM (clients, leads, segurados, audit), "
         "portfolio, pipeline, profile, interactions."
     ),
-    version="0.4.1",
+    version="0.5.0",
 )
 
 _settings = get_settings()
@@ -37,6 +38,7 @@ app.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
 app.include_router(me_router, prefix="/v1", tags=["users"])
 app.include_router(org_router, prefix="/v1")
 app.include_router(clients_router, prefix="/v1")
+app.include_router(client_import_router, prefix="/v1")
 app.include_router(intel_router, prefix="/v1")
 app.include_router(insurers_router, prefix="/v1")
 app.include_router(leads_router, prefix="/v1")

@@ -11,7 +11,7 @@
 | **Web** | No detalhe do cliente: A/C/D (fase de vida, filhos; imóvel básico; veículo) **e** blocos **B, E–H** (profissional/financeiro, saúde, empresa/garantias, pet, comportamento) no mesmo formulário com `PATCH` agregado. **Ainda sem** resto alargado de C (valor, localização, etc.). |
 | **Requisitos §5.3** | Preenchimento progressivo por blocos: **só via API** para blocos completos; na app, incremental só no subconjunto acima. Campos obrigatórios mínimos: **não**. Coleta assistida: **não**. Uso por recomendação / semáforo / campanhas: **Phase 6+ / 9 / 11**. |
 | **Governança (nota §5.3)** | Base legal, consentimento, trilhas, segregação de visibilidade: **Phase 10** (documentado no plano; não implementado no produto). |
-| **Import** | Colunas opcionais de perfil no template: **Phase 5**. |
+| **Import** | Colunas opcionais de perfil no template: **`profile_json`** — ver [`PHASE-5.md`](./PHASE-5.md). |
 
 ## Contrato
 
