@@ -11,7 +11,6 @@ services:
   - type: web
     name: ai-copilot-api-test
     runtime: python
-    region: aws-us-east-1
     rootDir: apps/api
     buildCommand: pip install --upgrade pip && pip install .
     startCommand: alembic upgrade head && uvicorn ai_copilot_api.main:app --host 0.0.0.0 --port $PORT

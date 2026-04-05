@@ -58,7 +58,7 @@ Render uses **`GET /health`** for the API web service (see `render.yaml`).
 
 ## 6. Regions
 
-Only the **API** web service sets `region` (e.g. `aws-us-east-1`) in [`render.yaml`](../render.yaml). **Static sites** are edge-cached globally and do not support a Blueprint `region` field.
+The **API** web service may set `region` in [`render.yaml`](../render.yaml); if omitted, Render uses its default for new services (you can still pick a region in the dashboard). **Static sites** are edge-cached globally and do not support a Blueprint `region` field.
 
 ## 7. Production
 
