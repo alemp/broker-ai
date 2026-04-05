@@ -45,6 +45,7 @@ You may paste Neon’s URI as either `postgresql://…` or `postgres://…`. The
 | `JWT_SECRET` | API | Strong secret; Blueprint uses `generateValue`. |
 | `CORS_ORIGINS` | API | Must include the browser origin of the static site. |
 | `VITE_API_BASE_URL` | Web (build-time) | Public API URL; requires a **rebuild** when it changes. |
+| `NODE_VERSION` | Web (build) | Must satisfy **Vite 8** (Node **≥20.19** or **≥22.12**); `render.yaml` pins **22.12.0**. |
 | `STORAGE_BACKEND` | API | `local` with `LOCAL_STORAGE_PATH=/tmp/ai-copilot-storage` (ephemeral on Render; fine for MVP test). |
 | `PYTHON_VERSION` | API | `3.12.8` in `render.yaml` (must match [`apps/api`](../apps/api) `requires-python`). |
 
