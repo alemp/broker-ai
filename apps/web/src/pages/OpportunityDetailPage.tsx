@@ -422,6 +422,22 @@ export function OpportunityDetailPage() {
                           {it.rule_ids.join(', ')}
                         </p>
                       ) : null}
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        <span className="font-medium text-foreground">
+                          {t('crm.intel.protectionGapsLabel')}:{' '}
+                        </span>
+                        {it.protection_gaps}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        <span className="font-medium text-foreground">
+                          {t('crm.intel.objectionsLabel')}:{' '}
+                        </span>
+                        {it.predictable_objections}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        <span className="font-medium text-foreground">{t('crm.intel.nbaLabel')}: </span>
+                        {it.next_best_action}
+                      </p>
                     </li>
                   ))}
                 </ul>

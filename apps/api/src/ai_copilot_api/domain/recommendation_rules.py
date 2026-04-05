@@ -148,7 +148,7 @@ def _nba_for_category(cat: ProductCategory) -> str:
             "Rever uso do veículo e coberturas essenciais; cotação alinhada ao perfil."
         ),
         ProductCategory.GENERAL_INSURANCE: (
-            "Mapear património/risco e apresentar pacote multirisco / RC."
+            "Mapear patrimônio/risco e apresentar pacote multirisco / RC."
         ),
     }.get(cat, "Agendar follow-up consultivo com base no perfil.")
 
@@ -333,7 +333,7 @@ def evaluate_rules_for_client(
                 20,
                 "RULE_PROPERTY_RISK",
                 "Imóvel identificado sem evidência de multirisco / ramos gerais adequados.",
-                "Património habitacional exposto a danos e responsabilidade.",
+                "Patrimônio habitacional exposto a danos e responsabilidade.",
             )
         if want_auto and p.category == ProductCategory.AUTO_INSURANCE:
             add_product(
@@ -405,6 +405,90 @@ def evaluate_rules_for_client(
 
     items = sorted(candidates.values(), key=lambda x: (x.priority, x.product.name))
     return items, trace
+
+
+@dataclass(frozen=True)
+class BuiltinRecommendationRule:
+    """Operator-facing description of a code-defined rule (GET /v1/recommendation-rules)."""
+
+    rule_id: str
+    title: str
+    description: str
+    inputs: tuple[str, ...]
+
+
+def list_builtin_recommendation_rules() -> list[BuiltinRecommendationRule]:
+    """Stable catalog aligned with `assess_protection_gaps` and `evaluate_rules_for_client`."""
+    return [
+        BuiltinRecommendationRule(
+            rule_id="RULE_FAMILY_PROTECTION",
+            title="Proteção familiar (vida)",
+            description=(
+                "Dispara quando há filhos ou dependentes financeiros declarados no perfil e "
+                "não há produto de vida ativo na carteira detida."
+            ),
+            inputs=("Perfil: filhos e dependentes", "Carteira: produtos detidos (categoria vida)"),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="RULE_PROPERTY_RISK",
+            title="Risco patrimonial (ramos gerais)",
+            description=(
+                "Cliente declara imóvel no perfil e não há produto de ramos gerais/multirisco "
+                "ativo associado na carteira."
+            ),
+            inputs=("Perfil: residência", "Carteira: ramos gerais"),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="RULE_AUTO_GAP",
+            title="Lacuna de automóvel",
+            description="Perfil indica veículo e não há seguro auto ativo na carteira.",
+            inputs=("Perfil: mobilidade", "Carteira: auto"),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="RULE_HEALTH_GAP",
+            title="Plano de saúde",
+            description=(
+                "Contexto familiar (filhos ou fase de vida) sem plano de saúde declarado no perfil."
+            ),
+            inputs=("Perfil: familiar e saúde",),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="RULE_COMMERCIAL_GUARANTEE",
+            title="Garantias e negócios",
+            description=(
+                "Sinais de licitações, garantias contratuais ou performance bond no perfil "
+                "empresarial, sem ramo geral ativo na carteira."
+            ),
+            inputs=("Perfil: empresa e garantias", "Carteira: ramos gerais"),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="RULE_LOB_AUTO_PORTFOLIO_GAP",
+            title="LOB automóvel vs carteira",
+            description=(
+                "Linha de negócio vinculada ao cliente sugere automóvel, mas não há apólice "
+                "de auto ativa nos produtos detidos."
+            ),
+            inputs=("CRM: linhas de negócio", "Carteira: auto"),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="RULE_PROFILE_HIGH_EARNER_PROTECTION",
+            title="Perfil de maior capacidade patrimonial",
+            description=(
+                "Faixa de renda ou patrimônio no perfil profissional sugere capacidade elevada; "
+                "reforço de proteção de vida se não houver vida ativo."
+            ),
+            inputs=("Perfil: profissional (renda/patrimônio)", "Carteira: vida"),
+        ),
+        BuiltinRecommendationRule(
+            rule_id="CONTEXT_OPPORTUNITY",
+            title="Contexto da oportunidade",
+            description=(
+                "Quando há oportunidade com produto em foco, ele é priorizado na narrativa "
+                "consultiva (não substitui lacunas de proteção)."
+            ),
+            inputs=("Oportunidade: produto de interesse",),
+        ),
+    ]
 
 
 def load_client_for_intel(db: Session, org_id: uuid.UUID, client_id: uuid.UUID) -> Client | None:

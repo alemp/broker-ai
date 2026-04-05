@@ -519,13 +519,15 @@ def test_lead_opportunity_convert_repoints_and_intel_blocked_until_client(
 def test_insurer_list_search_by_code_and_campaign_list_search(client: TestClient) -> None:
     token, _ = _register(client)
     headers = {"Authorization": f"Bearer {token}"}
+    code_alpha = f"SCH{uuid.uuid4().hex[:10].upper()}"
+    code_other = f"OTH{uuid.uuid4().hex[:10].upper()}"
 
     ins_a = client.post(
         "/v1/insurers",
         headers=headers,
         json={
             "name": "Insurer Alpha Search",
-            "code": "UNIQCODE42",
+            "code": code_alpha,
             "active": True,
             "notes": "nota lateral",
         },
@@ -534,10 +536,10 @@ def test_insurer_list_search_by_code_and_campaign_list_search(client: TestClient
     client.post(
         "/v1/insurers",
         headers=headers,
-        json={"name": "Other Insurer", "code": "OTHER", "active": True},
+        json={"name": "Other Insurer", "code": code_other, "active": True},
     )
 
-    by_code = client.get("/v1/insurers?active_only=false&q=UNIQCODE42", headers=headers)
+    by_code = client.get(f"/v1/insurers?active_only=false&q={code_alpha}", headers=headers)
     assert by_code.status_code == 200
     names = [x["name"] for x in by_code.json()]
     assert "Insurer Alpha Search" in names
@@ -545,7 +547,7 @@ def test_insurer_list_search_by_code_and_campaign_list_search(client: TestClient
 
     by_notes = client.get("/v1/insurers?active_only=false&q=lateral", headers=headers)
     assert by_notes.status_code == 200
-    assert any(x["code"] == "UNIQCODE42" for x in by_notes.json())
+    assert any(x["code"] == code_alpha for x in by_notes.json())
 
     camp = client.post(
         "/v1/campaigns",

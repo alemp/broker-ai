@@ -14,6 +14,7 @@ from ai_copilot_api.api.routes_me import router as me_router
 from ai_copilot_api.api.routes_opportunities import router as opportunities_router
 from ai_copilot_api.api.routes_org import router as org_router
 from ai_copilot_api.api.routes_products import router as products_router
+from ai_copilot_api.api.routes_recommendation_rules import router as recommendation_rules_router
 from ai_copilot_api.config import get_settings
 
 app = FastAPI(
@@ -22,7 +23,7 @@ app = FastAPI(
         "MVP API — CRM (clients, leads, segurados, audit), "
         "portfolio, pipeline, profile, interactions."
     ),
-    version="0.5.0",
+    version="0.6.0",
 )
 
 _settings = get_settings()
@@ -40,6 +41,7 @@ app.include_router(org_router, prefix="/v1")
 app.include_router(clients_router, prefix="/v1")
 app.include_router(client_import_router, prefix="/v1")
 app.include_router(intel_router, prefix="/v1")
+app.include_router(recommendation_rules_router, prefix="/v1")
 app.include_router(insurers_router, prefix="/v1")
 app.include_router(leads_router, prefix="/v1")
 app.include_router(lob_router, prefix="/v1")

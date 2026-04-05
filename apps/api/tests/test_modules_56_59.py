@@ -27,11 +27,12 @@ def _register(client: TestClient) -> tuple[str, str]:
 def test_insurer_product_intel_campaign_flow(client: TestClient) -> None:
     token, _email = _register(client)
     headers = {"Authorization": f"Bearer {token}"}
+    insurer_code = f"DEMO{uuid.uuid4().hex[:8].upper()}"
 
     ins = client.post(
         "/v1/insurers",
         headers=headers,
-        json={"name": "Seguradora Demo", "code": "DEMO", "active": True},
+        json={"name": "Seguradora Demo", "code": insurer_code, "active": True},
     )
     assert ins.status_code == 201, ins.text
     insurer_id = ins.json()["id"]
@@ -282,3 +283,25 @@ def test_phase6_recommendations_lob_and_profile_rules(client: TestClient) -> Non
         "RULE_PROFILE_HIGH_EARNER_PROTECTION" in (it.get("rule_ids") or [])
         for it in body2["items"]
     )
+
+
+def test_recommendation_rules_catalog_requires_auth(client: TestClient) -> None:
+    r = client.get("/v1/recommendation-rules")
+    assert r.status_code == 401
+
+
+def test_recommendation_rules_catalog_lists_builtins(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    r = client.get("/v1/recommendation-rules", headers=headers)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    ids = {row["rule_id"] for row in data}
+    assert "RULE_LOB_AUTO_PORTFOLIO_GAP" in ids
+    for row in data:
+        assert row.get("rule_id")
+        assert row.get("title")
+        assert "description" in row
+        assert isinstance(row.get("inputs"), list)

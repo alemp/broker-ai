@@ -1,6 +1,6 @@
 # Implementation plan (MVP)
 
-**Status:** **Phases 0–5** are implemented in-repo (Phase 5: [`PHASE-5.md`](./PHASE-5.md)), plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 6+** remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phases 0–6** are implemented in-repo (Phase 5: [`PHASE-5.md`](./PHASE-5.md); Phase 6: [`PHASE-6.md`](./PHASE-6.md)), plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 7+** remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
 **Living checklist:** Stakeholder scope from [`PRODUCT.md`](./PRODUCT.md) vs repo status is maintained in [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) — update that file when phases ship or scope shifts.  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
@@ -167,7 +167,9 @@
 
 ### Phase 6 — Product catalog and rule engine
 
-**Pre–Phase 6 slice (shipped before this phase):** PRODUCT §5.6–§5.9 MVP backend + web parcial — `Insurer` master, produtos enriquecidos, `recommendation_runs` + feedback, semáforo + fila de revisão, campanhas/toques, consentimento de marketing no cliente. Ver [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md). A Fase 6 continua a focar parametrização avançada, matriz de regras e UX de explicabilidade alinhada ao plano original.
+**Status:** **Done** — see [`PHASE-6.md`](./PHASE-6.md).
+
+**Pre–Phase 6 slice (shipped before this phase):** PRODUCT §5.6–§5.9 MVP backend + web parcial — `Insurer` master, produtos enriquecidos, `recommendation_runs` + feedback, semáforo + fila de revisão, campanhas/toques, consentimento de marketing no cliente. Ver [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md). **Post–Phase 6 backlog:** parametrização avançada (matriz DB-driven), mais regras, UX adicional.
 
 **Goal:** Explainable recommendations from client attributes **and** portfolio (LOB + held products) **and profile fields** where available.
 
@@ -175,8 +177,8 @@
 |-----------|--------|
 | `Product` model | As in `RECCOMENDATION.md`; admin or seed data for MVP. |
 | Rules | Safe evaluation (no string `eval`); priority ordering; conditions may reference **LOB membership**, **held** `Product` / status, and **Phase 3 profile** keys; store “matched rule ids” on output. |
-| API | `GET` recommendations for client (and optionally opportunity). |
-| Web | Surface recommendations on client/opportunity views. |
+| API | `GET` recommendations for client (and optionally opportunity); **`GET /v1/recommendation-rules`** built-in catalog. |
+| Web | Recommendations + **rule trace** and structured fields on client (incl. live preview) and opportunity. |
 
 **Exit criteria:** Changing a rule changes output predictably; UI shows why a product was suggested; **at least one** demo rule uses portfolio data (e.g. cross-sell gap); **at least one** demo rule uses a profile field **or** documented fallback when profile not yet populated.
 
@@ -328,6 +330,7 @@ All relevant → Phase 10
 | [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) | **Living checklist:** stakeholder scope ([`PRODUCT.md`](./PRODUCT.md)) ↔ repo; update when phases complete |
 | [`PRODUCT.md`](./PRODUCT.md) | Stakeholder product brief (Portuguese); §5.3 / §5.5 referenced by Phases 3–4 |
 | [`PHASE-5.md`](./PHASE-5.md) | CSV/Excel client import (Phase 5) |
+| [`PHASE-6.md`](./PHASE-6.md) | Rule engine + explainable recommendations (Phase 6) |
 | **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan** |
 | [`OPPORTUNITY.md`](./OPPORTUNITY.md) | Opportunity domain attributes |
 | [`PDF-UPLOAD.md`](./PDF-UPLOAD.md), [`EXTRACTION.md`](./EXTRACTION.md) | Document flows |

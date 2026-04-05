@@ -639,6 +639,15 @@ class RecommendationsPreviewOut(BaseModel):
     rule_trace: list[RuleTraceOut]
 
 
+class RecommendationBuiltinRuleOut(BaseModel):
+    """Built-in rule metadata for operators (Phase 6 — transparency, not DB-driven rules)."""
+
+    rule_id: str
+    title: str
+    description: str
+    inputs: list[str]
+
+
 class RecommendationFeedbackCreate(BaseModel):
     client_id: uuid.UUID
     product_id: uuid.UUID
