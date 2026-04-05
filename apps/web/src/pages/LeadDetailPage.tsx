@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { PageHeader } from '@/components/PageHeader'
+import { PartyOpportunitiesCard } from '@/components/PartyOpportunitiesCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -279,7 +280,15 @@ export function LeadDetailPage() {
         titleLoading={loading}
         title={lead?.full_name ?? ''}
         description={leadDescription}
-      />
+      >
+        {lead && !loading && !lead.converted_client_id ? (
+          <Button asChild variant="default">
+            <Link to={`/opportunities/new?lead_id=${encodeURIComponent(lead.id)}`}>
+              {t('crm.opportunities.new')}
+            </Link>
+          </Button>
+        ) : null}
+      </PageHeader>
       {!loading && !lead ? (
         <p className="text-destructive text-sm">{error ?? t('crm.error.notFound')}</p>
       ) : null}
@@ -351,6 +360,14 @@ export function LeadDetailPage() {
             })}
           </CardContent>
         </Card>
+      ) : null}
+
+      {lead ? (
+        <PartyOpportunitiesCard
+          party={{ type: 'lead', id: lead.id }}
+          viewStorageKey="ai-copilot:list-view:party-opportunities:lead"
+          searchFieldId="lead-detail-opportunities-search"
+        />
       ) : null}
 
       {lead && !lead.converted_client_id ? (

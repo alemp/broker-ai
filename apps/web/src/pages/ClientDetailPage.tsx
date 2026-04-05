@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   Briefcase,
   Building2,
@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner'
 
 import { PageHeader } from '@/components/PageHeader'
+import { PartyOpportunitiesCard, type PartyOppRow } from '@/components/PartyOpportunitiesCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -595,11 +596,7 @@ type InteractionDto = {
   created_by: { email: string; full_name: string | null }
 }
 
-type ClientOppRow = {
-  id: string
-  stage: string
-  status: string
-}
+type ClientOppRow = Pick<PartyOppRow, 'id' | 'stage' | 'status'>
 
 export function ClientDetailPage() {
   const { t } = useTranslation('common')
@@ -684,13 +681,11 @@ export function ClientDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [d, catalog, plist, ixList, oppList, users, audits, adeq, recRuns] =
-        await Promise.all([
+      const [d, catalog, plist, ixList, users, audits, adeq, recRuns] = await Promise.all([
           apiFetch<ClientDetail>(`/v1/clients/${clientId}`),
           apiFetch<LineOfBusinessDto[]>('/v1/lines-of-business'),
           apiFetch<ProductBrief[]>('/v1/products'),
           apiFetch<InteractionDto[]>(`/v1/interactions?client_id=${clientId}&limit=100`),
-          apiFetch<ClientOppRow[]>(`/v1/opportunities?client_id=${clientId}&limit=50`),
           apiFetch<UserBrief[]>('/v1/org/users'),
           apiFetch<AuditEventDto[]>(`/v1/clients/${clientId}/audit-events?limit=100`),
           apiFetch<AdequacyDto>(`/v1/clients/${clientId}/adequacy`),
@@ -701,7 +696,6 @@ export function ClientDetailPage() {
       setAdequacy(adeq)
       setRecommendationRuns(recRuns)
       setInteractions(ixList)
-      setClientOpportunities(oppList)
       setDetail(d)
       setOrgUsers(users)
       setAuditEvents(audits)
@@ -1247,7 +1241,15 @@ export function ClientDetailPage() {
         titleLoading={loading}
         title={detail?.full_name ?? (loading ? '' : t('crm.error.notFound'))}
         description={clientHeaderDescription}
-      />
+      >
+        {detail && !loading ? (
+          <Button asChild variant="default">
+            <Link to={`/opportunities/new?client_id=${encodeURIComponent(detail.id)}`}>
+              {t('crm.opportunities.new')}
+            </Link>
+          </Button>
+        ) : null}
+      </PageHeader>
       {!loading && !detail ? (
         <p className="text-destructive text-sm">{error ?? t('crm.error.notFound')}</p>
       ) : null}
@@ -1295,6 +1297,17 @@ export function ClientDetailPage() {
               </div>
             </div>
           </div>
+
+          <PartyOpportunitiesCard
+            party={{ type: 'client', id: clientId }}
+            viewStorageKey="ai-copilot:list-view:party-opportunities:client"
+            searchFieldId="client-detail-opportunities-search"
+            onOpportunitiesLoaded={(rows) =>
+              setClientOpportunities(
+                rows.map((r) => ({ id: r.id, stage: r.stage, status: r.status })),
+              )
+            }
+          />
 
           <TabsRoot defaultValue="core" className="space-y-2">
             <TabsList

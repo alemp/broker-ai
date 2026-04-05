@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { PageHeader } from '@/components/PageHeader'
@@ -32,6 +32,11 @@ export function OpportunityCreatePage() {
   const { t } = useTranslation('common')
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const presetClientId = searchParams.get('client_id')
+  const presetLeadId = searchParams.get('lead_id')
+  const presetKey = `${presetClientId ?? ''}\0${presetLeadId ?? ''}`
+  const appliedPresetKeyRef = useRef<string | null>(null)
   const [clients, setClients] = useState<ClientRow[]>([])
   const [leads, setLeads] = useState<LeadRow[]>([])
   const [partyKind, setPartyKind] = useState<PartyKind>('client')
@@ -68,6 +73,30 @@ export function OpportunityCreatePage() {
       cancelled = true
     }
   }, [t])
+
+  useEffect(() => {
+    if (loadingParties) {
+      return
+    }
+    if (!presetClientId && !presetLeadId) {
+      appliedPresetKeyRef.current = null
+      return
+    }
+    if (appliedPresetKeyRef.current === presetKey) {
+      return
+    }
+    if (presetClientId && clients.some((c) => c.id === presetClientId)) {
+      setPartyKind('client')
+      setClientId(presetClientId)
+      appliedPresetKeyRef.current = presetKey
+      return
+    }
+    if (presetLeadId && leads.some((l) => l.id === presetLeadId)) {
+      setPartyKind('lead')
+      setLeadId(presetLeadId)
+      appliedPresetKeyRef.current = presetKey
+    }
+  }, [loadingParties, presetKey, presetClientId, presetLeadId, clients, leads])
 
   const onCreate = async (ev: React.FormEvent) => {
     ev.preventDefault()
