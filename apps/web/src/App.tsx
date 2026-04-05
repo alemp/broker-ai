@@ -19,6 +19,7 @@ import { OpportunityCreatePage } from '@/pages/OpportunityCreatePage'
 import { OpportunityDetailPage } from '@/pages/OpportunityDetailPage'
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { ReleaseNotesPage } from '@/pages/ReleaseNotesPage'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/insurers/new" element={<InsurerNewPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/campaigns/new" element={<CampaignNewPage />} />
+        <Route path="/release-notes" element={<ReleaseNotesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

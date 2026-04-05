@@ -1,7 +1,7 @@
-import { Menu, X } from 'lucide-react'
+import { Menu, ScrollText, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { UserProfileMenu } from '@/components/UserProfileMenu'
 import { Button } from '@/components/ui/button'
@@ -87,7 +87,21 @@ export function AppLayout() {
             >
               {mobileNavOpen ? <X className="size-4" /> : <Menu className="size-4" />}
             </Button>
-            {user ? <UserProfileMenu /> : null}
+            {user ? (
+              <>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={t('releaseNotes.navButtonAria')}
+                >
+                  <Link to="/release-notes">
+                    <ScrollText className="size-4" aria-hidden />
+                  </Link>
+                </Button>
+                <UserProfileMenu />
+              </>
+            ) : null}
           </div>
         </div>
         {mobileNavOpen ? (
