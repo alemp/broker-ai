@@ -57,7 +57,7 @@ Render uses **`GET /health`** for the Docker web service (see `render.yaml`).
 
 ## 6. Naming and regions
 
-Service names and `region: frankfurt` in [`render.yaml`](../render.yaml) are defaults; adjust in the file or in the dashboard to match your team.
+Service names and `region` in [`render.yaml`](../render.yaml) are defaults (e.g. `sa-east-1`); adjust in the file or in the dashboard to match your team.
 
 ## 7. Production
 

@@ -10,7 +10,7 @@ services:
   - type: web
     name: ai-copilot-api-test
     runtime: docker
-    region: frankfurt
+    region: sa-east-1
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: ./apps/api
     healthCheckPath: /health
@@ -35,7 +35,7 @@ services:
   - type: web
     name: ai-copilot-web-test
     runtime: static
-    region: frankfurt
+    region: sa-east-1
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:web
     staticPublishPath: apps/web/dist
     envVars:
