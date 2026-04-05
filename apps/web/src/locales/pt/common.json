@@ -118,7 +118,7 @@
   "crm.clients.listSearchAria": "Filtrar lista de clientes",
   "crm.clients.back": "Voltar à lista",
   "crm.clients.noContact": "Sem contato registado",
-  "crm.clientDetail.statsCompleteness": "Completude do perfil",
+  "crm.clientDetail.statsCompleteness": "Perfil completo",
   "crm.clientDetail.statsInsured": "Segurados",
   "crm.clientDetail.statsInteractions": "Interações",
   "crm.clientDetail.tabsAria": "Secções da ficha do cliente",

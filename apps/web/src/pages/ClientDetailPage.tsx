@@ -1283,10 +1283,6 @@ export function ClientDetailPage() {
                 <Users className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabInsured')}
               </TabsTrigger>
-              <TabsTrigger value="audit">
-                <ScrollText className="size-4" aria-hidden />
-                {t('crm.clientDetail.tabAudit')}
-              </TabsTrigger>
               <TabsTrigger value="profile">
                 <UserCircle className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabProfile')}
@@ -1298,6 +1294,10 @@ export function ClientDetailPage() {
               <TabsTrigger value="portfolio">
                 <FolderTree className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabPortfolio')}
+              </TabsTrigger>
+              <TabsTrigger value="audit">
+                <ScrollText className="size-4" aria-hidden />
+                {t('crm.clientDetail.tabAudit')}
               </TabsTrigger>
             </TabsList>
 
@@ -1665,62 +1665,6 @@ export function ClientDetailPage() {
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
-            </TabsContent>
-
-            <TabsContent value="audit" className="mt-6 space-y-6 outline-none">
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="flex flex-row items-start gap-4 pb-2">
-              <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
-                <ScrollText className="size-5" aria-hidden />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-lg tracking-tight">{t('crm.audit.title')}</CardTitle>
-                <p className="text-muted-foreground text-sm">{t('crm.audit.subtitle')}</p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {auditEvents.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('crm.audit.empty')}</p>
-              ) : (
-                <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('crm.table.date')}</TableHead>
-                        <TableHead>{t('crm.table.entity')}</TableHead>
-                        <TableHead>{t('crm.table.action')}</TableHead>
-                        <TableHead className="hidden lg:table-cell">{t('crm.table.field')}</TableHead>
-                        <TableHead className="hidden xl:table-cell">{t('crm.table.change')}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {auditEvents.map((ev) => (
-                        <TableRow key={ev.id}>
-                          <TableCell className="whitespace-nowrap text-xs">
-                            {new Date(ev.created_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {auditEnumLabel('crm.audit.entity', ev.entity_type, t)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {auditEnumLabel('crm.audit.action', ev.action, t)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground hidden font-mono text-xs lg:table-cell">
-                            {ev.field_name ?? '—'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground hidden max-w-[14rem] break-all text-xs xl:table-cell">
-                            {ev.old_value != null || ev.new_value != null
-                              ? `${ev.old_value ?? '—'} → ${ev.new_value ?? '—'}`
-                              : '—'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
             </CardContent>
           </Card>
             </TabsContent>
@@ -2513,6 +2457,62 @@ export function ClientDetailPage() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+            </TabsContent>
+
+            <TabsContent value="audit" className="mt-6 space-y-6 outline-none">
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader className="flex flex-row items-start gap-4 pb-2">
+              <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
+                <ScrollText className="size-5" aria-hidden />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-lg tracking-tight">{t('crm.audit.title')}</CardTitle>
+                <p className="text-muted-foreground text-sm">{t('crm.audit.subtitle')}</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {auditEvents.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t('crm.audit.empty')}</p>
+              ) : (
+                <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('crm.table.date')}</TableHead>
+                        <TableHead>{t('crm.table.entity')}</TableHead>
+                        <TableHead>{t('crm.table.action')}</TableHead>
+                        <TableHead className="hidden lg:table-cell">{t('crm.table.field')}</TableHead>
+                        <TableHead className="hidden xl:table-cell">{t('crm.table.change')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {auditEvents.map((ev) => (
+                        <TableRow key={ev.id}>
+                          <TableCell className="whitespace-nowrap text-xs">
+                            {new Date(ev.created_at).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {auditEnumLabel('crm.audit.entity', ev.entity_type, t)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {auditEnumLabel('crm.audit.action', ev.action, t)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground hidden font-mono text-xs lg:table-cell">
+                            {ev.field_name ?? '—'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground hidden max-w-[14rem] break-all text-xs xl:table-cell">
+                            {ev.old_value != null || ev.new_value != null
+                              ? `${ev.old_value ?? '—'} → ${ev.new_value ?? '—'}`
+                              : '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
             </TabsContent>
