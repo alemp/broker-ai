@@ -158,11 +158,11 @@ As decisões abaixo substituem as opções genéricas da stack para o **MVP atua
 | Armazenamento de arquivos (dev) | **Local** (S3-compatível ou filesystem); **não versionado** no Git — ver `.gitignore` e `IMPLEMENTATION-SPEC.md` |
 | Autenticação | **E-mail e senha** |
 | Dashboard / scoring | **Batch** ou **quase tempo real** (jobs agendados) |
-| Idioma (UI) | **Português do Brasil** no MVP; projeto **preparado para i18n** |
+| Idioma (UI) | **Português do Brasil (pt-BR)** — única locale por enquanto; **i18n** para outros idiomas depois — ver [`LANGUAGE.md`](./LANGUAGE.md) |
 | Residência de dados | **Não obrigatória nesta fase**; decisão posterior |
 | LGPD | **By design** (governança, retenção, minimização, audit trail) |
 
-**Código:** inglês; **UI:** chaves de tradução (pt por enquanto).
+**Código:** inglês; **UI:** chaves de tradução (**pt-BR** por enquanto; outras línguas via i18n). Texto em português no repositório: seguir [`LANGUAGE.md`](./LANGUAGE.md).
 
 ---
 
@@ -194,4 +194,4 @@ Ao executar este prompt:
 - Pense como empreendedor (velocidade e diferenciação)
 - Sempre priorize **valor entregue vs esforço**
 - Evite complexidade desnecessária no início
-- Todo o código deve ser escrito em inglês e o projeto vai ser multi-linguagem (translation)
+- Todo o código deve ser escrito em inglês; a UI passa por **tradução (i18n)** — hoje só **pt-BR**, com suporte a mais idiomas no roadmap

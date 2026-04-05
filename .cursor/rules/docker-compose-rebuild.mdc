@@ -12,7 +12,7 @@ No **fim de cada tarefa** que altere código, config ou dependências — **mesm
 - **API:** `cd apps/api && uv run ruff check src tests` e, quando fizer sentido, `uv run pytest` com `DATABASE_URL` para o Postgres do Compose.
 - **Web:** `cd apps/web && npm run build`.
 
-## 2. Imagens e contentores (sempre api + web)
+## 2. Imagens e contêineres (sempre api + web)
 
 Na **raiz do repositório**, **sempre** reconstruir e recriar **api** e **web** (garante imagens alinhadas com o código e variáveis de build):
 
@@ -20,7 +20,7 @@ Na **raiz do repositório**, **sempre** reconstruir e recriar **api** e **web** 
 docker compose build api web && docker compose up -d --force-recreate api web
 ```
 
-- **Postgres:** não recriar por defeito; mantém dados e healthcheck. Recriar só se a tarefa exigir (volume, credenciais, etc.).
-- **Migrações:** após mudanças Alembic, `alembic upgrade head` (no host com `DATABASE_URL` ou dentro do contentor API), conforme o fluxo do projeto.
+- **Postgres:** não recriar por padrão; mantém dados e healthcheck. Recriar só se a tarefa exigir (volume, credenciais, etc.).
+- **Migrações:** após mudanças Alembic, `alembic upgrade head` (no host com `DATABASE_URL` ou dentro do contêiner da API), conforme o fluxo do projeto.
 
 Não declares a tarefa pronta sem estes passos.

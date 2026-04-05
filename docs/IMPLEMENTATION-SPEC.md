@@ -1,7 +1,7 @@
 # Implementation specification (MVP)
 
 Canonical technical and product decisions for the intelligent sales copilot MVP.  
-**Documentation language:** Implementation specs, roadmaps, plans, and **application code** use **English** (identifiers, APIs, comments). Localized UI strings use i18n keys.
+**Documentation language:** Implementation specs, roadmaps, plans, and **application code** use **English** (identifiers, APIs, comments). Localized UI strings use i18n keys. For **Portuguese** copy, use **Brazilian Portuguese (pt-BR)** only until more locales ship — see [`LANGUAGE.md`](./LANGUAGE.md).
 
 **Source prompts:** `AGENT.md`, `DESIGN-PARTNER.md`, `MVP-CRM-STRATEGY.md`, `OPPORTUNITY.md`, `RECCOMENDATION.md`, `PDF-UPLOAD.md`, `EXTRACTION.md`.  
 **Extended roadmap:** [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) (MVP → final product, CRM portfolio ingress).

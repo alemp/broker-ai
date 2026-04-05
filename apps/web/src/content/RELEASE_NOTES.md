@@ -23,7 +23,7 @@ Este documento é um **sumário executivo** das entregas do sistema, organizadas
 
 - Importação de **CSV** e **Excel (.xlsx)** com validação, pré-visualização e confirmação transacional.
 - Suporte a **linhas de negócio**, **produtos detidos**, **corretor responsável**, **tipo pessoa/empresa**, **marketing** e campos avançados (perfil e segurados via JSON, quando aplicável).
-- Registo de **origem dos dados** (importação) para rastreio na carteira.
+- Registro de **origem dos dados** (importação) para rastreio na carteira.
 - **Áreas de produto:** cadastro e consolidação da base; preparação para recomendações e análise de carteira.
 
 ---
@@ -36,7 +36,7 @@ Este documento é um **sumário executivo** das entregas do sistema, organizadas
 - Cliente **pessoa física** ou **empresa** (dados societários).
 - **Segurados** associados ao cliente (titular, dependente, outros).
 - **Histórico de alterações** relevantes na ficha (auditoria operacional do CRM).
-- Listagem de utilizadores da organização para atribuição de responsáveis.
+- Listagem de usuários da organização para atribuição de responsáveis.
 - **Áreas de produto:** gestão de leads e clientes; visão única com produtos e partes relacionadas.
 
 ---
@@ -45,7 +45,7 @@ Este documento é um **sumário executivo** das entregas do sistema, organizadas
 
 **Foco:** disciplina operacional e adoção pelo corretor.
 
-- Registo de **interações** (chamada, WhatsApp, e-mail, reunião, proposta, nota, pós-venda, campanha, etc.) ligadas a cliente e, opcionalmente, a oportunidade.
+- Registro de **interações** (chamada, WhatsApp, e-mail, reunião, proposta, nota, pós-venda, campanha, etc.) ligadas a cliente e, opcionalmente, a oportunidade.
 - **Linha do tempo** nas fichas; sincronização da **última interação** na oportunidade.
 - **Painel inicial:** oportunidades com **próxima ação em atraso** e interações do dia.
 - **Áreas de produto:** histórico de relacionamento; suporte ao funil e ao acompanhamento comercial.
@@ -56,7 +56,7 @@ Este documento é um **sumário executivo** das entregas do sistema, organizadas
 
 **Foco:** dados estruturados que sustentam recomendação e priorização futura.
 
-- Modelo de **perfil orientado a seguros** (família, património, mobilidade, profissão e finanças, saúde, empresa, animal de estimação, preferências de contacto).
+- Modelo de **perfil orientado a seguros** (família, patrimônio, mobilidade, profissão e finanças, saúde, empresa, animal de estimação, preferências de contato).
 - **Pontuação de completude** e **alertas** de lacunas na ficha do cliente.
 - **API e persistência** para todos os blocos; **formulário na web** em expansão (prioridade: blocos mais usados na venda consultiva).
 - **Áreas de produto:** perfil enriquecido; base para argumentação e para evolução do semáforo de adequação.
@@ -69,7 +69,7 @@ Este documento é um **sumário executivo** das entregas do sistema, organizadas
 
 - **Oportunidades** com estágios, valores, próxima ação e prazo; transições de pipeline.
 - **Linhas de negócio** por cliente e **produtos detidos** ligados ao catálogo (automóvel, ramos elementares, vida, etc.).
-- **Origem do registo** na carteira (CRM interno vs importação, extensível a extração futura).
+- **Origem do registro** na carteira (CRM interno vs importação, extensível a extração futura).
 - **Áreas de produto:** funil comercial; carteira como base de upsell e cross-sell.
 
 ---
@@ -89,9 +89,9 @@ Este documento é um **sumário executivo** das entregas do sistema, organizadas
 
 **Foco:** base técnica e primeiro uso pela corretora parceira.
 
-- **Registo e login** com sessão segura; utilizadores pertencentes a uma **organização** (corretora).
-- **Clientes** — criação, listagem e ficha com contacto e notas.
-- **Áreas de produto:** gestão de utilizadores e acesso (MVP); cadastro central de clientes.
+- **Cadastro e login** com sessão segura; usuários pertencentes a uma **organização** (corretora).
+- **Clientes** — criação, listagem e ficha com contato e notas.
+- **Áreas de produto:** gestão de usuários e acesso (MVP); cadastro central de clientes.
 
 ---
 

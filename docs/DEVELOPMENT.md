@@ -2,6 +2,8 @@
 
 Monorepo runbook for **ai-copilot**. Stack overview: [`PHASE-0-STACK.md`](./PHASE-0-STACK.md). Phase 1 auth and Compose: [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md). Phase 2 CRM and portfolio: [`PHASE-2-CRM.md`](./PHASE-2-CRM.md).
 
+**Portuguese copy:** product-facing text in this repo uses **Brazilian Portuguese (pt-BR)** only for now; more locales will follow with i18n. See [`LANGUAGE.md`](./LANGUAGE.md).
+
 ## Recommended: full stack in Docker Compose
 
 From the repository root (requires **Docker**):

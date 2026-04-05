@@ -24,7 +24,7 @@ def evaluate_adequacy(client: Client) -> AdequacyAssessment:
     """
     Map protection gaps + qualidade de perfil to GREEN / YELLOW / RED.
 
-    - RED: lacunas críticas (vida, património habitacional, garantias empresariais).
+    - RED: lacunas críticas (vida, patrimônio habitacional, garantias empresariais).
     - YELLOW: lacunas moderadas (auto, saúde), alertas de perfil ou base incompleta.
     - GREEN: sem lacunas materializadas pelas regras e perfil razoavelmente coerente.
     """
