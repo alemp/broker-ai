@@ -39,6 +39,14 @@ import {
 } from '@/components/ui/table'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs'
 import { apiFetch } from '@/lib/api'
+import {
+  translateIngestionSource,
+  translateInteractionType,
+  translateOpportunityStage,
+  translateOpportunityStatus,
+  translateProductCategory,
+} from '@/lib/crmEnumLabels'
+import { MARKETING_CHANNELS, marketingChannelSummaryLabel } from '@/lib/marketingChannels'
 import { cn } from '@/lib/utils'
 
 const INTERACTION_TYPES = [
@@ -110,16 +118,6 @@ const VET_USAGE_OPTIONS = [
   { value: 'yearly_checkups' },
   { value: 'frequent' },
   { value: 'other' },
-] as const
-
-const MARKETING_CHANNELS = [
-  'EMAIL',
-  'WHATSAPP',
-  'SMS',
-  'PHONE',
-  'POST',
-  'IN_PERSON',
-  'OTHER',
 ] as const
 
 function insuredRelationLabel(relation: string, translate: (key: string) => string): string {
@@ -320,21 +318,6 @@ function triBoolToLabel(v: unknown, translate: (key: string) => string): string 
     return translate('crm.profile.no')
   }
   return null
-}
-
-function marketingChannelSummaryLabel(
-  code: string | null | undefined,
-  translate: (key: string) => string,
-): string | null {
-  const c = typeof code === 'string' ? code.trim() : ''
-  if (!c) {
-    return null
-  }
-  const upper = c.toUpperCase()
-  if ((MARKETING_CHANNELS as readonly string[]).includes(upper)) {
-    return translate(`crm.core.marketingChannelOption.${upper}`)
-  }
-  return c
 }
 
 function buildGeneralSummarySections(
@@ -1552,7 +1535,8 @@ export function ClientDetailPage() {
                             <li key={`${run.id}-${it.product_id}`} className="border-t pt-2 first:border-0 first:pt-0">
                               <span className="font-medium">{it.product_name}</span>
                               <span className="text-muted-foreground ml-2">
-                                ({it.product_category}) · {t('crm.intel.itemPriority')}:{' '}
+                                ({translateProductCategory(it.product_category, t)}) ·{' '}
+                                {t('crm.intel.itemPriority')}:{' '}
                                 {it.priority}
                               </span>
                               <p className="mt-1">{it.rationale}</p>
@@ -2333,7 +2317,9 @@ export function ClientDetailPage() {
                           <TableCell className="whitespace-nowrap text-xs">
                             {new Date(row.occurred_at).toLocaleString()}
                           </TableCell>
-                          <TableCell className="font-medium">{row.interaction_type}</TableCell>
+                          <TableCell className="font-medium">
+                            {translateInteractionType(row.interaction_type, t)}
+                          </TableCell>
                           <TableCell
                             className="max-w-[min(20rem,40vw)] text-sm"
                             title={row.summary}
@@ -2362,7 +2348,7 @@ export function ClientDetailPage() {
                       onValueChange={setIxType}
                       options={INTERACTION_TYPES.map((code) => ({
                         value: code,
-                        label: code,
+                        label: translateInteractionType(code, t),
                       }))}
                     />
                   </div>
@@ -2377,7 +2363,7 @@ export function ClientDetailPage() {
                       placeholder={t('crm.interactions.noOpp')}
                       options={clientOpportunities.map((o) => ({
                         value: o.id,
-                        label: `${o.stage} (${o.status})`,
+                        label: `${translateOpportunityStage(o.stage, t)} (${translateOpportunityStatus(o.status, t)})`,
                       }))}
                     />
                   </div>
@@ -2429,7 +2415,7 @@ export function ClientDetailPage() {
                           {l.line_of_business.code}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {l.ingestion_source}
+                          {translateIngestionSource(l.ingestion_source, t)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -2489,7 +2475,9 @@ export function ClientDetailPage() {
                         <TableCell className="text-muted-foreground hidden text-sm sm:table-cell">
                           {h.insurer_name ?? '—'}
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{h.ingestion_source}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {translateIngestionSource(h.ingestion_source, t)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

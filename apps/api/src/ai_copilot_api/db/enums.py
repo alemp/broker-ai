@@ -101,6 +101,18 @@ class CampaignTouchStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class CampaignKind(StrEnum):
+    """Tipo de campanha (comunicação / régua)."""
+
+    BIRTHDAY = "BIRTHDAY"
+    RENEWAL_REMINDER = "RENEWAL_REMINDER"
+    CROSS_SELL = "CROSS_SELL"
+    SEASONAL = "SEASONAL"
+    NEWSLETTER = "NEWSLETTER"
+    REENGAGEMENT = "REENGAGEMENT"
+    CUSTOM = "CUSTOM"
+
+
 class AdequacyTrafficLight(StrEnum):
     GREEN = "GREEN"
     YELLOW = "YELLOW"

@@ -167,6 +167,14 @@ def get_client_recommendations_preview(
     opportunity: Opportunity | None = None
     if opportunity_id is not None:
         opportunity = _opp_in_org(db, org_id, opportunity_id)
+        if opportunity.lead_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Opportunity is linked to a lead; "
+                    "run recommendations on the client after conversion"
+                ),
+            )
         if opportunity.client_id != client_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -191,6 +199,14 @@ def create_recommendation_run(
     opportunity: Opportunity | None = None
     if body.opportunity_id is not None:
         opportunity = _opp_in_org(db, org_id, body.opportunity_id)
+        if opportunity.lead_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Opportunity is linked to a lead; "
+                    "run recommendations on the client after conversion"
+                ),
+            )
         if opportunity.client_id != client_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

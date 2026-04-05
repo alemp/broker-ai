@@ -3,18 +3,17 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
 from ai_copilot_api.db.enums import (
-    ClientKind,
     CrmAuditAction,
     CrmEntityType,
     LeadStatus,
     OpportunityStage,
 )
-from ai_copilot_api.db.models import Client, Lead, Opportunity, Product, User
+from ai_copilot_api.db.models import Client, Interaction, Lead, Opportunity, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.crm_audit import (
     record_audit,
@@ -80,6 +79,8 @@ def _client_snapshot_for_audit(row: Client) -> dict:
         "client_kind": row.client_kind.value if row.client_kind else None,
         "company_legal_name": row.company_legal_name,
         "company_tax_id": row.company_tax_id,
+        "marketing_opt_in": row.marketing_opt_in,
+        "preferred_marketing_channel": row.preferred_marketing_channel,
     }
 
 
@@ -121,10 +122,17 @@ def create_lead(
         full_name=body.full_name,
         email=str(body.email) if body.email is not None else None,
         phone=body.phone,
+        external_id=body.external_id,
         source=body.source,
         notes=body.notes,
         owner_id=body.owner_id,
         status=body.status,
+        client_kind=body.client_kind,
+        company_legal_name=body.company_legal_name,
+        company_tax_id=body.company_tax_id,
+        marketing_opt_in=body.marketing_opt_in,
+        preferred_marketing_channel=body.preferred_marketing_channel,
+        profile_data=dict(body.profile_data) if body.profile_data else {},
     )
     db.add(row)
     db.flush()
@@ -138,10 +146,16 @@ def create_lead(
             "full_name": row.full_name,
             "email": row.email,
             "phone": row.phone,
+            "external_id": row.external_id,
             "source": row.source,
             "notes": row.notes,
             "owner_id": row.owner_id,
             "status": row.status.value,
+            "client_kind": row.client_kind.value,
+            "company_legal_name": row.company_legal_name,
+            "company_tax_id": row.company_tax_id,
+            "marketing_opt_in": row.marketing_opt_in,
+            "preferred_marketing_channel": row.preferred_marketing_channel,
         },
     )
     db.commit()
@@ -180,10 +194,16 @@ def update_lead(
         "full_name": row.full_name,
         "email": row.email,
         "phone": row.phone,
+        "external_id": row.external_id,
         "source": row.source,
         "notes": row.notes,
         "owner_id": row.owner_id,
         "status": row.status.value,
+        "client_kind": row.client_kind.value,
+        "company_legal_name": row.company_legal_name,
+        "company_tax_id": row.company_tax_id,
+        "marketing_opt_in": row.marketing_opt_in,
+        "preferred_marketing_channel": row.preferred_marketing_channel,
     }
     data = body.model_dump(exclude_unset=True)
     if "email" in data and data["email"] is not None:
@@ -197,10 +217,16 @@ def update_lead(
         "full_name": row.full_name,
         "email": row.email,
         "phone": row.phone,
+        "external_id": row.external_id,
         "source": row.source,
         "notes": row.notes,
         "owner_id": row.owner_id,
         "status": row.status.value,
+        "client_kind": row.client_kind.value,
+        "company_legal_name": row.company_legal_name,
+        "company_tax_id": row.company_tax_id,
+        "marketing_opt_in": row.marketing_opt_in,
+        "preferred_marketing_channel": row.preferred_marketing_channel,
     }
     updates = {k: after[k] for k in before if before[k] != after[k]}
     if updates:
@@ -272,10 +298,33 @@ def convert_lead(
         phone=row.phone,
         notes=row.notes,
         owner_id=client_owner,
-        client_kind=ClientKind.INDIVIDUAL,
+        client_kind=row.client_kind,
+        company_legal_name=row.company_legal_name,
+        company_tax_id=row.company_tax_id,
+        external_id=row.external_id,
+        marketing_opt_in=row.marketing_opt_in,
+        preferred_marketing_channel=row.preferred_marketing_channel,
+        profile_data=dict(row.profile_data) if row.profile_data else {},
     )
     db.add(client_row)
     db.flush()
+
+    db.execute(
+        update(Opportunity)
+        .where(
+            Opportunity.lead_id == lead_id,
+            Opportunity.organization_id == org_id,
+        )
+        .values(client_id=client_row.id, lead_id=None),
+    )
+    db.execute(
+        update(Interaction)
+        .where(
+            Interaction.lead_id == lead_id,
+            Interaction.organization_id == org_id,
+        )
+        .values(client_id=client_row.id, lead_id=None),
+    )
 
     record_entity_snapshot_create(
         db,

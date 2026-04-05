@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
+import { translateLeadStatus } from '@/lib/crmEnumLabels'
+import { marketingChannelSummaryLabel } from '@/lib/marketingChannels'
 
 type UserBrief = {
   id: string
@@ -21,8 +23,14 @@ type LeadDetail = {
   full_name: string
   email: string | null
   phone: string | null
+  external_id: string | null
   notes: string | null
   status: string
+  client_kind: string
+  company_legal_name: string | null
+  company_tax_id: string | null
+  marketing_opt_in: boolean
+  preferred_marketing_channel: string | null
   converted_client_id: string | null
   owner_id: string | null
   owner: UserBrief | null
@@ -123,7 +131,11 @@ export function LeadDetailPage() {
   }
 
   const leadDescription = lead
-    ? [lead.status, lead.email, lead.owner ? lead.owner.full_name ?? lead.owner.email : '']
+    ? [
+        translateLeadStatus(lead.status, t),
+        lead.email,
+        lead.owner ? lead.owner.full_name ?? lead.owner.email : '',
+      ]
         .filter(Boolean)
         .join(' · ')
     : undefined
@@ -141,6 +153,61 @@ export function LeadDetailPage() {
       ) : null}
 
       {error && lead ? <p className="text-destructive text-sm">{error}</p> : null}
+
+      {lead ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('crm.leads.detailCardTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+            <p>
+              <span className="text-muted-foreground">{t('crm.core.kind')}: </span>
+              {lead.client_kind === 'COMPANY'
+                ? t('crm.core.kindCompany')
+                : t('crm.core.kindIndividual')}
+            </p>
+            {lead.phone ? (
+              <p>
+                <span className="text-muted-foreground">{t('crm.clientDetail.summary.phone')}: </span>
+                {lead.phone}
+              </p>
+            ) : null}
+            {lead.external_id ? (
+              <p>
+                <span className="text-muted-foreground">{t('crm.leads.detail.externalId')}: </span>
+                {lead.external_id}
+              </p>
+            ) : null}
+            {lead.client_kind === 'COMPANY' ? (
+              <>
+                <p className="sm:col-span-2">
+                  <span className="text-muted-foreground">{t('crm.core.companyLegal')}: </span>
+                  {lead.company_legal_name ?? '—'}
+                </p>
+                {lead.company_tax_id ? (
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">{t('crm.core.companyTax')}: </span>
+                    {lead.company_tax_id}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            <p>
+              <span className="text-muted-foreground">{t('crm.leads.field.marketingOptIn')}: </span>
+              {lead.marketing_opt_in ? t('crm.leads.yes') : t('crm.leads.no')}
+            </p>
+            {(() => {
+              const channelLabel = marketingChannelSummaryLabel(lead.preferred_marketing_channel, t)
+              return channelLabel ? (
+                <p>
+                  <span className="text-muted-foreground">{t('crm.core.marketingChannel')}: </span>
+                  {channelLabel}
+                </p>
+              ) : null
+            })()}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {lead?.converted_client_id ? (
         <Card>

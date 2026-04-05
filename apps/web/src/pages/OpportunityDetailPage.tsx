@@ -9,6 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
+import {
+  translateInteractionType,
+  translateOpportunityStage,
+  translateOpportunityStatus,
+  translateProductCategory,
+} from '@/lib/crmEnumLabels'
 
 const STAGES = [
   'LEAD',
@@ -42,7 +48,8 @@ type OpportunityDetail = {
   preferred_insurer_name: string | null
   expected_close_at: string | null
   loss_reason: string | null
-  client: { id: string; full_name: string; email: string | null }
+  client: { id: string; full_name: string; email: string | null } | null
+  lead: { id: string; full_name: string; email: string | null } | null
   next_action: string | null
   next_action_due_at: string | null
   last_interaction_at: string | null
@@ -137,7 +144,7 @@ export function OpportunityDetailPage() {
   }, [load])
 
   const loadRecommendationsPreview = useCallback(async () => {
-    if (!opportunityId || !detail) {
+    if (!opportunityId || !detail?.client) {
       return
     }
     setRecLoading(true)
@@ -154,10 +161,13 @@ export function OpportunityDetailPage() {
   }, [opportunityId, detail])
 
   useEffect(() => {
-    if (detail) {
+    if (detail?.client) {
       void loadRecommendationsPreview()
+    } else {
+      setRecPreview(null)
+      setRecLoading(false)
     }
-  }, [detail, loadRecommendationsPreview])
+  }, [detail?.client?.id, opportunityId, loadRecommendationsPreview])
 
   const setStage = async (stage: string) => {
     if (!opportunityId) {
@@ -220,13 +230,22 @@ export function OpportunityDetailPage() {
     if (!opportunityId || !detail || !ixSummary.trim()) {
       return
     }
+    const party =
+      detail.client != null
+        ? { client_id: detail.client.id }
+        : detail.lead != null
+          ? { lead_id: detail.lead.id }
+          : null
+    if (party == null) {
+      return
+    }
     setAddingIx(true)
     setError(null)
     try {
       await apiFetch('/v1/interactions', {
         method: 'POST',
         json: {
-          client_id: detail.client.id,
+          ...party,
           opportunity_id: opportunityId,
           interaction_type: ixType,
           summary: ixSummary.trim(),
@@ -246,12 +265,15 @@ export function OpportunityDetailPage() {
     return null
   }
 
+  const partyName =
+    detail?.client?.full_name ?? detail?.lead?.full_name ?? ''
+
   const canPostSale =
     detail?.stage === 'CLOSED_WON' || detail?.stage === 'POST_SALE' || detail?.status === 'WON'
 
   const oppDescription = detail
     ? [
-        `${t('crm.opportunities.pipeline')}: ${detail.stage} · ${detail.status}`,
+        `${t('crm.opportunities.pipeline')}: ${translateOpportunityStage(detail.stage, t)} · ${translateOpportunityStatus(detail.status, t)}`,
         `${t('crm.opportunities.probability')}: ${detail.closing_probability}%${
           detail.estimated_value ? ` · ${detail.estimated_value}` : ''
         }`,
@@ -274,7 +296,7 @@ export function OpportunityDetailPage() {
       <PageHeader
         back={{ to: '/opportunities', label: t('crm.opportunities.back') }}
         titleLoading={loading}
-        title={detail?.client.full_name ?? ''}
+        title={partyName}
         description={oppDescription}
       />
       {!loading && !detail ? (
@@ -300,9 +322,15 @@ export function OpportunityDetailPage() {
             </p>
           ) : null}
           <p className="mt-2 text-sm">
-            <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
-              {t('crm.opportunities.openClient')}
-            </Link>
+            {detail.client ? (
+              <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
+                {t('crm.opportunities.openClient')}
+              </Link>
+            ) : detail.lead ? (
+              <Link to={`/leads/${detail.lead.id}`} className="text-primary hover:underline">
+                {t('crm.opportunities.openLead')}
+              </Link>
+            ) : null}
           </p>
         </div>
       ) : null}
@@ -371,7 +399,9 @@ export function OpportunityDetailPage() {
             <p className="text-muted-foreground text-sm">{t('crm.opportunities.recommendationsSubtitle')}</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recLoading ? (
+            {!detail.client ? (
+              <p className="text-muted-foreground text-sm">{t('crm.opportunities.recLeadOnlyHint')}</p>
+            ) : recLoading ? (
               <p className="text-muted-foreground text-sm">{t('crm.opportunities.recLoading')}</p>
             ) : recPreview && recPreview.items.length > 0 ? (
               <>
@@ -381,7 +411,8 @@ export function OpportunityDetailPage() {
                       <div className="font-medium">
                         {it.product_name}{' '}
                         <span className="text-muted-foreground font-normal">
-                          ({it.product_category}) · {t('crm.intel.itemPriority')}: {it.priority}
+                          ({translateProductCategory(it.product_category, t)}) ·{' '}
+                          {t('crm.intel.itemPriority')}: {it.priority}
                         </span>
                       </div>
                       <p className="mt-1">{it.rationale}</p>
@@ -415,15 +446,17 @@ export function OpportunityDetailPage() {
             ) : (
               <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={recLoading}
-              onClick={() => void loadRecommendationsPreview()}
-            >
-              {t('crm.opportunities.recRefresh')}
-            </Button>
+            {detail.client ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={recLoading}
+                onClick={() => void loadRecommendationsPreview()}
+              >
+                {t('crm.opportunities.recRefresh')}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -442,7 +475,7 @@ export function OpportunityDetailPage() {
                 {interactions.map((row) => (
                   <li key={row.id} className="border-b pb-3 last:border-0">
                     <div className="font-medium">
-                      {row.interaction_type}{' '}
+                      {translateInteractionType(row.interaction_type, t)}{' '}
                       <span className="text-muted-foreground font-normal">
                         · {new Date(row.occurred_at).toLocaleString()}
                       </span>
@@ -462,7 +495,10 @@ export function OpportunityDetailPage() {
                   id="opp-ix-type"
                   value={ixType}
                   onValueChange={setIxType}
-                  options={INTERACTION_TYPES.map((code) => ({ value: code, label: code }))}
+                  options={INTERACTION_TYPES.map((code) => ({
+                    value: code,
+                    label: translateInteractionType(code, t),
+                  }))}
                 />
               </div>
               <div className="grid gap-2">
@@ -513,7 +549,9 @@ export function OpportunityDetailPage() {
                     title={s === 'POST_SALE' && !canPostSale ? t('crm.opportunities.postSaleDisabledHint') : undefined}
                     onClick={() => void setStage(s)}
                   >
-                    {busyStage === s ? t('crm.opportunities.updating') : s}
+                    {busyStage === s
+                      ? t('crm.opportunities.updating')
+                      : translateOpportunityStage(s, t)}
                   </Button>
                 )
               })}

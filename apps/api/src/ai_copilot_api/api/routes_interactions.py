@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
 from ai_copilot_api.db.enums import InteractionType
-from ai_copilot_api.db.models import Client, Interaction, Opportunity, User
+from ai_copilot_api.db.models import Client, Interaction, Lead, Opportunity, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.interaction_sync import refresh_opportunity_last_interaction_at
 from ai_copilot_api.schemas.crm import InteractionCreate, InteractionOut, InteractionUpdate
@@ -40,11 +40,18 @@ def _validate_client_org(db: Session, org_id: uuid.UUID, client_id: uuid.UUID) -
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
 
-def _validate_opportunity_for_client(
+def _validate_lead_org(db: Session, org_id: uuid.UUID, lead_id: uuid.UUID) -> None:
+    row = db.scalar(select(Lead).where(Lead.id == lead_id, Lead.organization_id == org_id))
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+
+
+def _validate_opportunity_for_party(
     db: Session,
     org_id: uuid.UUID,
     opportunity_id: uuid.UUID,
-    client_id: uuid.UUID,
+    client_id: uuid.UUID | None,
+    lead_id: uuid.UUID | None,
 ) -> Opportunity:
     opp = db.scalar(
         select(Opportunity).where(
@@ -54,11 +61,18 @@ def _validate_opportunity_for_client(
     )
     if opp is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Opportunity not found")
-    if opp.client_id != client_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Opportunity does not belong to this client",
-        )
+    if client_id is not None:
+        if opp.client_id != client_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Opportunity does not belong to this client",
+            )
+    elif lead_id is not None:
+        if opp.lead_id != lead_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Opportunity does not belong to this lead",
+            )
     return opp
 
 
@@ -69,6 +83,7 @@ def list_interactions(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
     client_id: uuid.UUID | None = None,
+    lead_id: uuid.UUID | None = None,
     opportunity_id: uuid.UUID | None = None,
     interaction_type: InteractionType | None = None,
     occurred_from: datetime | None = None,
@@ -82,6 +97,8 @@ def list_interactions(
     )
     if client_id is not None:
         stmt = stmt.where(Interaction.client_id == client_id)
+    if lead_id is not None:
+        stmt = stmt.where(Interaction.lead_id == lead_id)
     if opportunity_id is not None:
         stmt = stmt.where(Interaction.opportunity_id == opportunity_id)
     if interaction_type is not None:
@@ -102,15 +119,25 @@ def create_interaction(
     current_user: User = Depends(get_current_user),
 ) -> InteractionOut:
     org_id = current_user.organization_id
-    _validate_client_org(db, org_id, body.client_id)
+    if body.client_id is not None:
+        _validate_client_org(db, org_id, body.client_id)
+    elif body.lead_id is not None:
+        _validate_lead_org(db, org_id, body.lead_id)
     opportunity_id = body.opportunity_id
     if opportunity_id is not None:
-        _validate_opportunity_for_client(db, org_id, opportunity_id, body.client_id)
+        _validate_opportunity_for_party(
+            db,
+            org_id,
+            opportunity_id,
+            body.client_id,
+            body.lead_id,
+        )
 
     occurred_at = body.occurred_at or datetime.now(UTC)
     row = Interaction(
         organization_id=org_id,
         client_id=body.client_id,
+        lead_id=body.lead_id,
         opportunity_id=opportunity_id,
         created_by_id=current_user.id,
         interaction_type=body.interaction_type,
@@ -162,7 +189,13 @@ def update_interaction(
     if "opportunity_id" in data:
         new_val = data.pop("opportunity_id")
         if new_val is not None:
-            _validate_opportunity_for_client(db, org_id, new_val, row.client_id)
+            _validate_opportunity_for_party(
+                db,
+                org_id,
+                new_val,
+                row.client_id,
+                row.lead_id,
+            )
         row.opportunity_id = new_val
 
     for k, v in data.items():

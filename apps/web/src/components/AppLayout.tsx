@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', labelKey: 'nav.dashboard' as const, end: true as const },
-  { to: '/clients', labelKey: 'nav.clients' as const },
   { to: '/leads', labelKey: 'nav.leads' as const },
+  { to: '/clients', labelKey: 'nav.clients' as const },
   { to: '/opportunities', labelKey: 'nav.opportunities' as const },
   { to: '/insurers', labelKey: 'nav.insurers' as const },
   { to: '/campaigns', labelKey: 'nav.campaigns' as const },

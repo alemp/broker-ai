@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from ai_copilot_api.db.enums import (
     AdequacyTrafficLight,
+    CampaignKind,
     CampaignTouchStatus,
     ClientKind,
     CrmAuditAction,
@@ -35,6 +36,14 @@ class UserBrief(BaseModel):
 
 
 class ClientBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    full_name: str
+    email: str | None
+
+
+class LeadBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -272,20 +281,42 @@ class LeadCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
+    external_id: str | None = Field(default=None, max_length=128)
     source: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     owner_id: uuid.UUID | None = None
     status: LeadStatus = LeadStatus.NEW
+    client_kind: ClientKind = ClientKind.INDIVIDUAL
+    company_legal_name: str | None = Field(default=None, max_length=255)
+    company_tax_id: str | None = Field(default=None, max_length=32)
+    marketing_opt_in: bool = True
+    preferred_marketing_channel: str | None = Field(default=None, max_length=64)
+    profile_data: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def require_company_legal_name(self) -> Self:
+        if self.client_kind == ClientKind.COMPANY and not (
+            self.company_legal_name and self.company_legal_name.strip()
+        ):
+            raise ValueError("company_legal_name is required when client_kind is COMPANY")
+        return self
 
 
 class LeadUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
+    external_id: str | None = Field(default=None, max_length=128)
     source: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     owner_id: uuid.UUID | None = None
     status: LeadStatus | None = None
+    client_kind: ClientKind | None = None
+    company_legal_name: str | None = Field(default=None, max_length=255)
+    company_tax_id: str | None = Field(default=None, max_length=32)
+    marketing_opt_in: bool | None = None
+    preferred_marketing_channel: str | None = Field(default=None, max_length=64)
+    profile_data: dict[str, Any] | None = None
 
 
 class LeadOut(BaseModel):
@@ -294,11 +325,18 @@ class LeadOut(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     owner_id: uuid.UUID | None
+    external_id: str | None
     full_name: str
     email: str | None
     phone: str | None
     source: str | None
     notes: str | None
+    client_kind: ClientKind
+    company_legal_name: str | None
+    company_tax_id: str | None
+    marketing_opt_in: bool
+    preferred_marketing_channel: str | None
+    profile_data: dict[str, Any]
     status: LeadStatus
     converted_client_id: uuid.UUID | None
     created_at: datetime
@@ -399,7 +437,8 @@ class ProductOut(BaseModel):
 
 
 class OpportunityCreate(BaseModel):
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None = None
+    lead_id: uuid.UUID | None = None
     owner_id: uuid.UUID
     product_id: uuid.UUID | None = None
     estimated_value: Decimal | None = None
@@ -413,6 +452,13 @@ class OpportunityCreate(BaseModel):
     preferred_insurer_name: str | None = Field(default=None, max_length=255)
     expected_close_at: datetime | None = None
     loss_reason: str | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_party(self) -> Self:
+        cid, lid = self.client_id, self.lead_id
+        if (cid is None) == (lid is None):
+            raise ValueError("Exactly one of client_id or lead_id is required")
+        return self
 
     @model_validator(mode="after")
     def loss_reason_when_lost_on_create(self) -> Self:
@@ -455,7 +501,8 @@ class OpportunityOut(BaseModel):
 
     id: uuid.UUID
     organization_id: uuid.UUID
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None
+    lead_id: uuid.UUID | None
     owner_id: uuid.UUID
     product_id: uuid.UUID | None
     estimated_value: Decimal | None
@@ -471,7 +518,8 @@ class OpportunityOut(BaseModel):
     loss_reason: str | None
     created_at: datetime
     updated_at: datetime
-    client: ClientBrief
+    client: ClientBrief | None = None
+    lead: LeadBrief | None = None
     owner: UserBrief
     product: ProductBrief | None
 
@@ -485,13 +533,20 @@ class OpportunityMetricsSummary(BaseModel):
 
 
 class InteractionCreate(BaseModel):
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None = None
+    lead_id: uuid.UUID | None = None
     opportunity_id: uuid.UUID | None = None
     interaction_type: InteractionType
     summary: str = Field(min_length=1)
     occurred_at: datetime | None = None
     opportunity_next_action: str | None = None
     opportunity_next_action_due_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def exactly_one_party(self) -> Self:
+        if (self.client_id is None) == (self.lead_id is None):
+            raise ValueError("Exactly one of client_id or lead_id is required")
+        return self
 
 
 class InteractionUpdate(BaseModel):
@@ -506,7 +561,8 @@ class InteractionOut(BaseModel):
 
     id: uuid.UUID
     organization_id: uuid.UUID
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None
+    lead_id: uuid.UUID | None
     opportunity_id: uuid.UUID | None
     created_by_id: uuid.UUID
     interaction_type: InteractionType
@@ -602,7 +658,7 @@ class ClientAdequacyReviewBrief(BaseModel):
 
 class CampaignCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
-    kind: str = Field(min_length=1, max_length=64)
+    kind: CampaignKind
     description: str | None = None
     template_subject: str | None = Field(default=None, max_length=255)
     template_body: str = Field(min_length=1)
@@ -612,7 +668,7 @@ class CampaignCreate(BaseModel):
 
 class CampaignUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
-    kind: str | None = Field(default=None, min_length=1, max_length=64)
+    kind: CampaignKind | None = None
     description: str | None = None
     template_subject: str | None = Field(default=None, max_length=255)
     template_body: str | None = Field(default=None, min_length=1)
@@ -626,7 +682,7 @@ class CampaignOut(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     name: str
-    kind: str
+    kind: CampaignKind
     description: str | None
     template_subject: str | None
     template_body: str

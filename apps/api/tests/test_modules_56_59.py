@@ -133,7 +133,7 @@ def test_insurer_product_intel_campaign_flow(client: TestClient) -> None:
         headers=headers,
         json={
             "name": "Aniversários",
-            "kind": "birthday",
+            "kind": "BIRTHDAY",
             "template_body": "Olá {{nome}}, feliz aniversário!",
             "segment_criteria": {"marketing_opt_in": True},
             "active": True,

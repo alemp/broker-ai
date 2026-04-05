@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ai_copilot_api.api.deps import get_current_user
@@ -33,10 +33,14 @@ def list_campaigns(
     active_only: bool = Query(default=False),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
+    q: str | None = Query(default=None, max_length=255),
 ) -> list[CampaignOut]:
     stmt = select(Campaign).where(Campaign.organization_id == current_user.organization_id)
     if active_only:
         stmt = stmt.where(Campaign.active.is_(True))
+    if q and q.strip():
+        pat = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Campaign.name.ilike(pat), Campaign.kind.ilike(pat)))
     stmt = stmt.order_by(Campaign.updated_at.desc()).offset(skip).limit(limit)
     rows = db.scalars(stmt).all()
     return [CampaignOut.model_validate(r) for r in rows]

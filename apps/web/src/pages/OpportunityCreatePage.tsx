@@ -16,6 +16,14 @@ type ClientRow = {
   full_name: string
 }
 
+type LeadRow = {
+  id: string
+  full_name: string
+  converted_client_id: string | null
+}
+
+type PartyKind = 'client' | 'lead'
+
 type CreatedOpportunity = {
   id: string
 }
@@ -25,19 +33,26 @@ export function OpportunityCreatePage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [clients, setClients] = useState<ClientRow[]>([])
+  const [leads, setLeads] = useState<LeadRow[]>([])
+  const [partyKind, setPartyKind] = useState<PartyKind>('client')
   const [clientId, setClientId] = useState('')
+  const [leadId, setLeadId] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [loadingClients, setLoadingClients] = useState(true)
+  const [loadingParties, setLoadingParties] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      setLoadingClients(true)
+      setLoadingParties(true)
       try {
-        const cl = await apiFetch<ClientRow[]>('/v1/clients')
+        const [cl, ld] = await Promise.all([
+          apiFetch<ClientRow[]>('/v1/clients'),
+          apiFetch<LeadRow[]>('/v1/leads'),
+        ])
         if (!cancelled) {
           setClients(cl)
+          setLeads(ld.filter((l) => !l.converted_client_id))
         }
       } catch {
         if (!cancelled) {
@@ -45,7 +60,7 @@ export function OpportunityCreatePage() {
         }
       } finally {
         if (!cancelled) {
-          setLoadingClients(false)
+          setLoadingParties(false)
         }
       }
     })()
@@ -56,21 +71,32 @@ export function OpportunityCreatePage() {
 
   const onCreate = async (ev: React.FormEvent) => {
     ev.preventDefault()
-    if (!user || !clientId) {
+    if (!user) {
+      return
+    }
+    if (partyKind === 'client' && !clientId) {
+      return
+    }
+    if (partyKind === 'lead' && !leadId) {
       return
     }
     setCreating(true)
     setError(null)
     try {
+      const partyPayload =
+        partyKind === 'client' ? { client_id: clientId } : { lead_id: leadId }
       const created = await apiFetch<CreatedOpportunity>('/v1/opportunities', {
         method: 'POST',
         json: {
-          client_id: clientId,
+          ...partyPayload,
           owner_id: user.id,
           stage: 'LEAD',
           status: 'OPEN',
           closing_probability: 10,
-          next_action: 'Primeiro contato com o cliente',
+          next_action:
+            partyKind === 'client'
+              ? 'Primeiro contato com o cliente'
+              : 'Primeiro contato com o lead',
         },
       })
       toast.success(t('toast.opportunityCreated'))
@@ -97,21 +123,58 @@ export function OpportunityCreatePage() {
           <CardTitle className="text-base">{t('crm.opportunities.new')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={onCreate}>
-            <div className="grid flex-1 gap-2">
-              <Label htmlFor="opp-client">{t('crm.opportunities.client')}</Label>
+          <form className="flex flex-col gap-4" onSubmit={onCreate}>
+            <div className="grid gap-2 sm:max-w-md">
+              <Label htmlFor="opp-party-kind">{t('crm.opportunities.partyKind')}</Label>
               <FormSelect
-                id="opp-client"
-                value={clientId}
-                onValueChange={setClientId}
-                allowEmpty
-                emptyLabel={t('crm.opportunities.selectClient')}
-                placeholder={t('crm.opportunities.selectClient')}
-                disabled={loadingClients || !user}
-                options={clients.map((c) => ({ value: c.id, label: c.full_name }))}
+                id="opp-party-kind"
+                value={partyKind}
+                onValueChange={(v) => setPartyKind(v as PartyKind)}
+                disabled={loadingParties || !user}
+                options={[
+                  { value: 'client', label: t('crm.opportunities.partyClient') },
+                  { value: 'lead', label: t('crm.opportunities.partyLead') },
+                ]}
               />
             </div>
-            <Button type="submit" disabled={creating || !clientId || !user}>
+            {partyKind === 'client' ? (
+              <div className="grid flex-1 gap-2 sm:max-w-md">
+                <Label htmlFor="opp-client">{t('crm.opportunities.client')}</Label>
+                <FormSelect
+                  id="opp-client"
+                  value={clientId}
+                  onValueChange={setClientId}
+                  allowEmpty
+                  emptyLabel={t('crm.opportunities.selectClient')}
+                  placeholder={t('crm.opportunities.selectClient')}
+                  disabled={loadingParties || !user}
+                  options={clients.map((c) => ({ value: c.id, label: c.full_name }))}
+                />
+              </div>
+            ) : (
+              <div className="grid flex-1 gap-2 sm:max-w-md">
+                <Label htmlFor="opp-lead">{t('crm.opportunities.lead')}</Label>
+                <FormSelect
+                  id="opp-lead"
+                  value={leadId}
+                  onValueChange={setLeadId}
+                  allowEmpty
+                  emptyLabel={t('crm.opportunities.selectLead')}
+                  placeholder={t('crm.opportunities.selectLead')}
+                  disabled={loadingParties || !user}
+                  options={leads.map((l) => ({ value: l.id, label: l.full_name }))}
+                />
+              </div>
+            )}
+            <Button
+              type="submit"
+              disabled={
+                creating ||
+                !user ||
+                (partyKind === 'client' && !clientId) ||
+                (partyKind === 'lead' && !leadId)
+              }
+            >
               {creating ? t('crm.opportunities.creating') : t('crm.opportunities.create')}
             </Button>
           </form>

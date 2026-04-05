@@ -8,13 +8,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
+import { CAMPAIGN_KIND_VALUES, type CampaignKindValue } from '@/lib/campaignKinds'
+import { translateCampaignKind } from '@/lib/crmEnumLabels'
 
 export function CampaignNewPage() {
   const { t } = useTranslation('common')
   const navigate = useNavigate()
   const [name, setName] = useState('')
-  const [kind, setKind] = useState('birthday')
+  const [kind, setKind] = useState<CampaignKindValue>('BIRTHDAY')
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +34,7 @@ export function CampaignNewPage() {
         method: 'POST',
         json: {
           name: name.trim(),
-          kind: kind.trim() || 'custom',
+          kind,
           template_body: body.trim(),
           segment_criteria: { marketing_opt_in: true },
           active: true,
@@ -69,7 +72,15 @@ export function CampaignNewPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="c-kind">{t('crm.campaigns.kind')}</Label>
-                <Input id="c-kind" value={kind} onChange={(ev) => setKind(ev.target.value)} />
+                <FormSelect
+                  id="c-kind"
+                  value={kind}
+                  onValueChange={(v) => setKind(v as CampaignKindValue)}
+                  options={CAMPAIGN_KIND_VALUES.map((k) => ({
+                    value: k,
+                    label: translateCampaignKind(k, t),
+                  }))}
+                />
               </div>
             </div>
             <div className="grid gap-2">

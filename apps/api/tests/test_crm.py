@@ -433,3 +433,148 @@ def test_opportunity_product_54_rules_and_metrics(client: TestClient) -> None:
 
     mine = client.get(f"/v1/opportunities?owner_id={user_id}&status=OPEN", headers=headers)
     assert mine.status_code == 200
+
+
+def test_lead_opportunity_convert_repoints_and_intel_blocked_until_client(
+    client: TestClient,
+) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = client.get("/v1/me", headers=headers)
+    assert me.status_code == 200
+    my_id = me.json()["user"]["id"]
+
+    other = client.post(
+        "/v1/clients",
+        headers=headers,
+        json={"full_name": "Cliente só para URL de intel", "owner_id": my_id},
+    )
+    assert other.status_code == 201
+    intel_client_id = other.json()["id"]
+
+    lead = client.post(
+        "/v1/leads",
+        headers=headers,
+        json={
+            "full_name": "Lead Oportunidade",
+            "email": f"l-{uuid.uuid4().hex}@example.com",
+            "owner_id": my_id,
+            "client_kind": "COMPANY",
+            "company_legal_name": "Lead Corp Lda",
+        },
+    )
+    assert lead.status_code == 201, lead.text
+    lead_id = lead.json()["id"]
+
+    opp = client.post(
+        "/v1/opportunities",
+        headers=headers,
+        json={
+            "lead_id": lead_id,
+            "owner_id": my_id,
+            "stage": "LEAD",
+            "status": "OPEN",
+            "closing_probability": 10,
+            "next_action": "Contactar",
+        },
+    )
+    assert opp.status_code == 201, opp.text
+    opp_id = opp.json()["id"]
+    assert opp.json()["lead_id"] == lead_id
+    assert opp.json()["client_id"] is None
+
+    intel = client.get(
+        f"/v1/clients/{intel_client_id}/recommendations",
+        headers=headers,
+        params={"opportunity_id": opp_id},
+    )
+    assert intel.status_code == 400
+    assert "lead" in str(intel.json().get("detail", "")).lower()
+
+    conv = client.post(
+        f"/v1/leads/{lead_id}/convert",
+        headers=headers,
+        json={"client_owner_id": my_id},
+    )
+    assert conv.status_code == 200, conv.text
+    new_client_id = conv.json()["client"]["id"]
+    assert conv.json()["client"]["client_kind"] == "COMPANY"
+    assert conv.json()["client"]["company_legal_name"] == "Lead Corp Lda"
+
+    opp_after = client.get(f"/v1/opportunities/{opp_id}", headers=headers)
+    assert opp_after.status_code == 200
+    ob = opp_after.json()
+    assert ob["client_id"] == new_client_id
+    assert ob["lead_id"] is None
+
+    intel_ok = client.get(
+        f"/v1/clients/{new_client_id}/recommendations",
+        headers=headers,
+        params={"opportunity_id": opp_id},
+    )
+    assert intel_ok.status_code == 200
+
+
+def test_insurer_list_search_by_code_and_campaign_list_search(client: TestClient) -> None:
+    token, _ = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    ins_a = client.post(
+        "/v1/insurers",
+        headers=headers,
+        json={
+            "name": "Insurer Alpha Search",
+            "code": "UNIQCODE42",
+            "active": True,
+            "notes": "nota lateral",
+        },
+    )
+    assert ins_a.status_code == 201, ins_a.text
+    client.post(
+        "/v1/insurers",
+        headers=headers,
+        json={"name": "Other Insurer", "code": "OTHER", "active": True},
+    )
+
+    by_code = client.get("/v1/insurers?active_only=false&q=UNIQCODE42", headers=headers)
+    assert by_code.status_code == 200
+    names = [x["name"] for x in by_code.json()]
+    assert "Insurer Alpha Search" in names
+    assert "Other Insurer" not in names
+
+    by_notes = client.get("/v1/insurers?active_only=false&q=lateral", headers=headers)
+    assert by_notes.status_code == 200
+    assert any(x["code"] == "UNIQCODE42" for x in by_notes.json())
+
+    camp = client.post(
+        "/v1/campaigns",
+        headers=headers,
+        json={
+            "name": "Campanha Verão",
+            "kind": "SEASONAL",
+            "template_body": "Olá",
+            "active": True,
+        },
+    )
+    assert camp.status_code == 201, camp.text
+    client.post(
+        "/v1/campaigns",
+        headers=headers,
+        json={
+            "name": "Outra",
+            "kind": "CUSTOM",
+            "template_body": "Hi",
+            "active": True,
+        },
+    )
+
+    by_name = client.get("/v1/campaigns?q=Verão&limit=100", headers=headers)
+    assert by_name.status_code == 200
+    assert len(by_name.json()) >= 1
+    assert all("Verão" in c["name"] for c in by_name.json())
+
+    by_kind = client.get("/v1/campaigns?q=SEASONAL&limit=100", headers=headers)
+    assert by_kind.status_code == 200
+    kinds = [c["kind"] for c in by_kind.json()]
+    assert "SEASONAL" in kinds

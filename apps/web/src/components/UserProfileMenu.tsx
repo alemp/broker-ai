@@ -1,4 +1,4 @@
-import { Check, ChevronDown, LogOut, User } from 'lucide-react'
+import { ChevronDown, LogOut, Monitor, Moon, Sun, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenu } from 'radix-ui'
 
@@ -18,8 +18,6 @@ const itemClass = cn(
   'data-disabled:pointer-events-none data-disabled:opacity-50',
 )
 
-const radioItemClass = cn(itemClass, 'pl-8')
-
 const labelClass = 'text-muted-foreground px-2 py-1.5 text-xs font-medium'
 
 export function UserProfileMenu() {
@@ -29,12 +27,6 @@ export function UserProfileMenu() {
 
   if (!user) {
     return null
-  }
-
-  const onThemeChange = (value: string) => {
-    if (value === 'system' || value === 'light' || value === 'dark') {
-      setPreference(value)
-    }
   }
 
   return (
@@ -63,32 +55,48 @@ export function UserProfileMenu() {
             {user.email}
           </DropdownMenu.Label>
           <DropdownMenu.Label className={labelClass}>{t('theme.appearance')}</DropdownMenu.Label>
-          <DropdownMenu.RadioGroup value={preference} onValueChange={onThemeChange}>
-            <DropdownMenu.RadioItem value="system" className={radioItemClass}>
-              <span className="absolute left-2 flex size-3.5 items-center justify-center">
-                <DropdownMenu.ItemIndicator>
-                  <Check className="size-4" aria-hidden />
-                </DropdownMenu.ItemIndicator>
-              </span>
-              {t('theme.system')}
-            </DropdownMenu.RadioItem>
-            <DropdownMenu.RadioItem value="light" className={radioItemClass}>
-              <span className="absolute left-2 flex size-3.5 items-center justify-center">
-                <DropdownMenu.ItemIndicator>
-                  <Check className="size-4" aria-hidden />
-                </DropdownMenu.ItemIndicator>
-              </span>
-              {t('theme.light')}
-            </DropdownMenu.RadioItem>
-            <DropdownMenu.RadioItem value="dark" className={radioItemClass}>
-              <span className="absolute left-2 flex size-3.5 items-center justify-center">
-                <DropdownMenu.ItemIndicator>
-                  <Check className="size-4" aria-hidden />
-                </DropdownMenu.ItemIndicator>
-              </span>
-              {t('theme.dark')}
-            </DropdownMenu.RadioItem>
-          </DropdownMenu.RadioGroup>
+          <div
+            className="flex items-center justify-center gap-1 px-2 pb-2"
+            role="group"
+            aria-label={t('theme.appearance')}
+          >
+            <Button
+              type="button"
+              variant={preference === 'system' ? 'secondary' : 'ghost'}
+              size="icon-xs"
+              className="shrink-0"
+              aria-label={t('theme.system')}
+              aria-pressed={preference === 'system'}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => setPreference('system')}
+            >
+              <Monitor className="size-3.5" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant={preference === 'light' ? 'secondary' : 'ghost'}
+              size="icon-xs"
+              className="shrink-0"
+              aria-label={t('theme.light')}
+              aria-pressed={preference === 'light'}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => setPreference('light')}
+            >
+              <Sun className="size-3.5" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant={preference === 'dark' ? 'secondary' : 'ghost'}
+              size="icon-xs"
+              className="shrink-0"
+              aria-label={t('theme.dark')}
+              aria-pressed={preference === 'dark'}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => setPreference('dark')}
+            >
+              <Moon className="size-3.5" aria-hidden />
+            </Button>
+          </div>
           <DropdownMenu.Separator className="bg-border my-1 h-px" />
           <DropdownMenu.Item
             className={cn(itemClass, 'text-destructive focus:bg-destructive/10 focus:text-destructive pl-8')}

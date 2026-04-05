@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
 import { apiFetch, getApiBaseUrl } from '@/lib/api'
+import { translateInteractionType, translateOpportunityStage } from '@/lib/crmEnumLabels'
 
 type ApiState = 'loading' | 'ok' | 'error'
 
@@ -169,7 +170,7 @@ export function DashboardPage() {
                     {o.client.full_name}
                   </Link>
                   <p className="text-muted-foreground text-xs">
-                    {o.stage}
+                    {translateOpportunityStage(o.stage, t)}
                     {o.next_action_due_at
                       ? ` · ${new Date(o.next_action_due_at).toLocaleString()}`
                       : ''}
@@ -199,7 +200,7 @@ export function DashboardPage() {
               {todayIx.map((row) => (
                 <li key={row.id} className="border-b pb-3 last:border-0">
                   <div className="font-medium">
-                    {row.interaction_type}{' '}
+                    {translateInteractionType(row.interaction_type, t)}{' '}
                     <span className="text-muted-foreground font-normal">
                       · {new Date(row.occurred_at).toLocaleTimeString()}
                     </span>

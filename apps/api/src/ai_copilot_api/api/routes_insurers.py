@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ai_copilot_api.api.deps import get_current_user
@@ -26,7 +26,13 @@ def list_insurers(
         stmt = stmt.where(Insurer.active.is_(True))
     if q and q.strip():
         pat = f"%{q.strip()}%"
-        stmt = stmt.where(Insurer.name.ilike(pat))
+        stmt = stmt.where(
+            or_(
+                Insurer.name.ilike(pat),
+                Insurer.code.ilike(pat),
+                Insurer.notes.ilike(pat),
+            ),
+        )
     stmt = stmt.order_by(Insurer.name)
     rows = db.scalars(stmt).all()
     return [InsurerOut.model_validate(r) for r in rows]

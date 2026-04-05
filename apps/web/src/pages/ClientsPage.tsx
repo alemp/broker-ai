@@ -1,30 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, RefreshCw, Table2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+
+import { CrmListCardHeader } from '@/components/CrmListCardHeader'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePersistedListViewMode } from '@/hooks/usePersistedListViewMode'
 import { apiFetch } from '@/lib/api'
-import { cn } from '@/lib/utils'
 
-const CLIENTS_VIEW_STORAGE_KEY = 'ai-copilot:clients-list-view'
-
-type ClientsListViewMode = 'table' | 'cards'
-
-function readStoredViewMode(): ClientsListViewMode {
-  try {
-    const v = localStorage.getItem(CLIENTS_VIEW_STORAGE_KEY)
-    return v === 'cards' ? 'cards' : 'table'
-  } catch {
-    return 'table'
-  }
-}
+const LIST_VIEW_STORAGE_KEY = 'ai-copilot:list-view:clients'
 
 type UserBrief = {
   id: string
@@ -62,17 +50,9 @@ export function ClientsPage() {
   const [items, setItems] = useState<ClientListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ClientsListViewMode>(readStoredViewMode)
   const [listSearch, setListSearch] = useState('')
   const debouncedListSearch = useDebouncedValue(listSearch, 350)
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(CLIENTS_VIEW_STORAGE_KEY, viewMode)
-    } catch {
-      /* ignore quota / private mode */
-    }
-  }, [viewMode])
+  const [viewMode, setViewMode] = usePersistedListViewMode(LIST_VIEW_STORAGE_KEY)
 
   const loadClients = useCallback(async () => {
     setLoading(true)
@@ -108,68 +88,18 @@ export function ClientsPage() {
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
       <Card>
-        <CardHeader className="flex w-full flex-col items-stretch gap-4 space-y-0">
-          <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
-            <CardTitle className="text-base min-w-0 shrink">{t('crm.clients.list')}</CardTitle>
-            <div className="ms-auto flex shrink-0 flex-wrap items-center gap-2">
-              <div
-                className="border-border flex rounded-lg border p-0.5"
-                role="group"
-                aria-label={t('crm.clients.viewModeLabel')}
-              >
-                <Button
-                  type="button"
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className={cn('gap-1.5', viewMode === 'table' && 'shadow-sm')}
-                  aria-pressed={viewMode === 'table'}
-                  aria-label={t('crm.clients.viewTable')}
-                  onClick={() => setViewMode('table')}
-                >
-                  <Table2 className="size-4 shrink-0" aria-hidden />
-                  <span className="hidden sm:inline">{t('crm.clients.viewTable')}</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className={cn('gap-1.5', viewMode === 'cards' && 'shadow-sm')}
-                  aria-pressed={viewMode === 'cards'}
-                  aria-label={t('crm.clients.viewCards')}
-                  onClick={() => setViewMode('cards')}
-                >
-                  <LayoutGrid className="size-4 shrink-0" aria-hidden />
-                  <span className="hidden sm:inline">{t('crm.clients.viewCards')}</span>
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon-sm"
-                onClick={() => void loadClients()}
-                disabled={loading}
-                aria-label={t('action.refresh')}
-                title={t('action.refresh')}
-              >
-                <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} aria-hidden />
-              </Button>
-            </div>
-          </div>
-          <div className="w-full max-w-md">
-            <Label htmlFor="clients-list-search" className="sr-only">
-              {t('crm.clients.listSearchAria')}
-            </Label>
-            <Input
-              id="clients-list-search"
-              type="search"
-              value={listSearch}
-              onChange={(ev) => setListSearch(ev.target.value)}
-              placeholder={t('crm.clients.listSearch')}
-              aria-label={t('crm.clients.listSearchAria')}
-              autoComplete="off"
-            />
-          </div>
-        </CardHeader>
+        <CrmListCardHeader
+          listTitle={t('crm.clients.list')}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onRefresh={loadClients}
+          loading={loading}
+          searchId="clients-list-search"
+          searchValue={listSearch}
+          onSearchChange={setListSearch}
+          searchPlaceholder={t('crm.clients.listSearch')}
+          searchAriaLabel={t('crm.clients.listSearchAria')}
+        />
         <CardContent>
           {loading ? (
             viewMode === 'table' ? (

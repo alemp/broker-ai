@@ -4,12 +4,12 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
 from ai_copilot_api.db.enums import OpportunityStage, OpportunityStatus
-from ai_copilot_api.db.models import Client, Opportunity, Product, User
+from ai_copilot_api.db.models import Client, Lead, Opportunity, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.opportunity_rules import (
     assert_next_action_when_required,
@@ -32,6 +32,7 @@ _MAX_PAGE = 100
 def _opp_options():
     return (
         selectinload(Opportunity.client),
+        selectinload(Opportunity.lead),
         selectinload(Opportunity.owner),
         selectinload(Opportunity.product),
     )
@@ -52,6 +53,18 @@ def _client_in_org(db: Session, org_id: uuid.UUID, client_id: uuid.UUID) -> None
     c = db.scalar(select(Client).where(Client.id == client_id, Client.organization_id == org_id))
     if c is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+
+def _lead_in_org(db: Session, org_id: uuid.UUID, lead_id: uuid.UUID) -> Lead:
+    row = db.scalar(select(Lead).where(Lead.id == lead_id, Lead.organization_id == org_id))
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lead not found")
+    if row.converted_client_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot attach opportunity to a converted lead",
+        )
+    return row
 
 
 def _user_in_org(db: Session, org_id: uuid.UUID, user_id: uuid.UUID) -> None:
@@ -116,6 +129,7 @@ def list_opportunities(
     stage: OpportunityStage | None = None,
     status: OpportunityStatus | None = None,
     client_id: uuid.UUID | None = None,
+    lead_id: uuid.UUID | None = None,
     owner_id: uuid.UUID | None = None,
     overdue_next_action: bool = Query(default=False),
     q: str | None = Query(default=None, max_length=200),
@@ -127,18 +141,26 @@ def list_opportunities(
     stmt = (
         select(Opportunity)
         .options(*_opp_options())
-        .join(Client, Client.id == Opportunity.client_id)
+        .outerjoin(Client, Client.id == Opportunity.client_id)
+        .outerjoin(Lead, Lead.id == Opportunity.lead_id)
         .where(Opportunity.organization_id == current_user.organization_id)
     )
     if q and q.strip():
         pat = f"%{q.strip()}%"
-        stmt = stmt.where(Client.full_name.ilike(pat))
+        stmt = stmt.where(
+            or_(
+                Client.full_name.ilike(pat),
+                Lead.full_name.ilike(pat),
+            ),
+        )
     if stage is not None:
         stmt = stmt.where(Opportunity.stage == stage)
     if status is not None:
         stmt = stmt.where(Opportunity.status == status)
     if client_id is not None:
         stmt = stmt.where(Opportunity.client_id == client_id)
+    if lead_id is not None:
+        stmt = stmt.where(Opportunity.lead_id == lead_id)
     if owner_id is not None:
         stmt = stmt.where(Opportunity.owner_id == owner_id)
     if overdue_next_action:
@@ -170,13 +192,26 @@ def create_opportunity(
     current_user: User = Depends(get_current_user),
 ) -> OpportunityOut:
     org_id = current_user.organization_id
-    _client_in_org(db, org_id, body.client_id)
+    cid: uuid.UUID | None = None
+    lid: uuid.UUID | None = None
+    if body.client_id is not None:
+        _client_in_org(db, org_id, body.client_id)
+        cid = body.client_id
+    elif body.lead_id is not None:
+        _lead_in_org(db, org_id, body.lead_id)
+        lid = body.lead_id
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Exactly one of client_id or lead_id is required",
+        )
     _user_in_org(db, org_id, body.owner_id)
     _product_in_org(db, org_id, body.product_id)
     derived_status = status_for_stage(body.stage, body.status)
     row = Opportunity(
         organization_id=org_id,
-        client_id=body.client_id,
+        client_id=cid,
+        lead_id=lid,
         owner_id=body.owner_id,
         product_id=body.product_id,
         estimated_value=body.estimated_value,
