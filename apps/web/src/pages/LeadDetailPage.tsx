@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import {
+  CheckCircle2,
+  ClipboardList,
+  IdCard,
+  Megaphone,
+  ScrollText,
+  UserCircle,
+} from 'lucide-react'
 
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -24,6 +33,7 @@ type LeadDetail = {
   email: string | null
   phone: string | null
   external_id: string | null
+  source: string | null
   notes: string | null
   status: string
   client_kind: string
@@ -34,6 +44,123 @@ type LeadDetail = {
   converted_client_id: string | null
   owner_id: string | null
   owner: UserBrief | null
+  profile_data: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+function formatPtDateTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(iso))
+  } catch {
+    return iso
+  }
+}
+
+function countNonEmptyProfileBlocks(data: Record<string, unknown>): number {
+  if (!data || typeof data !== 'object') {
+    return 0
+  }
+  return Object.values(data).filter((block) => {
+    if (block == null || typeof block !== 'object' || Array.isArray(block)) {
+      return false
+    }
+    return Object.keys(block as Record<string, unknown>).length > 0
+  }).length
+}
+
+type LeadSummarySection = {
+  key: string
+  title: string
+  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  items: { label: string; value: string }[]
+}
+
+function buildLeadSummarySections(lead: LeadDetail, t: TFunction<'common'>): LeadSummarySection[] {
+  const sections: LeadSummarySection[] = []
+
+  const add = (
+    key: string,
+    title: string,
+    icon: LeadSummarySection['icon'],
+    raw: { label: string; value: string | null | undefined }[],
+  ) => {
+    const items = raw
+      .map((r) => {
+        const v = r.value
+        if (v == null) {
+          return null
+        }
+        const s = typeof v === 'string' ? v.trim() : String(v)
+        return s ? { label: r.label, value: s } : null
+      })
+      .filter((x): x is { label: string; value: string } => x != null)
+    if (items.length === 0) {
+      return
+    }
+    sections.push({ key, title, icon, items })
+  }
+
+  add('contact', t('crm.clientDetail.summary.sectionContact'), UserCircle, [
+    { label: t('crm.clientDetail.summary.name'), value: lead.full_name?.trim() || null },
+    { label: t('crm.clientDetail.summary.email'), value: lead.email?.trim() || null },
+    { label: t('crm.clientDetail.summary.phone'), value: lead.phone?.trim() || null },
+    { label: t('crm.clientDetail.summary.notes'), value: lead.notes?.trim() || null },
+  ])
+
+  add('crm', t('crm.clientDetail.summary.sectionCrm'), IdCard, [
+    {
+      label: t('crm.core.owner'),
+      value: lead.owner ? lead.owner.full_name?.trim() || lead.owner.email : null,
+    },
+    {
+      label: t('crm.core.kind'),
+      value:
+        lead.client_kind === 'COMPANY'
+          ? t('crm.core.kindCompany')
+          : lead.client_kind === 'INDIVIDUAL'
+            ? t('crm.core.kindIndividual')
+            : lead.client_kind,
+    },
+    { label: t('crm.core.companyLegal'), value: lead.company_legal_name?.trim() || null },
+    { label: t('crm.core.companyTax'), value: lead.company_tax_id?.trim() || null },
+    { label: t('crm.leads.field.status'), value: translateLeadStatus(lead.status, t) },
+    { label: t('crm.leads.detail.externalId'), value: lead.external_id?.trim() || null },
+    { label: t('crm.leads.summary.source'), value: lead.source?.trim() || null },
+    { label: t('crm.leads.summary.createdAt'), value: formatPtDateTime(lead.created_at) },
+    { label: t('crm.leads.summary.updatedAt'), value: formatPtDateTime(lead.updated_at) },
+  ])
+
+  add('marketing', t('crm.clientDetail.summary.sectionMarketing'), Megaphone, [
+    {
+      label: t('crm.core.marketingOptIn'),
+      value: lead.marketing_opt_in ? t('crm.profile.yes') : t('crm.profile.no'),
+    },
+    {
+      label: t('crm.core.marketingChannel'),
+      value: marketingChannelSummaryLabel(lead.preferred_marketing_channel, t),
+    },
+  ])
+
+  const profileCount = countNonEmptyProfileBlocks(lead.profile_data)
+  if (profileCount > 0) {
+    sections.push({
+      key: 'profile',
+      title: t('crm.leads.summary.sectionProfile'),
+      icon: ClipboardList,
+      items: [
+        {
+          label: t('crm.leads.summary.profileBlocks'),
+          value: String(profileCount),
+        },
+      ],
+    })
+  }
+
+  return sections
 }
 
 type ProductBrief = {
@@ -140,6 +267,11 @@ export function LeadDetailPage() {
         .join(' · ')
     : undefined
 
+  const leadSummarySections = useMemo(
+    () => (lead ? buildLeadSummarySections(lead, t) : []),
+    [lead, t],
+  )
+
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
       <PageHeader
@@ -154,68 +286,69 @@ export function LeadDetailPage() {
 
       {error && lead ? <p className="text-destructive text-sm">{error}</p> : null}
 
-      {lead ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('crm.leads.detailCardTitle')}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-            <p>
-              <span className="text-muted-foreground">{t('crm.core.kind')}: </span>
-              {lead.client_kind === 'COMPANY'
-                ? t('crm.core.kindCompany')
-                : t('crm.core.kindIndividual')}
-            </p>
-            {lead.phone ? (
-              <p>
-                <span className="text-muted-foreground">{t('crm.clientDetail.summary.phone')}: </span>
-                {lead.phone}
-              </p>
-            ) : null}
-            {lead.external_id ? (
-              <p>
-                <span className="text-muted-foreground">{t('crm.leads.detail.externalId')}: </span>
-                {lead.external_id}
-              </p>
-            ) : null}
-            {lead.client_kind === 'COMPANY' ? (
-              <>
-                <p className="sm:col-span-2">
-                  <span className="text-muted-foreground">{t('crm.core.companyLegal')}: </span>
-                  {lead.company_legal_name ?? '—'}
+      {lead?.converted_client_id ? (
+        <Card className="to-card border-primary/25 from-primary/5 shadow-sm ring-1 ring-primary/10 bg-gradient-to-br">
+          <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="flex min-w-0 gap-4">
+              <div
+                className="bg-primary/15 text-primary flex size-12 shrink-0 items-center justify-center rounded-xl"
+                aria-hidden
+              >
+                <CheckCircle2 className="size-6" strokeWidth={2} />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <p className="text-foreground text-base font-semibold tracking-tight">
+                  {t('crm.leads.convertedHint')}
                 </p>
-                {lead.company_tax_id ? (
-                  <p className="sm:col-span-2">
-                    <span className="text-muted-foreground">{t('crm.core.companyTax')}: </span>
-                    {lead.company_tax_id}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
-            <p>
-              <span className="text-muted-foreground">{t('crm.leads.field.marketingOptIn')}: </span>
-              {lead.marketing_opt_in ? t('crm.leads.yes') : t('crm.leads.no')}
-            </p>
-            {(() => {
-              const channelLabel = marketingChannelSummaryLabel(lead.preferred_marketing_channel, t)
-              return channelLabel ? (
-                <p>
-                  <span className="text-muted-foreground">{t('crm.core.marketingChannel')}: </span>
-                  {channelLabel}
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  {t('crm.leads.convertedCtaSubtitle')}
                 </p>
-              ) : null
-            })()}
+              </div>
+            </div>
+            <Button asChild size="lg" className="w-full shrink-0 sm:w-auto">
+              <Link to={`/clients/${lead.converted_client_id}`}>{t('crm.leads.openClient')}</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : null}
 
-      {lead?.converted_client_id ? (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm">{t('crm.leads.convertedHint')}</p>
-            <Button asChild className="mt-3" variant="secondary">
-              <Link to={`/clients/${lead.converted_client_id}`}>{t('crm.leads.openClient')}</Link>
-            </Button>
+      {lead ? (
+        <Card className="border-border/80 shadow-sm">
+          <CardHeader className="flex flex-row items-start gap-4 pb-2">
+            <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
+              <ScrollText className="size-5" aria-hidden />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="text-lg tracking-tight">
+                {t('crm.clientDetail.summary.title')}
+              </CardTitle>
+              <p className="text-muted-foreground text-sm">{t('crm.leads.summary.subtitle')}</p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {leadSummarySections.map((sec) => {
+              const Icon = sec.icon
+              return (
+                <section key={sec.key} className="space-y-2">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+                      <Icon className="size-4" aria-hidden />
+                    </div>
+                    <h3 className="text-foreground pt-1 text-sm font-semibold">{sec.title}</h3>
+                  </div>
+                  <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 sm:pl-12">
+                    {sec.items.map((item, idx) => (
+                      <div key={`${sec.key}-${idx}`} className="min-w-0">
+                        <dt className="text-muted-foreground text-xs font-medium">{item.label}</dt>
+                        <dd className="text-foreground mt-0.5 text-sm font-medium wrap-break-word whitespace-pre-wrap">
+                          {item.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              )
+            })}
           </CardContent>
         </Card>
       ) : null}
