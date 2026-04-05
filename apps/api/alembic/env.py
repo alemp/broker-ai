@@ -6,6 +6,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from ai_copilot_api.db.url import normalize_database_url
+
 config = context.config
 
 if config.config_file_name is not None:
@@ -15,10 +17,11 @@ target_metadata = None
 
 
 def get_url() -> str:
-    return os.environ.get(
+    raw = os.environ.get(
         "DATABASE_URL",
         "postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot",
     )
+    return normalize_database_url(raw)
 
 
 def run_migrations_offline() -> None:

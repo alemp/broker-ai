@@ -4,6 +4,8 @@ from pathlib import Path
 from pydantic import Field, PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ai_copilot_api.db.url import normalize_database_url
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -33,6 +35,13 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://ai_copilot:ai_copilot_dev@localhost:5432/ai_copilot",
         validation_alias="DATABASE_URL",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_postgres_scheme(cls, value: object) -> object:
+        if isinstance(value, str):
+            return normalize_database_url(value)
+        return value
     storage_backend: str = Field(default="local", validation_alias="STORAGE_BACKEND")
     local_storage_path: Path = Field(
         default=Path(".local-storage/objects"),

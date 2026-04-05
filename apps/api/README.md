@@ -1,6 +1,6 @@
 # AI Copilot API
 
-Python **FastAPI** service. Runbook: [`../../docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md). Auth (Phase 1): [`../../docs/PHASE-1-AUTH.md`](../../docs/PHASE-1-AUTH.md).
+Python **FastAPI** service. Runbook: [`../../docs/DEVELOPMENT.md`](../../docs/DEVELOPMENT.md). Test hosting (Neon + Render): [`../../docs/DEPLOY-TEST.md`](../../docs/DEPLOY-TEST.md). Auth (Phase 1): [`../../docs/PHASE-1-AUTH.md`](../../docs/PHASE-1-AUTH.md).
 
 **Docker (recommended):** from repo root, `docker compose up --build` (API on port **8000** by default).
 

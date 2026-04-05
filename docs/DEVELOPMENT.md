@@ -88,3 +88,7 @@ For **`pnpm build:web`**, set `VITE_API_BASE_URL` in the environment if the defa
 ## CI
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs API checks (with Postgres) and web lint/build. Do not commit secrets; use `.env` locally only.
+
+## Test deployment (Neon + Render)
+
+For a hosted **test** stack (Postgres on Neon, API and static web on Render), see [`DEPLOY-TEST.md`](./DEPLOY-TEST.md) and the root [`render.yaml`](../render.yaml). Local Docker Compose remains the default for development.
