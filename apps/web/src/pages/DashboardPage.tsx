@@ -25,7 +25,22 @@ type TodayInteractionRow = {
   interaction_type: string
   summary: string
   occurred_at: string
-  client_id: string
+  client_id: string | null
+  lead_id: string | null
+  opportunity_id: string | null
+}
+
+function todayIxPartyLink(row: TodayInteractionRow): { to: string; labelKey: string } | null {
+  if (row.client_id) {
+    return { to: `/clients/${row.client_id}`, labelKey: 'crm.dashboard.openClient' }
+  }
+  if (row.lead_id) {
+    return { to: `/leads/${row.lead_id}`, labelKey: 'crm.dashboard.openLead' }
+  }
+  if (row.opportunity_id) {
+    return { to: `/opportunities/${row.opportunity_id}`, labelKey: 'crm.dashboard.openOpportunity' }
+  }
+  return null
 }
 
 export function DashboardPage() {
@@ -197,23 +212,28 @@ export function DashboardPage() {
             <p className="text-muted-foreground mt-4 text-sm">{t('crm.dashboard.todayIxEmpty')}</p>
           ) : (
             <ul className="mt-4 space-y-3 text-sm">
-              {todayIx.map((row) => (
-                <li key={row.id} className="border-b pb-3 last:border-0">
-                  <div className="font-medium">
-                    {translateInteractionType(row.interaction_type, t)}{' '}
-                    <span className="text-muted-foreground font-normal">
-                      · {new Date(row.occurred_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2">{row.summary}</p>
-                  <Link
-                    to={`/clients/${row.client_id}`}
-                    className="text-primary mt-1 inline-block text-xs hover:underline"
-                  >
-                    {t('crm.dashboard.openClient')}
-                  </Link>
-                </li>
-              ))}
+              {todayIx.map((row) => {
+                const partyLink = todayIxPartyLink(row)
+                return (
+                  <li key={row.id} className="border-b pb-3 last:border-0">
+                    <div className="font-medium">
+                      {translateInteractionType(row.interaction_type, t)}{' '}
+                      <span className="text-muted-foreground font-normal">
+                        · {new Date(row.occurred_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2">{row.summary}</p>
+                    {partyLink ? (
+                      <Link
+                        to={partyLink.to}
+                        className="text-primary mt-1 inline-block text-xs hover:underline"
+                      >
+                        {t(partyLink.labelKey)}
+                      </Link>
+                    ) : null}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>

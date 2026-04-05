@@ -546,5 +546,7 @@
   "crm.dashboard.todayIxTitle": "Interações de hoje",
   "crm.dashboard.todayIxSubtitle": "Registros com data de hoje (fuso local).",
   "crm.dashboard.todayIxEmpty": "Nenhuma interação hoje.",
-  "crm.dashboard.openClient": "Abrir cliente"
+  "crm.dashboard.openClient": "Abrir cliente",
+  "crm.dashboard.openLead": "Abrir lead",
+  "crm.dashboard.openOpportunity": "Abrir oportunidade"
 }
