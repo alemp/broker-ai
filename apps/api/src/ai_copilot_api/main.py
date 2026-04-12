@@ -10,6 +10,7 @@ from ai_copilot_api.api.routes_clients import router as clients_router
 from ai_copilot_api.api.routes_dashboard import router as dashboard_router
 from ai_copilot_api.api.routes_insurers import router as insurers_router
 from ai_copilot_api.api.routes_intel import router as intel_router
+from ai_copilot_api.api.routes_intel_leads import router as intel_leads_router
 from ai_copilot_api.api.routes_interactions import router as interactions_router
 from ai_copilot_api.api.routes_jobs import router as jobs_router
 from ai_copilot_api.api.routes_leads import router as leads_router
@@ -69,6 +70,7 @@ app.include_router(org_router, prefix="/v1")
 app.include_router(clients_router, prefix="/v1")
 app.include_router(client_import_router, prefix="/v1")
 app.include_router(intel_router, prefix="/v1")
+app.include_router(intel_leads_router, prefix="/v1")
 app.include_router(recommendation_rules_router, prefix="/v1")
 app.include_router(insurers_router, prefix="/v1")
 app.include_router(leads_router, prefix="/v1")

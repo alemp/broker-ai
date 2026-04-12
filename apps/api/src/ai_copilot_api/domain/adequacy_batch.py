@@ -13,17 +13,23 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.db.enums import AdequacyTrafficLight, BatchJobStatus
-from ai_copilot_api.db.models import BatchJobRun, Client, ClientAdequacySnapshot, ClientHeldProduct
+from ai_copilot_api.db.models import (
+    BatchJobRun,
+    Client,
+    ClientAdequacySnapshot,
+    ClientHeldProduct,
+    Lead,
+)
 from ai_copilot_api.domain.adequacy_rules import AdequacyAssessment, evaluate_adequacy
 
 ADEQUACY_RULE_VERSION = "phase9-v2"
 JOB_TYPE_ADEQUACY_REFRESH = "adequacy_refresh"
 
 
-def adequacy_inputs_fingerprint(client: Client) -> str:
+def adequacy_inputs_fingerprint(party: Client | Lead) -> str:
     """Stable hash of profile + portfolio inputs used for adequacy (debug / change detection)."""
-    profile = client.profile_data if isinstance(client.profile_data, dict) else {}
-    held = getattr(client, "held_products", None) or []
+    profile = party.profile_data if isinstance(party.profile_data, dict) else {}
+    held = getattr(party, "held_products", None) or []
     held_payload = sorted(
         (
             str(h.product_id) if h.product_id else None,
@@ -37,7 +43,7 @@ def adequacy_inputs_fingerprint(client: Client) -> str:
     payload: dict[str, Any] = {
         "profile": profile,
         "held": held_payload,
-        "client_kind": client.client_kind.value,
+        "client_kind": party.client_kind.value,
     }
     canonical = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()
@@ -196,3 +202,11 @@ def resolve_adequacy_for_api(
         )
     ad = evaluate_adequacy(client)
     return ad, "live", None, adequacy_inputs_fingerprint(client), ADEQUACY_RULE_VERSION
+
+
+def resolve_adequacy_for_lead_api(
+    lead: Lead,
+) -> tuple[AdequacyAssessment, Literal["live"], None, str, str]:
+    """Leads have no batch adequacy snapshot; assessment is always computed live."""
+    ad = evaluate_adequacy(lead)
+    return ad, "live", None, adequacy_inputs_fingerprint(lead), ADEQUACY_RULE_VERSION

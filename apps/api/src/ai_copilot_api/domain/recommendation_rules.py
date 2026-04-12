@@ -12,14 +12,17 @@ from ai_copilot_api.db.enums import ProductCategory
 from ai_copilot_api.db.models import (
     Client,
     ClientHeldProduct,
+    Lead,
     Opportunity,
     Product,
 )
 from ai_copilot_api.schemas.client_profile import ClientInsuranceProfile
 
+IntelParty = Client | Lead
 
-def _profile(client: Client) -> ClientInsuranceProfile:
-    return ClientInsuranceProfile.model_validate(client.profile_data or {})
+
+def _profile(party: IntelParty) -> ClientInsuranceProfile:
+    return ClientInsuranceProfile.model_validate(party.profile_data or {})
 
 
 def _held_active(h: ClientHeldProduct) -> bool:
@@ -29,12 +32,12 @@ def _held_active(h: ClientHeldProduct) -> bool:
     return s not in ("cancelled", "canceled", "lapsed", "expired", "inactive")
 
 
-def _profile_high_earner_life_gap(client: Client) -> tuple[bool, str]:
+def _profile_high_earner_life_gap(party: IntelParty) -> tuple[bool, str]:
     """
     Phase 6 — profile-only signal when professional block signals higher capacity
     but no active life product (complements family-based RULE_FAMILY_PROTECTION).
     """
-    prof = _profile(client)
+    prof = _profile(party)
     pr = prof.professional
     if pr is None:
         return False, "professional block empty"
@@ -54,7 +57,7 @@ def _profile_high_earner_life_gap(client: Client) -> tuple[bool, str]:
     )
     income_hit = any(m in band for m in markers)
     wealth_hit = any(m in wealth for m in ("high", "alto", "elevado", "top"))
-    life_held = _has_active_category(client, ProductCategory.LIFE_INSURANCE)
+    life_held = _has_active_category(party, ProductCategory.LIFE_INSURANCE)
     if (income_hit or wealth_hit) and not life_held:
         return True, (
             f"approximate_income_band={band!r}, wealth_band={wealth!r}, life_held={life_held}"
@@ -62,8 +65,8 @@ def _profile_high_earner_life_gap(client: Client) -> tuple[bool, str]:
     return False, f"approximate_income_band={band!r}, wealth_band={wealth!r}, life_held={life_held}"
 
 
-def _has_active_category(client: Client, category: ProductCategory) -> bool:
-    for h in client.held_products:
+def _has_active_category(party: IntelParty, category: ProductCategory) -> bool:
+    for h in party.held_products:
         if not _held_active(h):
             continue
         if h.product_id is None:
@@ -130,9 +133,9 @@ def _nba_for_category(cat: ProductCategory) -> str:
     }.get(cat, "Agendar follow-up consultivo com base no perfil.")
 
 
-def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleResult]]:
+def assess_protection_gaps(party: IntelParty) -> tuple[ProtectionGaps, list[RuleResult]]:
     """Profile vs carteira detida — usado em recomendações (§5.7) e semáforo (§5.8)."""
-    prof = _profile(client)
+    prof = _profile(party)
     personal = prof.personal
     res = prof.residence
     mob = prof.mobility
@@ -160,7 +163,7 @@ def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleRes
 
     trace: list[RuleResult] = []
     family_exposure = children > 0 or dependents > 0
-    life_held = _has_active_category(client, ProductCategory.LIFE_INSURANCE)
+    life_held = _has_active_category(party, ProductCategory.LIFE_INSURANCE)
     want_life = family_exposure and not life_held
     trace.append(
         RuleResult(
@@ -169,7 +172,7 @@ def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleRes
             f"children={children}, financial_dependents={dependents}, life_held={life_held}",
         ),
     )
-    general_held = _has_active_category(client, ProductCategory.GENERAL_INSURANCE)
+    general_held = _has_active_category(party, ProductCategory.GENERAL_INSURANCE)
     want_home = owns_property and not general_held
     trace.append(
         RuleResult(
@@ -178,7 +181,7 @@ def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleRes
             f"owns_property={owns_property}, general_held={general_held}",
         ),
     )
-    auto_held = _has_active_category(client, ProductCategory.AUTO_INSURANCE)
+    auto_held = _has_active_category(party, ProductCategory.AUTO_INSURANCE)
     want_auto = owns_vehicle and not auto_held
     trace.append(
         RuleResult(
@@ -199,7 +202,7 @@ def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleRes
     )
     commercial_signals = bids or guarantee or needs_bond
     want_commercial = commercial_signals and not _has_active_category(
-        client,
+        party,
         ProductCategory.GENERAL_INSURANCE,
     )
     trace.append(
@@ -221,19 +224,19 @@ def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleRes
 
 
 def evaluate_rules_for_client(
-    client: Client,
+    party: IntelParty,
     opportunity: Opportunity | None,
     products: list[Product],
 ) -> tuple[list[RecommendationItemData], list[RuleResult]]:
     """Return ranked recommendation items and a diagnostic trace."""
-    gaps, trace = assess_protection_gaps(client)
+    gaps, trace = assess_protection_gaps(party)
     want_life = gaps.want_life
     want_home = gaps.want_home
     want_auto = gaps.want_auto
     want_health = gaps.want_health
     want_commercial = gaps.want_commercial
 
-    want_profile_life, prof_life_detail = _profile_high_earner_life_gap(client)
+    want_profile_life, prof_life_detail = _profile_high_earner_life_gap(party)
     trace.append(
         RuleResult(
             "RULE_PROFILE_HIGH_EARNER_PROTECTION",
@@ -447,6 +450,16 @@ def load_client_for_intel(db: Session, org_id: uuid.UUID, client_id: uuid.UUID) 
             selectinload(Client.held_products).selectinload(ClientHeldProduct.product),
         )
         .where(Client.id == client_id, Client.organization_id == org_id),
+    )
+
+
+def load_lead_for_intel(db: Session, org_id: uuid.UUID, lead_id: uuid.UUID) -> Lead | None:
+    return db.scalar(
+        select(Lead)
+        .options(
+            selectinload(Lead.held_products).selectinload(ClientHeldProduct.product),
+        )
+        .where(Lead.id == lead_id, Lead.organization_id == org_id),
     )
 
 

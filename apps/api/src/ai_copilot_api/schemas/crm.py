@@ -604,7 +604,8 @@ class RuleTraceOut(BaseModel):
 class RecommendationRunOut(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None = None
+    lead_id: uuid.UUID | None = None
     opportunity_id: uuid.UUID | None
     created_by_id: uuid.UUID
     items: list[RecommendationItemOut]

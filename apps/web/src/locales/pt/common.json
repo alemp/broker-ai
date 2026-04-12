@@ -207,6 +207,7 @@
   "crm.clientDetail.summary.email": "E-mail",
   "crm.clientDetail.summary.phone": "Telefone",
   "crm.clientDetail.summary.dateOfBirth": "Data de nascimento",
+  "crm.clientDetail.summary.valueEmpty": "—",
   "crm.clientDetail.summary.notes": "Notas",
   "crm.clientDetail.summary.heldProducts": "Produtos do cliente",
   "crm.clientDetail.summary.productUnnamed": "Produto sem nome",

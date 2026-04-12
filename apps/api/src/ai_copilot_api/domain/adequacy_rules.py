@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ai_copilot_api.db.enums import AdequacyTrafficLight
-from ai_copilot_api.db.models import Client
+from ai_copilot_api.db.models import Client, Lead
 from ai_copilot_api.domain.client_profile import completeness_score, parse_profile, profile_alerts
 from ai_copilot_api.domain.recommendation_rules import assess_protection_gaps
 
@@ -20,7 +20,7 @@ class AdequacyAssessment:
     profile_alert_codes: list[str]
 
 
-def evaluate_adequacy(client: Client) -> AdequacyAssessment:
+def evaluate_adequacy(party: Client | Lead) -> AdequacyAssessment:
     """
     Map protection gaps + qualidade de perfil to GREEN / YELLOW / RED.
 
@@ -28,8 +28,8 @@ def evaluate_adequacy(client: Client) -> AdequacyAssessment:
     - YELLOW: lacunas moderadas (auto, saúde), alertas de perfil ou base incompleta.
     - GREEN: sem lacunas materializadas pelas regras e perfil razoavelmente coerente.
     """
-    gaps, _trace = assess_protection_gaps(client)
-    prof = parse_profile(client.profile_data if isinstance(client.profile_data, dict) else None)
+    gaps, _trace = assess_protection_gaps(party)
+    prof = parse_profile(party.profile_data if isinstance(party.profile_data, dict) else None)
     score = completeness_score(prof)
     alerts = profile_alerts(prof)
 

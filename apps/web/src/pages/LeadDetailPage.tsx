@@ -15,6 +15,7 @@ import {
   ScrollText,
   Sparkles,
   UserCircle,
+  UserPlus,
   Users,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -44,6 +45,7 @@ import {
   translateLeadStatus,
   translateOpportunityStage,
   translateOpportunityStatus,
+  translateProductCategory,
 } from '@/lib/crmEnumLabels'
 import { MARKETING_CHANNELS, marketingChannelSummaryLabel } from '@/lib/marketingChannels'
 
@@ -89,6 +91,43 @@ type HeldProductRow = {
   insurer_name: string | null
   ingestion_source: string
   product: { id: string; name: string; category: string } | null
+}
+
+type AdequacyDto = {
+  traffic_light: string
+  summary: string
+  reasons: string[]
+  needs_human_review: boolean
+  profile_completeness_score: number
+  profile_alert_codes: string[]
+  source?: string
+  computed_at?: string | null
+  inputs_hash?: string | null
+  rule_version?: string | null
+}
+
+type RecItemDto = {
+  product_id: string
+  product_name: string
+  product_category: string
+  priority: number
+  rule_ids: string[]
+  rationale: string
+  protection_gaps: string
+  predictable_objections: string
+  next_best_action: string
+}
+
+type RecommendationRunDto = {
+  id: string
+  items: RecItemDto[]
+  rule_trace: { rule_id: string; fired: boolean; detail: string }[]
+  created_at: string
+}
+
+type RecPreviewDto = {
+  items: RecItemDto[]
+  rule_trace: { rule_id: string; fired: boolean; detail: string }[]
 }
 
 type LeadDetail = {
@@ -201,13 +240,17 @@ function buildLeadSummarySections(lead: LeadDetail, t: TFunction<'common'>): Lea
     sections.push({ key, title, icon, items })
   }
 
+  const summaryEmpty = t('crm.clientDetail.summary.valueEmpty')
   add('contact', t('crm.clientDetail.summary.sectionContact'), UserCircle, [
     { label: t('crm.clientDetail.summary.name'), value: lead.full_name?.trim() || null },
     { label: t('crm.clientDetail.summary.email'), value: lead.email?.trim() || null },
-    { label: t('crm.clientDetail.summary.phone'), value: lead.phone?.trim() || null },
+    {
+      label: t('crm.clientDetail.summary.phone'),
+      value: lead.phone?.trim() || summaryEmpty,
+    },
     {
       label: t('crm.clientDetail.summary.dateOfBirth'),
-      value: formatPtDateOnly(lead.date_of_birth),
+      value: formatPtDateOnly(lead.date_of_birth) || summaryEmpty,
     },
     { label: t('crm.clientDetail.summary.notes'), value: lead.notes?.trim() || null },
   ])
@@ -339,6 +382,11 @@ export function LeadDetailPage() {
   const [crmMarketingOptIn, setCrmMarketingOptIn] = useState('yes')
   const [crmMarketingChannel, setCrmMarketingChannel] = useState('')
   const [savingCrm, setSavingCrm] = useState(false)
+  const [adequacy, setAdequacy] = useState<AdequacyDto | null>(null)
+  const [recommendationRuns, setRecommendationRuns] = useState<RecommendationRunDto[]>([])
+  const [runRecLoading, setRunRecLoading] = useState(false)
+  const [recPreview, setRecPreview] = useState<RecPreviewDto | null>(null)
+  const [recPreviewLoading, setRecPreviewLoading] = useState(false)
 
   const load = useCallback(async () => {
     if (!leadId) {
@@ -347,13 +395,17 @@ export function LeadDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [l, me, plist, users, ixList] = await Promise.all([
+      const [l, me, plist, users, ixList, adeq, recRuns] = await Promise.all([
         apiFetch<LeadDetail>(`/v1/leads/${leadId}`),
         apiFetch<{ user: { id: string } }>('/v1/me'),
         apiFetch<ProductBrief[]>('/v1/products'),
         apiFetch<UserBrief[]>('/v1/org/users'),
         apiFetch<InteractionDto[]>(`/v1/interactions?lead_id=${leadId}&limit=100`),
+        apiFetch<AdequacyDto>(`/v1/leads/${leadId}/adequacy`),
+        apiFetch<RecommendationRunDto[]>(`/v1/leads/${leadId}/recommendation-runs?limit=5`),
       ])
+      setAdequacy(adeq)
+      setRecommendationRuns(recRuns)
       setLead(l)
       setCrmFullName(l.full_name)
       setCrmEmail(l.email ?? '')
@@ -370,9 +422,18 @@ export function LeadDetailPage() {
       setOppOwnerId(me.user.id)
       setProducts(plist)
       setOrgUsers(users)
+      try {
+        const prev = await apiFetch<RecPreviewDto>(`/v1/leads/${leadId}/recommendations`)
+        setRecPreview(prev)
+      } catch {
+        setRecPreview(null)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
       setLead(null)
+      setAdequacy(null)
+      setRecommendationRuns([])
+      setRecPreview(null)
     } finally {
       setLoading(false)
     }
@@ -381,6 +442,49 @@ export function LeadDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const loadRecPreview = useCallback(async () => {
+    if (!leadId) {
+      return
+    }
+    setRecPreviewLoading(true)
+    try {
+      const prev = await apiFetch<RecPreviewDto>(`/v1/leads/${leadId}/recommendations`)
+      setRecPreview(prev)
+    } catch {
+      setRecPreview(null)
+    } finally {
+      setRecPreviewLoading(false)
+    }
+  }, [leadId])
+
+  const onRunLeadRecommendation = async () => {
+    if (!leadId) {
+      return
+    }
+    setRunRecLoading(true)
+    setError(null)
+    try {
+      const run = await apiFetch<RecommendationRunDto>(`/v1/leads/${leadId}/recommendation-runs`, {
+        method: 'POST',
+        json: {},
+      })
+      setRecommendationRuns((prev) => [run, ...prev])
+      const ad = await apiFetch<AdequacyDto>(`/v1/leads/${leadId}/adequacy`)
+      setAdequacy(ad)
+      try {
+        const prev = await apiFetch<RecPreviewDto>(`/v1/leads/${leadId}/recommendations`)
+        setRecPreview(prev)
+      } catch {
+        setRecPreview(null)
+      }
+      toast.success(t('toast.recommendationRun'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setRunRecLoading(false)
+    }
+  }
 
   const onAddInsured = async (ev: React.FormEvent) => {
     ev.preventDefault()
@@ -556,14 +660,8 @@ export function LeadDetailPage() {
     return null
   }
 
-  const leadDescription = lead
-    ? [
-        translateLeadStatus(lead.status, t),
-        lead.email,
-        lead.owner ? lead.owner.full_name ?? lead.owner.email : '',
-      ]
-        .filter(Boolean)
-        .join(' · ')
+  const leadHeaderDescription = lead
+    ? [lead.email, lead.phone].filter(Boolean).join(' · ') || t('crm.clients.noContact')
     : undefined
 
   const leadSummarySections = useMemo(
@@ -577,7 +675,7 @@ export function LeadDetailPage() {
         back={{ to: '/leads', label: t('crm.leads.back') }}
         titleLoading={loading}
         title={lead?.full_name ?? (loading ? '' : t('crm.error.notFound'))}
-        description={leadDescription}
+        description={leadHeaderDescription}
       >
         {lead && !loading && !lead.converted_client_id ? (
           <Button asChild variant="default">
@@ -656,12 +754,12 @@ export function LeadDetailPage() {
             }
           />
 
-          <TabsRoot defaultValue="overview" className="space-y-2">
+          <TabsRoot defaultValue="core" className="space-y-2">
             <TabsList
               className="sticky top-2 z-30 h-auto w-full flex-wrap justify-start gap-1 bg-background/95 shadow-sm backdrop-blur-md"
-              aria-label={t('crm.leads.detail.tabsAria')}
+              aria-label={t('crm.clientDetail.tabsAria')}
             >
-              <TabsTrigger value="overview">
+              <TabsTrigger value="core">
                 <ClipboardList className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabCore')}
               </TabsTrigger>
@@ -691,15 +789,24 @@ export function LeadDetailPage() {
                     <FolderTree className="size-4" aria-hidden />
                     {t('crm.clientDetail.tabPortfolio')}
                   </TabsTrigger>
-                  <TabsTrigger value="convert">
+                  <TabsTrigger value="intel">
                     <Sparkles className="size-4" aria-hidden />
+                    {t('crm.clientDetail.tabIntel')}
+                  </TabsTrigger>
+                  <TabsTrigger value="convert">
+                    <UserPlus className="size-4" aria-hidden />
                     {t('crm.leads.detail.tabConvert')}
                   </TabsTrigger>
                 </>
-              ) : null}
+              ) : (
+                <TabsTrigger value="intel">
+                  <Sparkles className="size-4" aria-hidden />
+                  {t('crm.clientDetail.tabIntel')}
+                </TabsTrigger>
+              )}
             </TabsList>
 
-            <TabsContent value="overview" className="mt-6 space-y-6 outline-none">
+            <TabsContent value="core" className="mt-6 space-y-6 outline-none">
               <Card className="border-border/80 shadow-sm">
                 <CardHeader className="flex flex-row items-start gap-4 pb-2">
                   <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
@@ -709,7 +816,9 @@ export function LeadDetailPage() {
                     <CardTitle className="text-lg tracking-tight">
                       {t('crm.clientDetail.summary.title')}
                     </CardTitle>
-                    <p className="text-muted-foreground text-sm">{t('crm.leads.summary.subtitle')}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {t('crm.clientDetail.summary.subtitle')}
+                    </p>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-8">
@@ -884,6 +993,7 @@ export function LeadDetailPage() {
               </TabsContent>
             ) : null}
 
+
             {!lead.converted_client_id ? (
               <TabsContent value="insured" className="mt-6 space-y-6 outline-none">
                 <Card className="border-border/80 shadow-sm">
@@ -988,6 +1098,7 @@ export function LeadDetailPage() {
                 onAfterSave={load}
               />
             </TabsContent>
+
 
             <TabsContent value="interactions" className="mt-6 space-y-6 outline-none">
               <Card className="border-border/80 shadow-sm">
@@ -1094,7 +1205,6 @@ export function LeadDetailPage() {
             </TabsContent>
 
             {!lead.converted_client_id ? (
-              <>
                 <TabsContent value="portfolio" className="mt-6 space-y-6 outline-none">
                   <Card className="border-border/80 shadow-sm">
                     <CardHeader className="flex flex-row items-start gap-4 pb-2">
@@ -1165,7 +1275,265 @@ export function LeadDetailPage() {
                     </CardContent>
                   </Card>
                 </TabsContent>
+            ) : null}
 
+            <TabsContent value="intel" className="mt-6 space-y-6 outline-none">
+              <Card className="border-border/80 shadow-sm">
+                <CardHeader className="flex flex-row items-start gap-4 pb-2">
+                  <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
+                    <Sparkles className="size-5" aria-hidden />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <CardTitle className="text-lg tracking-tight">{t('crm.intel.title')}</CardTitle>
+                    <p className="text-muted-foreground text-sm">{t('crm.intel.subtitle')}</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {adequacy ? (
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">{t('crm.intel.traffic')}: </span>
+                        <span
+                          className={
+                            adequacy.traffic_light === 'RED'
+                              ? 'font-semibold text-red-600'
+                              : adequacy.traffic_light === 'YELLOW'
+                                ? 'font-semibold text-amber-600'
+                                : 'font-semibold text-emerald-600'
+                          }
+                        >
+                          {adequacy.traffic_light}
+                        </span>
+                      </p>
+                      {adequacy.source === 'batch' && adequacy.computed_at ? (
+                        <p className="text-muted-foreground text-xs">
+                          {t('crm.intel.adequacyBatchLine', {
+                            when: new Date(adequacy.computed_at).toLocaleString(),
+                          })}
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground text-xs">{t('crm.intel.adequacyLiveLine')}</p>
+                      )}
+                      <p>
+                        <span className="text-muted-foreground">{t('crm.intel.summary')}: </span>
+                        {adequacy.summary}
+                      </p>
+                      {adequacy.reasons.length > 0 ? (
+                        <div>
+                          <p className="text-muted-foreground mb-1">{t('crm.intel.reasons')}</p>
+                          <ul className="list-inside list-disc text-xs">
+                            {adequacy.reasons.map((r) => (
+                              <li key={r}>{r}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="space-y-3 border-t pt-4">
+                    <div>
+                      <p className="text-sm font-medium">{t('crm.intel.livePreviewTitle')}</p>
+                      <p className="text-muted-foreground text-xs">{t('crm.intel.livePreviewSubtitle')}</p>
+                    </div>
+                    {recPreviewLoading ? (
+                      <p className="text-muted-foreground text-sm">{t('crm.opportunities.recLoading')}</p>
+                    ) : recPreview ? (
+                      <>
+                        {recPreview.items.length > 0 ? (
+                          <ul className="space-y-3 text-sm">
+                            {recPreview.items.map((it) => (
+                              <li key={it.product_id} className="border-b pb-3 last:border-0">
+                                <div className="font-medium">
+                                  {it.product_name}{' '}
+                                  <span className="text-muted-foreground font-normal">
+                                    ({translateProductCategory(it.product_category, t)}) ·{' '}
+                                    {t('crm.intel.itemPriority')}: {it.priority}
+                                  </span>
+                                </div>
+                                <p className="mt-1">{it.rationale}</p>
+                                {it.rule_ids.length > 0 ? (
+                                  <p className="text-muted-foreground mt-1 text-xs">
+                                    <span className="font-medium text-foreground">
+                                      {t('crm.intel.rulesMatched')}:{' '}
+                                    </span>
+                                    {it.rule_ids.join(', ')}
+                                  </p>
+                                ) : null}
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                  <span className="font-medium text-foreground">
+                                    {t('crm.intel.protectionGapsLabel')}:{' '}
+                                  </span>
+                                  {it.protection_gaps}
+                                </p>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                  <span className="font-medium text-foreground">
+                                    {t('crm.intel.objectionsLabel')}:{' '}
+                                  </span>
+                                  {it.predictable_objections}
+                                </p>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                  <span className="font-medium text-foreground">
+                                    {t('crm.intel.nbaLabel')}:{' '}
+                                  </span>
+                                  {it.next_best_action}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
+                        )}
+                        {recPreview.rule_trace.length > 0 ? (
+                          <details className="mt-2 text-xs">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                              {t('crm.intel.ruleTraceTitle')}
+                            </summary>
+                            <ul className="mt-2 space-y-1 font-mono">
+                              {recPreview.rule_trace.map((tr) => (
+                                <li key={tr.rule_id}>
+                                  <span
+                                    className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}
+                                  >
+                                    {tr.rule_id}
+                                  </span>
+                                  <span className="text-muted-foreground"> — {tr.detail}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={recPreviewLoading || !leadId}
+                      onClick={() => void loadRecPreview()}
+                    >
+                      {t('crm.intel.refreshPreview')}
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    disabled={runRecLoading || !leadId}
+                    onClick={() => void onRunLeadRecommendation()}
+                  >
+                    {runRecLoading ? t('crm.intel.running') : t('crm.intel.runRecommendation')}
+                  </Button>
+                  {recommendationRuns.length > 0 ? (
+                    <div className="space-y-4">
+                      <p className="text-muted-foreground text-sm font-medium">
+                        {t('crm.intel.recentRuns')}
+                      </p>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('crm.table.date')}</TableHead>
+                            <TableHead>{t('crm.intel.suggestionsCount')}</TableHead>
+                            <TableHead className="hidden sm:table-cell">ID</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {recommendationRuns.map((run) => (
+                            <TableRow key={`sum-${run.id}`}>
+                              <TableCell className="whitespace-nowrap font-medium">
+                                {new Date(run.created_at).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="tabular-nums">{run.items.length}</TableCell>
+                              <TableCell className="text-muted-foreground hidden max-w-[8rem] truncate font-mono text-xs sm:table-cell">
+                                {run.id.slice(0, 8)}…
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <p className="text-muted-foreground text-xs">{t('crm.intel.runSummary')}</p>
+                      {recommendationRuns.map((run) => (
+                        <div key={run.id} className="bg-muted/40 rounded-md border p-3 text-xs">
+                          <p className="text-muted-foreground mb-2">
+                            {new Date(run.created_at).toLocaleString()} · {run.id.slice(0, 8)}…
+                          </p>
+                          {run.items.length === 0 ? (
+                            <p>{t('crm.intel.noItems')}</p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {run.items.map((it) => (
+                                <li
+                                  key={`${run.id}-${it.product_id}`}
+                                  className="border-t pt-2 first:border-0 first:pt-0"
+                                >
+                                  <span className="font-medium">{it.product_name}</span>
+                                  <span className="text-muted-foreground ml-2">
+                                    ({translateProductCategory(it.product_category, t)}) ·{' '}
+                                    {t('crm.intel.itemPriority')}: {it.priority}
+                                  </span>
+                                  <p className="mt-1">{it.rationale}</p>
+                                  {it.rule_ids.length > 0 ? (
+                                    <p className="text-muted-foreground mt-1 text-[11px]">
+                                      <span className="font-medium text-foreground">
+                                        {t('crm.intel.rulesMatched')}:{' '}
+                                      </span>
+                                      {it.rule_ids.join(', ')}
+                                    </p>
+                                  ) : null}
+                                  <p className="text-muted-foreground mt-1 text-[11px]">
+                                    <span className="font-medium text-foreground">
+                                      {t('crm.intel.protectionGapsLabel')}:{' '}
+                                    </span>
+                                    {it.protection_gaps}
+                                  </p>
+                                  <p className="text-muted-foreground mt-1 text-[11px]">
+                                    <span className="font-medium text-foreground">
+                                      {t('crm.intel.objectionsLabel')}:{' '}
+                                    </span>
+                                    {it.predictable_objections}
+                                  </p>
+                                  <p className="text-muted-foreground mt-1 text-[11px]">
+                                    <span className="font-medium text-foreground">
+                                      {t('crm.intel.nbaLabel')}:{' '}
+                                    </span>
+                                    {it.next_best_action}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {run.rule_trace.length > 0 ? (
+                            <details className="mt-2 border-t pt-2">
+                              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                                {t('crm.intel.ruleTraceTitle')}
+                              </summary>
+                              <ul className="mt-2 space-y-1 font-mono text-[11px]">
+                                {run.rule_trace.map((tr) => (
+                                  <li key={`${run.id}-${tr.rule_id}`}>
+                                    <span
+                                      className={
+                                        tr.fired ? 'text-emerald-700' : 'text-muted-foreground'
+                                      }
+                                    >
+                                      {tr.rule_id}{' '}
+                                      {tr.fired
+                                        ? `(${t('crm.intel.ruleTraceFired')})`
+                                        : `(${t('crm.intel.ruleTraceNotFired')})`}
+                                    </span>
+                                    <span className="text-muted-foreground"> — {tr.detail}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {!lead.converted_client_id ? (
                 <TabsContent value="convert" className="mt-6 space-y-6 outline-none">
                   <Card className="border-border/80 shadow-sm">
                     <CardHeader className="flex flex-row items-start gap-4 pb-2">
@@ -1242,7 +1610,6 @@ export function LeadDetailPage() {
                     </CardContent>
                   </Card>
                 </TabsContent>
-              </>
             ) : null}
           </TabsRoot>
         </>

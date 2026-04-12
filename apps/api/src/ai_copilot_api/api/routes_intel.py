@@ -19,6 +19,7 @@ from ai_copilot_api.db.models import (
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.adequacy_batch import resolve_adequacy_for_api
 from ai_copilot_api.domain.recommendation_rules import (
+    IntelParty,
     evaluate_rules_for_client,
     load_client_for_intel,
     load_products_for_org,
@@ -85,11 +86,11 @@ def _serialize_trace(raw: list[Any]) -> list[RuleTraceOut]:
 
 
 def _evaluate_to_serialized(
-    client: Client,
+    party: IntelParty,
     opportunity: Opportunity | None,
     products: list[Product],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    items, trace = evaluate_rules_for_client(client, opportunity, products)
+    items, trace = evaluate_rules_for_client(party, opportunity, products)
     items_payload: list[dict[str, Any]] = []
     for i in items:
         items_payload.append(
@@ -112,11 +113,11 @@ def _evaluate_to_serialized(
 def _preview_from_client(
     db: Session,
     org_id: uuid.UUID,
-    client: Client,
+    party: IntelParty,
     opportunity: Opportunity | None,
 ) -> RecommendationsPreviewOut:
     products = load_products_for_org(db, org_id)
-    items_payload, trace_payload = _evaluate_to_serialized(client, opportunity, products)
+    items_payload, trace_payload = _evaluate_to_serialized(party, opportunity, products)
     return RecommendationsPreviewOut(
         items=_serialize_items(items_payload),
         rule_trace=_serialize_trace(trace_payload),
@@ -128,6 +129,7 @@ def _run_to_out(row: RecommendationRun) -> RecommendationRunOut:
         id=row.id,
         organization_id=row.organization_id,
         client_id=row.client_id,
+        lead_id=row.lead_id,
         opportunity_id=row.opportunity_id,
         created_by_id=row.created_by_id,
         items=_serialize_items(row.items if isinstance(row.items, list) else []),

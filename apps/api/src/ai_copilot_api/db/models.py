@@ -806,6 +806,11 @@ class Lead(Base):
         foreign_keys="ClientHeldProduct.lead_id",
         cascade="all, delete-orphan",
     )
+    recommendation_runs: Mapped[list["RecommendationRun"]] = relationship(
+        "RecommendationRun",
+        back_populates="lead",
+        foreign_keys="RecommendationRun.lead_id",
+    )
 
 
 class InsuredPerson(Base):
@@ -957,6 +962,12 @@ class ClientImportBatch(Base):
 
 class RecommendationRun(Base):
     __tablename__ = "recommendation_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "(client_id IS NOT NULL)::int + (lead_id IS NOT NULL)::int = 1",
+            name="ck_recommendation_runs_client_xor_lead",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -969,10 +980,16 @@ class RecommendationRun(Base):
         nullable=False,
         index=True,
     )
-    client_id: Mapped[uuid.UUID] = mapped_column(
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("clients.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("leads.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -999,7 +1016,12 @@ class RecommendationRun(Base):
     )
 
     organization: Mapped["Organization"] = relationship("Organization")
-    client: Mapped["Client"] = relationship("Client")
+    client: Mapped["Client | None"] = relationship("Client")
+    lead: Mapped["Lead | None"] = relationship(
+        "Lead",
+        back_populates="recommendation_runs",
+        foreign_keys=[lead_id],
+    )
     opportunity: Mapped["Opportunity | None"] = relationship("Opportunity")
     created_by_user: Mapped["User"] = relationship(
         "User",

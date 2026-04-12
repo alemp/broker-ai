@@ -267,13 +267,17 @@ function buildGeneralSummarySections(
     sections.push({ key, title, icon, items })
   }
 
+  const summaryEmpty = t('crm.clientDetail.summary.valueEmpty')
   add('contact', t('crm.clientDetail.summary.sectionContact'), UserCircle, [
     { label: t('crm.clientDetail.summary.name'), value: d.full_name?.trim() || null },
     { label: t('crm.clientDetail.summary.email'), value: d.email?.trim() || null },
-    { label: t('crm.clientDetail.summary.phone'), value: d.phone?.trim() || null },
+    {
+      label: t('crm.clientDetail.summary.phone'),
+      value: d.phone?.trim() || summaryEmpty,
+    },
     {
       label: t('crm.clientDetail.summary.dateOfBirth'),
-      value: formatPtDateOnly(d.date_of_birth),
+      value: formatPtDateOnly(d.date_of_birth) || summaryEmpty,
     },
     { label: t('crm.clientDetail.summary.notes'), value: d.notes?.trim() || null },
   ])
@@ -952,10 +956,6 @@ export function ClientDetailPage() {
                 <Briefcase className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabCrmCore')}
               </TabsTrigger>
-              <TabsTrigger value="intel">
-                <Sparkles className="size-4" aria-hidden />
-                {t('crm.clientDetail.tabIntel')}
-              </TabsTrigger>
               <TabsTrigger value="insured">
                 <Users className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabInsured')}
@@ -975,6 +975,10 @@ export function ClientDetailPage() {
               <TabsTrigger value="audit">
                 <ScrollText className="size-4" aria-hidden />
                 {t('crm.clientDetail.tabAudit')}
+              </TabsTrigger>
+              <TabsTrigger value="intel">
+                <Sparkles className="size-4" aria-hidden />
+                {t('crm.clientDetail.tabIntel')}
               </TabsTrigger>
             </TabsList>
 
@@ -1157,254 +1161,6 @@ export function ClientDetailPage() {
               </form>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="intel" className="mt-6 space-y-6 outline-none">
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="flex flex-row items-start gap-4 pb-2">
-              <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
-                <Sparkles className="size-5" aria-hidden />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-lg tracking-tight">{t('crm.intel.title')}</CardTitle>
-                <p className="text-muted-foreground text-sm">{t('crm.intel.subtitle')}</p>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {adequacy ? (
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">{t('crm.intel.traffic')}: </span>
-                    <span
-                      className={
-                        adequacy.traffic_light === 'RED'
-                          ? 'font-semibold text-red-600'
-                          : adequacy.traffic_light === 'YELLOW'
-                            ? 'font-semibold text-amber-600'
-                            : 'font-semibold text-emerald-600'
-                      }
-                    >
-                      {adequacy.traffic_light}
-                    </span>
-                  </p>
-                  {adequacy.source === 'batch' && adequacy.computed_at ? (
-                    <p className="text-muted-foreground text-xs">
-                      {t('crm.intel.adequacyBatchLine', {
-                        when: new Date(adequacy.computed_at).toLocaleString(),
-                      })}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground text-xs">{t('crm.intel.adequacyLiveLine')}</p>
-                  )}
-                  <p>
-                    <span className="text-muted-foreground">{t('crm.intel.summary')}: </span>
-                    {adequacy.summary}
-                  </p>
-                  {adequacy.reasons.length > 0 ? (
-                    <div>
-                      <p className="text-muted-foreground mb-1">{t('crm.intel.reasons')}</p>
-                      <ul className="list-inside list-disc text-xs">
-                        {adequacy.reasons.map((r) => (
-                          <li key={r}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="space-y-3 border-t pt-4">
-                <div>
-                  <p className="text-sm font-medium">{t('crm.intel.livePreviewTitle')}</p>
-                  <p className="text-muted-foreground text-xs">{t('crm.intel.livePreviewSubtitle')}</p>
-                </div>
-                {recPreviewLoading ? (
-                  <p className="text-muted-foreground text-sm">{t('crm.opportunities.recLoading')}</p>
-                ) : recPreview ? (
-                  <>
-                    {recPreview.items.length > 0 ? (
-                      <ul className="space-y-3 text-sm">
-                        {recPreview.items.map((it) => (
-                          <li key={it.product_id} className="border-b pb-3 last:border-0">
-                            <div className="font-medium">
-                              {it.product_name}{' '}
-                              <span className="text-muted-foreground font-normal">
-                                ({translateProductCategory(it.product_category, t)}) ·{' '}
-                                {t('crm.intel.itemPriority')}: {it.priority}
-                              </span>
-                            </div>
-                            <p className="mt-1">{it.rationale}</p>
-                            {it.rule_ids.length > 0 ? (
-                              <p className="text-muted-foreground mt-1 text-xs">
-                                <span className="font-medium text-foreground">
-                                  {t('crm.intel.rulesMatched')}:{' '}
-                                </span>
-                                {it.rule_ids.join(', ')}
-                              </p>
-                            ) : null}
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              <span className="font-medium text-foreground">
-                                {t('crm.intel.protectionGapsLabel')}:{' '}
-                              </span>
-                              {it.protection_gaps}
-                            </p>
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              <span className="font-medium text-foreground">
-                                {t('crm.intel.objectionsLabel')}:{' '}
-                              </span>
-                              {it.predictable_objections}
-                            </p>
-                            <p className="text-muted-foreground mt-1 text-xs">
-                              <span className="font-medium text-foreground">
-                                {t('crm.intel.nbaLabel')}:{' '}
-                              </span>
-                              {it.next_best_action}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
-                    )}
-                    {recPreview.rule_trace.length > 0 ? (
-                      <details className="mt-2 text-xs">
-                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                          {t('crm.intel.ruleTraceTitle')}
-                        </summary>
-                        <ul className="mt-2 space-y-1 font-mono">
-                          {recPreview.rule_trace.map((tr) => (
-                            <li key={tr.rule_id}>
-                              <span className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}>
-                                {tr.rule_id}
-                              </span>
-                              <span className="text-muted-foreground"> — {tr.detail}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={recPreviewLoading || !clientId}
-                  onClick={() => void loadRecPreview()}
-                >
-                  {t('crm.intel.refreshPreview')}
-                </Button>
-              </div>
-              <Button
-                type="button"
-                disabled={runRecLoading || !clientId}
-                onClick={() => void onRunRecommendation()}
-              >
-                {runRecLoading ? t('crm.intel.running') : t('crm.intel.runRecommendation')}
-              </Button>
-              {recommendationRuns.length > 0 ? (
-                <div className="space-y-4">
-                  <p className="text-muted-foreground text-sm font-medium">
-                    {t('crm.intel.recentRuns')}
-                  </p>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('crm.table.date')}</TableHead>
-                        <TableHead>{t('crm.intel.suggestionsCount')}</TableHead>
-                        <TableHead className="hidden sm:table-cell">ID</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {recommendationRuns.map((run) => (
-                        <TableRow key={`sum-${run.id}`}>
-                          <TableCell className="whitespace-nowrap font-medium">
-                            {new Date(run.created_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="tabular-nums">{run.items.length}</TableCell>
-                          <TableCell className="text-muted-foreground hidden max-w-[8rem] truncate font-mono text-xs sm:table-cell">
-                            {run.id.slice(0, 8)}…
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <p className="text-muted-foreground text-xs">{t('crm.intel.runSummary')}</p>
-                  {recommendationRuns.map((run) => (
-                    <div key={run.id} className="bg-muted/40 rounded-md border p-3 text-xs">
-                      <p className="text-muted-foreground mb-2">
-                        {new Date(run.created_at).toLocaleString()} · {run.id.slice(0, 8)}…
-                      </p>
-                      {run.items.length === 0 ? (
-                        <p>{t('crm.intel.noItems')}</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {run.items.map((it) => (
-                            <li key={`${run.id}-${it.product_id}`} className="border-t pt-2 first:border-0 first:pt-0">
-                              <span className="font-medium">{it.product_name}</span>
-                              <span className="text-muted-foreground ml-2">
-                                ({translateProductCategory(it.product_category, t)}) ·{' '}
-                                {t('crm.intel.itemPriority')}:{' '}
-                                {it.priority}
-                              </span>
-                              <p className="mt-1">{it.rationale}</p>
-                              {it.rule_ids.length > 0 ? (
-                                <p className="text-muted-foreground mt-1 text-[11px]">
-                                  <span className="font-medium text-foreground">
-                                    {t('crm.intel.rulesMatched')}:{' '}
-                                  </span>
-                                  {it.rule_ids.join(', ')}
-                                </p>
-                              ) : null}
-                              <p className="text-muted-foreground mt-1 text-[11px]">
-                                <span className="font-medium text-foreground">
-                                  {t('crm.intel.protectionGapsLabel')}:{' '}
-                                </span>
-                                {it.protection_gaps}
-                              </p>
-                              <p className="text-muted-foreground mt-1 text-[11px]">
-                                <span className="font-medium text-foreground">
-                                  {t('crm.intel.objectionsLabel')}:{' '}
-                                </span>
-                                {it.predictable_objections}
-                              </p>
-                              <p className="text-muted-foreground mt-1 text-[11px]">
-                                <span className="font-medium text-foreground">
-                                  {t('crm.intel.nbaLabel')}:{' '}
-                                </span>
-                                {it.next_best_action}
-                              </p>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {run.rule_trace.length > 0 ? (
-                        <details className="mt-2 border-t pt-2">
-                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                            {t('crm.intel.ruleTraceTitle')}
-                          </summary>
-                          <ul className="mt-2 space-y-1 font-mono text-[11px]">
-                            {run.rule_trace.map((tr) => (
-                              <li key={`${run.id}-${tr.rule_id}`}>
-                                <span className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}>
-                                  {tr.rule_id}{' '}
-                                  {tr.fired
-                                    ? `(${t('crm.intel.ruleTraceFired')})`
-                                    : `(${t('crm.intel.ruleTraceNotFired')})`}
-                                </span>
-                                <span className="text-muted-foreground"> — {tr.detail}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
             </TabsContent>
 
             <TabsContent value="insured" className="mt-6 space-y-6 outline-none">
@@ -1735,6 +1491,255 @@ export function ClientDetailPage() {
             </CardContent>
           </Card>
             </TabsContent>
+
+            <TabsContent value="intel" className="mt-6 space-y-6 outline-none">
+          <Card className="border-border/80 shadow-sm">
+            <CardHeader className="flex flex-row items-start gap-4 pb-2">
+              <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
+                <Sparkles className="size-5" aria-hidden />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-lg tracking-tight">{t('crm.intel.title')}</CardTitle>
+                <p className="text-muted-foreground text-sm">{t('crm.intel.subtitle')}</p>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {adequacy ? (
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">{t('crm.intel.traffic')}: </span>
+                    <span
+                      className={
+                        adequacy.traffic_light === 'RED'
+                          ? 'font-semibold text-red-600'
+                          : adequacy.traffic_light === 'YELLOW'
+                            ? 'font-semibold text-amber-600'
+                            : 'font-semibold text-emerald-600'
+                      }
+                    >
+                      {adequacy.traffic_light}
+                    </span>
+                  </p>
+                  {adequacy.source === 'batch' && adequacy.computed_at ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t('crm.intel.adequacyBatchLine', {
+                        when: new Date(adequacy.computed_at).toLocaleString(),
+                      })}
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">{t('crm.intel.adequacyLiveLine')}</p>
+                  )}
+                  <p>
+                    <span className="text-muted-foreground">{t('crm.intel.summary')}: </span>
+                    {adequacy.summary}
+                  </p>
+                  {adequacy.reasons.length > 0 ? (
+                    <div>
+                      <p className="text-muted-foreground mb-1">{t('crm.intel.reasons')}</p>
+                      <ul className="list-inside list-disc text-xs">
+                        {adequacy.reasons.map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="space-y-3 border-t pt-4">
+                <div>
+                  <p className="text-sm font-medium">{t('crm.intel.livePreviewTitle')}</p>
+                  <p className="text-muted-foreground text-xs">{t('crm.intel.livePreviewSubtitle')}</p>
+                </div>
+                {recPreviewLoading ? (
+                  <p className="text-muted-foreground text-sm">{t('crm.opportunities.recLoading')}</p>
+                ) : recPreview ? (
+                  <>
+                    {recPreview.items.length > 0 ? (
+                      <ul className="space-y-3 text-sm">
+                        {recPreview.items.map((it) => (
+                          <li key={it.product_id} className="border-b pb-3 last:border-0">
+                            <div className="font-medium">
+                              {it.product_name}{' '}
+                              <span className="text-muted-foreground font-normal">
+                                ({translateProductCategory(it.product_category, t)}) ·{' '}
+                                {t('crm.intel.itemPriority')}: {it.priority}
+                              </span>
+                            </div>
+                            <p className="mt-1">{it.rationale}</p>
+                            {it.rule_ids.length > 0 ? (
+                              <p className="text-muted-foreground mt-1 text-xs">
+                                <span className="font-medium text-foreground">
+                                  {t('crm.intel.rulesMatched')}:{' '}
+                                </span>
+                                {it.rule_ids.join(', ')}
+                              </p>
+                            ) : null}
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              <span className="font-medium text-foreground">
+                                {t('crm.intel.protectionGapsLabel')}:{' '}
+                              </span>
+                              {it.protection_gaps}
+                            </p>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              <span className="font-medium text-foreground">
+                                {t('crm.intel.objectionsLabel')}:{' '}
+                              </span>
+                              {it.predictable_objections}
+                            </p>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              <span className="font-medium text-foreground">
+                                {t('crm.intel.nbaLabel')}:{' '}
+                              </span>
+                              {it.next_best_action}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
+                    )}
+                    {recPreview.rule_trace.length > 0 ? (
+                      <details className="mt-2 text-xs">
+                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                          {t('crm.intel.ruleTraceTitle')}
+                        </summary>
+                        <ul className="mt-2 space-y-1 font-mono">
+                          {recPreview.rule_trace.map((tr) => (
+                            <li key={tr.rule_id}>
+                              <span className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}>
+                                {tr.rule_id}
+                              </span>
+                              <span className="text-muted-foreground"> — {tr.detail}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">{t('crm.opportunities.recEmpty')}</p>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={recPreviewLoading || !clientId}
+                  onClick={() => void loadRecPreview()}
+                >
+                  {t('crm.intel.refreshPreview')}
+                </Button>
+              </div>
+              <Button
+                type="button"
+                disabled={runRecLoading || !clientId}
+                onClick={() => void onRunRecommendation()}
+              >
+                {runRecLoading ? t('crm.intel.running') : t('crm.intel.runRecommendation')}
+              </Button>
+              {recommendationRuns.length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-muted-foreground text-sm font-medium">
+                    {t('crm.intel.recentRuns')}
+                  </p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('crm.table.date')}</TableHead>
+                        <TableHead>{t('crm.intel.suggestionsCount')}</TableHead>
+                        <TableHead className="hidden sm:table-cell">ID</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recommendationRuns.map((run) => (
+                        <TableRow key={`sum-${run.id}`}>
+                          <TableCell className="whitespace-nowrap font-medium">
+                            {new Date(run.created_at).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="tabular-nums">{run.items.length}</TableCell>
+                          <TableCell className="text-muted-foreground hidden max-w-[8rem] truncate font-mono text-xs sm:table-cell">
+                            {run.id.slice(0, 8)}…
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <p className="text-muted-foreground text-xs">{t('crm.intel.runSummary')}</p>
+                  {recommendationRuns.map((run) => (
+                    <div key={run.id} className="bg-muted/40 rounded-md border p-3 text-xs">
+                      <p className="text-muted-foreground mb-2">
+                        {new Date(run.created_at).toLocaleString()} · {run.id.slice(0, 8)}…
+                      </p>
+                      {run.items.length === 0 ? (
+                        <p>{t('crm.intel.noItems')}</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {run.items.map((it) => (
+                            <li key={`${run.id}-${it.product_id}`} className="border-t pt-2 first:border-0 first:pt-0">
+                              <span className="font-medium">{it.product_name}</span>
+                              <span className="text-muted-foreground ml-2">
+                                ({translateProductCategory(it.product_category, t)}) ·{' '}
+                                {t('crm.intel.itemPriority')}:{' '}
+                                {it.priority}
+                              </span>
+                              <p className="mt-1">{it.rationale}</p>
+                              {it.rule_ids.length > 0 ? (
+                                <p className="text-muted-foreground mt-1 text-[11px]">
+                                  <span className="font-medium text-foreground">
+                                    {t('crm.intel.rulesMatched')}:{' '}
+                                  </span>
+                                  {it.rule_ids.join(', ')}
+                                </p>
+                              ) : null}
+                              <p className="text-muted-foreground mt-1 text-[11px]">
+                                <span className="font-medium text-foreground">
+                                  {t('crm.intel.protectionGapsLabel')}:{' '}
+                                </span>
+                                {it.protection_gaps}
+                              </p>
+                              <p className="text-muted-foreground mt-1 text-[11px]">
+                                <span className="font-medium text-foreground">
+                                  {t('crm.intel.objectionsLabel')}:{' '}
+                                </span>
+                                {it.predictable_objections}
+                              </p>
+                              <p className="text-muted-foreground mt-1 text-[11px]">
+                                <span className="font-medium text-foreground">
+                                  {t('crm.intel.nbaLabel')}:{' '}
+                                </span>
+                                {it.next_best_action}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {run.rule_trace.length > 0 ? (
+                        <details className="mt-2 border-t pt-2">
+                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                            {t('crm.intel.ruleTraceTitle')}
+                          </summary>
+                          <ul className="mt-2 space-y-1 font-mono text-[11px]">
+                            {run.rule_trace.map((tr) => (
+                              <li key={`${run.id}-${tr.rule_id}`}>
+                                <span className={tr.fired ? 'text-emerald-700' : 'text-muted-foreground'}>
+                                  {tr.rule_id}{' '}
+                                  {tr.fired
+                                    ? `(${t('crm.intel.ruleTraceFired')})`
+                                    : `(${t('crm.intel.ruleTraceNotFired')})`}
+                                </span>
+                                <span className="text-muted-foreground"> — {tr.detail}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+            </TabsContent>
+
           </TabsRoot>
         </>
       ) : null}

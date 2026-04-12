@@ -694,3 +694,80 @@ def test_insurer_list_search_by_code_and_campaign_list_search(client: TestClient
     assert by_kind.status_code == 200
     kinds = [c["kind"] for c in by_kind.json()]
     assert "SEASONAL" in kinds
+
+
+def test_lead_intel_adequacy_and_recommendations(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = client.get("/v1/me", headers=headers)
+    assert me.status_code == 200
+    my_id = me.json()["user"]["id"]
+
+    products = client.get("/v1/products", headers=headers)
+    assert products.status_code == 200
+    product_id = products.json()[0]["id"]
+
+    lead = client.post(
+        "/v1/leads",
+        headers=headers,
+        json={
+            "full_name": "Lead Intel",
+            "email": f"li-{uuid.uuid4().hex}@example.com",
+            "owner_id": my_id,
+        },
+    )
+    assert lead.status_code == 201, lead.text
+    lead_id = lead.json()["id"]
+
+    patch_prof = client.patch(
+        f"/v1/leads/{lead_id}/profile",
+        headers=headers,
+        json={"personal": {"number_of_children": 2, "life_stage": "young_family"}},
+    )
+    assert patch_prof.status_code == 200, patch_prof.text
+
+    ad = client.get(f"/v1/leads/{lead_id}/adequacy", headers=headers)
+    assert ad.status_code == 200, ad.text
+    assert ad.json()["traffic_light"] in ("RED", "YELLOW", "GREEN")
+    assert ad.json()["source"] == "live"
+
+    prev = client.get(f"/v1/leads/{lead_id}/recommendations", headers=headers)
+    assert prev.status_code == 200, prev.text
+    assert "items" in prev.json()
+
+    opp = client.post(
+        "/v1/opportunities",
+        headers=headers,
+        json={
+            "lead_id": lead_id,
+            "owner_id": my_id,
+            "product_id": product_id,
+            "stage": "LEAD",
+            "status": "OPEN",
+            "closing_probability": 30,
+        },
+    )
+    assert opp.status_code == 201, opp.text
+    opp_id = opp.json()["id"]
+
+    prev_ctx = client.get(
+        f"/v1/leads/{lead_id}/recommendations",
+        headers=headers,
+        params={"opportunity_id": opp_id},
+    )
+    assert prev_ctx.status_code == 200, prev_ctx.text
+
+    run = client.post(
+        f"/v1/leads/{lead_id}/recommendation-runs",
+        headers=headers,
+        json={"opportunity_id": opp_id},
+    )
+    assert run.status_code == 201, run.text
+    rb = run.json()
+    assert rb["lead_id"] == lead_id
+    assert rb["client_id"] is None
+
+    hist = client.get(f"/v1/leads/{lead_id}/recommendation-runs", headers=headers)
+    assert hist.status_code == 200
+    assert len(hist.json()) >= 1
