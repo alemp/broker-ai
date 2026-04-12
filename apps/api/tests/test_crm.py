@@ -32,12 +32,6 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
     assert me.status_code == 200
     user_id = me.json()["user"]["id"]
 
-    lobs = client.get("/v1/lines-of-business", headers=headers)
-    assert lobs.status_code == 200
-    lob_list = lobs.json()
-    assert len(lob_list) >= 1
-    motor_id = next(x["id"] for x in lob_list if x["code"] == "MOTOR")
-
     products = client.get("/v1/products", headers=headers)
     assert products.status_code == 200
     product_list = products.json()
@@ -55,14 +49,6 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
     assert create_client.status_code == 201, create_client.text
     client_id = create_client.json()["id"]
 
-    link = client.post(
-        f"/v1/clients/{client_id}/lines-of-business",
-        headers=headers,
-        json={"line_of_business_id": motor_id, "ingestion_source": "internal_crm"},
-    )
-    assert link.status_code == 201, link.text
-    assert link.json()["ingestion_source"] == "internal_crm"
-
     held = client.post(
         f"/v1/clients/{client_id}/held-products",
         headers=headers,
@@ -78,7 +64,6 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
     detail = client.get(f"/v1/clients/{client_id}", headers=headers)
     assert detail.status_code == 200
     body = detail.json()
-    assert len(body["lines_of_business"]) == 1
     assert len(body["held_products"]) == 1
     assert body["profile_completeness_score"] == 0
     assert body["profile_alerts"] == []

@@ -69,7 +69,7 @@ def test_adequacy_batch_refresh_and_dashboard_summary(client: TestClient) -> Non
     assert a["source"] == "batch"
     assert a["computed_at"] is not None
     assert a["inputs_hash"] is not None
-    assert a["rule_version"] == "phase9-v1"
+    assert a["rule_version"] == "phase9-v2"
 
     listed = client.get("/v1/clients", headers=headers)
     assert listed.status_code == 200

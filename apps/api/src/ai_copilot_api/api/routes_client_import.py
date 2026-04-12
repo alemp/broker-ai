@@ -82,7 +82,6 @@ async def preview_client_import(
                 "email": row.email,
                 "external_id": row.external_id,
                 "client_kind": row.client_kind.value,
-                "lob_codes": ",".join(row.lob_codes),
                 "held_product_count": len(row.held_segments),
             },
         )

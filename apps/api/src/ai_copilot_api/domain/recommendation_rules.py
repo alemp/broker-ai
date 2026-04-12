@@ -12,8 +12,6 @@ from ai_copilot_api.db.enums import ProductCategory
 from ai_copilot_api.db.models import (
     Client,
     ClientHeldProduct,
-    ClientLineOfBusiness,
-    LineOfBusiness,
     Opportunity,
     Product,
 )
@@ -29,26 +27,6 @@ def _held_active(h: ClientHeldProduct) -> bool:
         return True
     s = h.policy_status.strip().lower()
     return s not in ("cancelled", "canceled", "lapsed", "expired", "inactive")
-
-
-def _lob_suggests_auto(lob: LineOfBusiness) -> bool:
-    c = (lob.code or "").upper()
-    n = (lob.name or "").upper()
-    keys = ("AUTO", "MOTOR", "VIATURA", "AUTOM")
-    return any(k in c for k in keys) or any(k in n for k in keys)
-
-
-def _client_has_auto_lob_without_product(client: Client) -> bool:
-    """CRM linked LOB indicates auto/motor portfolio line but no active auto policy held."""
-    has_auto_lob = False
-    for link in client.line_of_business_links:
-        lob = link.line_of_business
-        if lob is not None and _lob_suggests_auto(lob):
-            has_auto_lob = True
-            break
-    if not has_auto_lob:
-        return False
-    return not _has_active_category(client, ProductCategory.AUTO_INSURANCE)
 
 
 def _profile_high_earner_life_gap(client: Client) -> tuple[bool, str]:
@@ -109,7 +87,6 @@ class ProtectionGaps:
     want_auto: bool
     want_health: bool
     want_commercial: bool
-    want_lob_auto: bool
 
 
 @dataclass
@@ -233,22 +210,12 @@ def assess_protection_gaps(client: Client) -> tuple[ProtectionGaps, list[RuleRes
         ),
     )
 
-    want_lob_auto = _client_has_auto_lob_without_product(client)
-    trace.append(
-        RuleResult(
-            "RULE_LOB_AUTO_PORTFOLIO_GAP",
-            want_lob_auto,
-            "linked LOB suggests motor/auto line; no active AUTO_INSURANCE in held products",
-        ),
-    )
-
     gaps = ProtectionGaps(
         want_life=want_life,
         want_home=want_home,
         want_auto=want_auto,
         want_health=want_health,
         want_commercial=want_commercial,
-        want_lob_auto=want_lob_auto,
     )
     return gaps, trace
 
@@ -265,7 +232,6 @@ def evaluate_rules_for_client(
     want_auto = gaps.want_auto
     want_health = gaps.want_health
     want_commercial = gaps.want_commercial
-    want_lob_auto = gaps.want_lob_auto
 
     want_profile_life, prof_life_detail = _profile_high_earner_life_gap(client)
     trace.append(
@@ -342,14 +308,6 @@ def evaluate_rules_for_client(
                 "RULE_AUTO_GAP",
                 "Veículo na mobilidade do cliente sem auto detido no portfólio.",
                 "Responsabilidade civil e danos próprios.",
-            )
-        if want_lob_auto and p.category == ProductCategory.AUTO_INSURANCE:
-            add_product(
-                p,
-                28,
-                "RULE_LOB_AUTO_PORTFOLIO_GAP",
-                "Ramo de automóveis ligado ao cliente (CRM) sem apólice de auto ativa na carteira.",
-                "Alinhar cobertura ao ramo declarado na relação comercial.",
             )
         if want_profile_life and p.category == ProductCategory.LIFE_INSURANCE:
             add_product(
@@ -462,15 +420,6 @@ def list_builtin_recommendation_rules() -> list[BuiltinRecommendationRule]:
             inputs=("Perfil: empresa e garantias", "Carteira: ramos gerais"),
         ),
         BuiltinRecommendationRule(
-            rule_id="RULE_LOB_AUTO_PORTFOLIO_GAP",
-            title="LOB automóvel vs carteira",
-            description=(
-                "Linha de negócio vinculada ao cliente sugere automóvel, mas não há apólice "
-                "de auto ativa nos produtos detidos."
-            ),
-            inputs=("CRM: linhas de negócio", "Carteira: auto"),
-        ),
-        BuiltinRecommendationRule(
             rule_id="RULE_PROFILE_HIGH_EARNER_PROTECTION",
             title="Perfil de maior capacidade patrimonial",
             description=(
@@ -496,9 +445,6 @@ def load_client_for_intel(db: Session, org_id: uuid.UUID, client_id: uuid.UUID) 
         select(Client)
         .options(
             selectinload(Client.held_products).selectinload(ClientHeldProduct.product),
-            selectinload(Client.line_of_business_links).selectinload(
-                ClientLineOfBusiness.line_of_business,
-            ),
         )
         .where(Client.id == client_id, Client.organization_id == org_id),
     )

@@ -6,7 +6,6 @@ import csv
 import hashlib
 import io
 import json
-import re
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
@@ -24,9 +23,7 @@ from ai_copilot_api.db.models import (
     Client,
     ClientHeldProduct,
     ClientImportBatch,
-    ClientLineOfBusiness,
     InsuredPerson,
-    LineOfBusiness,
     Product,
     User,
 )
@@ -106,14 +103,7 @@ _HEADER_ALIASES: dict[str, str] = {
     "canal_de_comunicacao": "preferred_marketing_channel",
     "canal_comunicacao": "preferred_marketing_channel",
     "preferred_marketing_channel": "preferred_marketing_channel",
-    # LOB / held / profile / insured (canonical + PT)
-    "linhas_negocio": "lob_codes",
-    "linhas_de_negocio": "lob_codes",
-    "linha_negocio": "lob_codes",
-    "codigos_lob": "lob_codes",
-    "codigo_lob": "lob_codes",
-    "lob_codes": "lob_codes",
-    "lobs": "lob_codes",
+    # held / profile / insured (canonical + PT)
     "produtos_detidos": "held_products",
     "produtos_em_carteira": "held_products",
     "carteira_seguros": "held_products",
@@ -343,7 +333,6 @@ class ValidatedImportRow:
     company_tax_id: str | None
     marketing_opt_in: bool | None
     preferred_marketing_channel: str | None
-    lob_codes: list[str]
     held_segments: list[HeldSegmentTuple]
     profile_patch: dict[str, Any]
     insured_specs: list[tuple[str, InsuredRelation]]
@@ -403,14 +392,6 @@ def validate_rows_structural(raw_rows: list[RawImportRow]) -> ImportValidationRe
                 ),
             )
             continue
-
-        lob_raw = r.get("lob_codes") or ""
-        lob_codes: list[str] = []
-        if lob_raw and lob_raw.strip():
-            for part in re.split(r"[;,]", lob_raw):
-                p = part.strip()
-                if p:
-                    lob_codes.append(p)
 
         held_segments: list[HeldSegmentTuple] = []
         hp = r.get("held_products")
@@ -510,7 +491,6 @@ def validate_rows_structural(raw_rows: list[RawImportRow]) -> ImportValidationRe
                 marketing_opt_in=mo,
                 preferred_marketing_channel=(r.get("preferred_marketing_channel") or "").strip()
                 or None,
-                lob_codes=lob_codes,
                 held_segments=held_segments,
                 profile_patch=profile_patch,
                 insured_specs=insured_specs,
@@ -528,12 +508,8 @@ def validate_rows_with_catalog(
     org_id: uuid.UUID,
     structural: ImportValidationResult,
 ) -> ImportValidationResult:
-    """Resolve owner emails, LOB codes, and product names against org catalog."""
+    """Resolve owner emails and product names against org catalog."""
     out = ImportValidationResult(errors=list(structural.errors))
-    lob_rows = db.scalars(
-        select(LineOfBusiness).where(LineOfBusiness.organization_id == org_id),
-    ).all()
-    lob_by_code = {row.code.strip().lower(): row for row in lob_rows}
 
     prod_rows = db.scalars(
         select(Product).where(
@@ -563,17 +539,6 @@ def validate_rows_with_catalog(
                 )
                 continue
             row.owner_id = u.id
-        unknown_lobs = [c for c in row.lob_codes if c.strip().lower() not in lob_by_code]
-        if unknown_lobs:
-            codes = ", ".join(unknown_lobs)
-            out.errors.append(
-                (
-                    row.row_number,
-                    f"Código(s) de linha de negócio desconhecido(s): {codes}. "
-                    "Cadastre-os no catálogo ou corrija a planilha.",
-                ),
-            )
-            continue
         held_ok = True
         for seg in row.held_segments:
             pname = (seg[0] or "").strip()
@@ -682,11 +647,6 @@ def apply_import(
     ingestion: IngestionSource,
     rows: list[ValidatedImportRow],
 ) -> ClientImportBatch:
-    lob_rows = db.scalars(
-        select(LineOfBusiness).where(LineOfBusiness.organization_id == organization_id),
-    ).all()
-    lob_by_code = {row.code.strip().lower(): row for row in lob_rows}
-
     prod_rows = db.scalars(
         select(Product).where(
             Product.organization_id == organization_id,
@@ -773,23 +733,6 @@ def apply_import(
                 },
             )
             updated += 1
-
-        for code in row.lob_codes:
-            lob = lob_by_code[code.strip().lower()]
-            exists = db.scalar(
-                select(ClientLineOfBusiness).where(
-                    ClientLineOfBusiness.client_id == client.id,
-                    ClientLineOfBusiness.line_of_business_id == lob.id,
-                ),
-            )
-            if exists is None:
-                db.add(
-                    ClientLineOfBusiness(
-                        client_id=client.id,
-                        line_of_business_id=lob.id,
-                        ingestion_source=ingestion,
-                    ),
-                )
 
         for seg in row.held_segments:
             pname = (seg[0] or "").strip()

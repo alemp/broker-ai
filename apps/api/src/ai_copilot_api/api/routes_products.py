@@ -7,7 +7,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from ai_copilot_api.api.deps import get_current_user
-from ai_copilot_api.db.models import Insurer, LineOfBusiness, Product, User
+from ai_copilot_api.db.models import Insurer, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.schemas.crm import ProductCreate, ProductOut, ProductUpdate
 
@@ -20,19 +20,6 @@ def _insurer_in_org(db: Session, org_id: uuid.UUID, insurer_id: uuid.UUID) -> No
     )
     if r is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Insurer not found")
-
-
-def _lob_in_org(db: Session, org_id: uuid.UUID, lob_id: uuid.UUID) -> None:
-    r = db.scalar(
-        select(LineOfBusiness).where(
-            LineOfBusiness.id == lob_id,
-            LineOfBusiness.organization_id == org_id,
-        ),
-    )
-    if r is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Line of business not found"
-        )
 
 
 @router.get("", response_model=list[ProductOut])
@@ -73,8 +60,6 @@ def create_product(
     org_id = current_user.organization_id
     if body.insurer_id is not None:
         _insurer_in_org(db, org_id, body.insurer_id)
-    if body.line_of_business_id is not None:
-        _lob_in_org(db, org_id, body.line_of_business_id)
     row = Product(
         organization_id=org_id,
         name=body.name,
@@ -84,7 +69,6 @@ def create_product(
         target_tags=body.target_tags,
         active=body.active,
         insurer_id=body.insurer_id,
-        line_of_business_id=body.line_of_business_id,
         main_coverage_summary=body.main_coverage_summary,
         additional_coverages=body.additional_coverages or [],
         exclusions_notes=body.exclusions_notes,
@@ -140,8 +124,6 @@ def update_product(
     data = body.model_dump(exclude_unset=True)
     if "insurer_id" in data and data["insurer_id"] is not None:
         _insurer_in_org(db, org_id, data["insurer_id"])
-    if "line_of_business_id" in data and data["line_of_business_id"] is not None:
-        _lob_in_org(db, org_id, data["line_of_business_id"])
     for k, v in data.items():
         setattr(row, k, v)
     db.commit()

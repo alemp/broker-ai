@@ -16,18 +16,14 @@ from ai_copilot_api.db.enums import AdequacyTrafficLight, BatchJobStatus
 from ai_copilot_api.db.models import BatchJobRun, Client, ClientAdequacySnapshot, ClientHeldProduct
 from ai_copilot_api.domain.adequacy_rules import AdequacyAssessment, evaluate_adequacy
 
-ADEQUACY_RULE_VERSION = "phase9-v1"
+ADEQUACY_RULE_VERSION = "phase9-v2"
 JOB_TYPE_ADEQUACY_REFRESH = "adequacy_refresh"
 
 
 def adequacy_inputs_fingerprint(client: Client) -> str:
     """Stable hash of profile + portfolio inputs used for adequacy (debug / change detection)."""
     profile = client.profile_data if isinstance(client.profile_data, dict) else {}
-    lob_links = getattr(client, "line_of_business_links", None) or []
     held = getattr(client, "held_products", None) or []
-    lob_payload = sorted(
-        (str(x.line_of_business_id), x.ingestion_source.value) for x in lob_links
-    )
     held_payload = sorted(
         (
             str(h.product_id) if h.product_id else None,
@@ -40,7 +36,6 @@ def adequacy_inputs_fingerprint(client: Client) -> str:
     )
     payload: dict[str, Any] = {
         "profile": profile,
-        "lobs": lob_payload,
         "held": held_payload,
         "client_kind": client.client_kind.value,
     }
@@ -136,7 +131,6 @@ def refresh_adequacy_for_organization(db: Session, organization_id: uuid.UUID) -
             select(Client)
             .options(
                 selectinload(Client.held_products).selectinload(ClientHeldProduct.product),
-                selectinload(Client.line_of_business_links),
             )
             .where(Client.organization_id == organization_id),
         ).unique().all()

@@ -24,7 +24,7 @@ from ai_copilot_api.domain.client_import import normalize_header
         ("Observações", "notes"),
         ("Razão social", "company_legal_name"),
         ("NIF", "company_tax_id"),
-        ("Linhas de negócio", "lob_codes"),
+        ("Matrícula fiscal", "company_tax_id"),
         ("Produtos detidos", "held_products"),
         ("Email do corretor", "owner_email"),
         ("Tipo de cliente", "client_kind"),

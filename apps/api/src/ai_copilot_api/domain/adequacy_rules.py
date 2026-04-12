@@ -50,10 +50,6 @@ def evaluate_adequacy(client: Client) -> AdequacyAssessment:
         reasons.append(
             "Veículo declarado sem apólice de automóvel ativa.",
         )
-    if gaps.want_lob_auto and not gaps.want_auto:
-        reasons.append(
-            "Ramo de automóveis associado ao cliente sem apólice de auto ativa na carteira.",
-        )
     if gaps.want_health:
         reasons.append(
             "Contexto familiar sem plano de saúde declarado — rever necessidade de saúde.",
@@ -62,7 +58,7 @@ def evaluate_adequacy(client: Client) -> AdequacyAssessment:
         reasons.append(f"Alerta de consistência do perfil: {code}.")
 
     critical = gaps.want_life or gaps.want_home or gaps.want_commercial
-    moderate = gaps.want_auto or gaps.want_health or gaps.want_lob_auto
+    moderate = gaps.want_auto or gaps.want_health
     thin_profile = score < 40 and score >= 0
 
     if critical:

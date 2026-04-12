@@ -33,9 +33,9 @@ def test_client_import_preview_and_commit_csv(client: TestClient) -> None:
     ext2 = f"EXT-IMP-{uid}-2"
     held = '"Auto|Porto|ACTIVE|2024-01-01|"'
     csv_body = (
-        "full_name,email,external_id,lob_codes,held_products\n"
-        f"Import One,import-one-{uid}@example.com,{ext1},MOTOR,{held}\n"
-        f"Import Two,import-two-{uid}@example.com,{ext2},LIFE,\n"
+        "full_name,email,external_id,held_products\n"
+        f"Import One,import-one-{uid}@example.com,{ext1},{held}\n"
+        f"Import Two,import-two-{uid}@example.com,{ext2},\n"
     )
 
     prev = client.post(
@@ -74,7 +74,6 @@ def test_client_import_preview_and_commit_csv(client: TestClient) -> None:
     detail = client.get(f"/v1/clients/{cid}", headers=headers)
     assert detail.status_code == 200
     d = detail.json()
-    assert len(d["lines_of_business"]) >= 1
     assert len(d["held_products"]) >= 1
     assert d["held_products"][0]["ingestion_source"] == "csv_import"
 
@@ -109,12 +108,12 @@ def test_client_import_preview_portuguese_headers_csv(client: TestClient) -> Non
     assert body["error_count"] == 0
 
 
-def test_client_import_rejects_unknown_lob(client: TestClient) -> None:
+def test_client_import_rejects_unknown_held_product(client: TestClient) -> None:
     token = _register(client)
     headers = {"Authorization": f"Bearer {token}"}
     csv_body = (
-        "full_name,email,lob_codes\n"
-        f"Bad Lob,bad-lob-{uuid.uuid4().hex}@example.com,NOT_A_REAL_LOB_CODE\n"
+        "full_name,email,held_products\n"
+        f"Bad Held,bad-held-{uuid.uuid4().hex}@example.com,ProdutoInexistente999|X|ACTIVE\n"
     )
     prev = client.post(
         "/v1/clients/import/preview",

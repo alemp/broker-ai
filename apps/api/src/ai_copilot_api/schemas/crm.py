@@ -111,44 +111,6 @@ class ClientOut(BaseModel):
     adequacy_computed_at: datetime | None = None
 
 
-class LineOfBusinessCreate(BaseModel):
-    code: str = Field(min_length=1, max_length=64)
-    name: str = Field(min_length=1, max_length=255)
-    description: str | None = None
-
-
-class LineOfBusinessUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
-
-
-class LineOfBusinessOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    organization_id: uuid.UUID
-    code: str
-    name: str
-    description: str | None
-    created_at: datetime
-
-
-class ClientLineOfBusinessCreate(BaseModel):
-    line_of_business_id: uuid.UUID
-    ingestion_source: IngestionSource = IngestionSource.INTERNAL_CRM
-
-
-class ClientLineOfBusinessOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    client_id: uuid.UUID
-    line_of_business_id: uuid.UUID
-    ingestion_source: IngestionSource
-    created_at: datetime
-    line_of_business: LineOfBusinessOut
-
-
 class ClientHeldProductCreate(BaseModel):
     product_id: uuid.UUID | None = None
     insurer_name: str | None = Field(default=None, max_length=255)
@@ -294,9 +256,6 @@ class CrmAuditEventOut(BaseModel):
 class ClientDetailOut(ClientOut):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    lines_of_business: list[ClientLineOfBusinessOut] = Field(
-        validation_alias="line_of_business_links",
-    )
     held_products: list[ClientHeldProductOut]
     insured_persons: list[InsuredPersonOut] = Field(default_factory=list)
     profile: ClientInsuranceProfile = Field(default_factory=ClientInsuranceProfile)
@@ -414,7 +373,6 @@ class ProductCreate(BaseModel):
     target_tags: str | None = Field(default=None, max_length=512)
     active: bool = True
     insurer_id: uuid.UUID | None = None
-    line_of_business_id: uuid.UUID | None = None
     main_coverage_summary: str | None = None
     additional_coverages: list[dict[str, Any]] = Field(default_factory=list)
     exclusions_notes: str | None = None
@@ -431,7 +389,6 @@ class ProductUpdate(BaseModel):
     target_tags: str | None = Field(default=None, max_length=512)
     active: bool | None = None
     insurer_id: uuid.UUID | None = None
-    line_of_business_id: uuid.UUID | None = None
     main_coverage_summary: str | None = None
     additional_coverages: list[dict[str, Any]] | None = None
     exclusions_notes: str | None = None
@@ -452,7 +409,6 @@ class ProductOut(BaseModel):
     target_tags: str | None
     active: bool
     insurer_id: uuid.UUID | None
-    line_of_business_id: uuid.UUID | None
     main_coverage_summary: str | None
     additional_coverages: list[dict[str, Any]]
     exclusions_notes: str | None

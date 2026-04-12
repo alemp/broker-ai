@@ -13,7 +13,6 @@ from ai_copilot_api.api.routes_intel import router as intel_router
 from ai_copilot_api.api.routes_interactions import router as interactions_router
 from ai_copilot_api.api.routes_jobs import router as jobs_router
 from ai_copilot_api.api.routes_leads import router as leads_router
-from ai_copilot_api.api.routes_lines_of_business import router as lob_router
 from ai_copilot_api.api.routes_me import router as me_router
 from ai_copilot_api.api.routes_opportunities import router as opportunities_router
 from ai_copilot_api.api.routes_org import router as org_router
@@ -73,7 +72,6 @@ app.include_router(intel_router, prefix="/v1")
 app.include_router(recommendation_rules_router, prefix="/v1")
 app.include_router(insurers_router, prefix="/v1")
 app.include_router(leads_router, prefix="/v1")
-app.include_router(lob_router, prefix="/v1")
 app.include_router(products_router, prefix="/v1")
 app.include_router(campaigns_router, prefix="/v1")
 app.include_router(opportunities_router, prefix="/v1")

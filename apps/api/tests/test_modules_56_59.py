@@ -37,10 +37,6 @@ def test_insurer_product_intel_campaign_flow(client: TestClient) -> None:
     assert ins.status_code == 201, ins.text
     insurer_id = ins.json()["id"]
 
-    lobs = client.get("/v1/lines-of-business", headers=headers)
-    assert lobs.status_code == 200
-    lob_id = lobs.json()[0]["id"]
-
     prod = client.post(
         "/v1/products",
         headers=headers,
@@ -51,7 +47,6 @@ def test_insurer_product_intel_campaign_flow(client: TestClient) -> None:
             "risk_level": "MEDIUM",
             "active": True,
             "insurer_id": insurer_id,
-            "line_of_business_id": lob_id,
             "main_coverage_summary": "Morte e invalidez",
             "commercial_arguments": "Proteção familiar",
         },
@@ -206,33 +201,28 @@ def test_insurer_product_intel_campaign_flow(client: TestClient) -> None:
     assert preview_ctx.status_code == 200, preview_ctx.text
 
 
-def test_phase6_recommendations_lob_and_profile_rules(client: TestClient) -> None:
-    """Phase 6 — LOB-based auto gap + GET preview; profile income band life signal."""
+def test_phase6_recommendations_auto_gap_and_profile_rules(client: TestClient) -> None:
+    """Phase 6 — profile mobility auto gap + GET preview; profile income band life signal."""
     token, _email = _register(client)
     headers = {"Authorization": f"Bearer {token}"}
-
-    lobs = client.get("/v1/lines-of-business", headers=headers)
-    assert lobs.status_code == 200
-    lob_list = lobs.json()
-    motor_id = next(row["id"] for row in lob_list if row.get("code") == "MOTOR")
 
     cli = client.post(
         "/v1/clients",
         headers=headers,
         json={
-            "full_name": "Cliente LOB Auto",
-            "email": f"lob-auto-{uuid.uuid4().hex}@example.com",
+            "full_name": "Cliente Auto Perfil",
+            "email": f"auto-prof-{uuid.uuid4().hex}@example.com",
         },
     )
     assert cli.status_code == 201, cli.text
     client_id = cli.json()["id"]
 
-    lob_link = client.post(
-        f"/v1/clients/{client_id}/lines-of-business",
+    mob = client.patch(
+        f"/v1/clients/{client_id}/profile",
         headers=headers,
-        json={"line_of_business_id": motor_id, "ingestion_source": "internal_crm"},
+        json={"mobility": {"owns_vehicle": True}},
     )
-    assert lob_link.status_code == 201, lob_link.text
+    assert mob.status_code == 200, mob.text
 
     auto_prod = client.post(
         "/v1/products",
@@ -250,10 +240,9 @@ def test_phase6_recommendations_lob_and_profile_rules(client: TestClient) -> Non
     prev = client.get(f"/v1/clients/{client_id}/recommendations", headers=headers)
     assert prev.status_code == 200, prev.text
     body = prev.json()
-    assert any("RULE_LOB_AUTO_PORTFOLIO_GAP" in (it.get("rule_ids") or []) for it in body["items"])
+    assert any("RULE_AUTO_GAP" in (it.get("rule_ids") or []) for it in body["items"])
     assert any(
-        t.get("rule_id") == "RULE_LOB_AUTO_PORTFOLIO_GAP" and t.get("fired")
-        for t in body["rule_trace"]
+        t.get("rule_id") == "RULE_AUTO_GAP" and t.get("fired") for t in body["rule_trace"]
     )
 
     prof_patch = client.patch(
@@ -299,7 +288,7 @@ def test_recommendation_rules_catalog_lists_builtins(client: TestClient) -> None
     assert isinstance(data, list)
     assert len(data) >= 1
     ids = {row["rule_id"] for row in data}
-    assert "RULE_LOB_AUTO_PORTFOLIO_GAP" in ids
+    assert "RULE_AUTO_GAP" in ids
     for row in data:
         assert row.get("rule_id")
         assert row.get("title")

@@ -74,10 +74,6 @@ class Organization(Base):
     users: Mapped[list["User"]] = relationship("User", back_populates="organization")
     clients: Mapped[list["Client"]] = relationship("Client", back_populates="organization")
     products: Mapped[list["Product"]] = relationship("Product", back_populates="organization")
-    lines_of_business: Mapped[list["LineOfBusiness"]] = relationship(
-        "LineOfBusiness",
-        back_populates="organization",
-    )
     opportunities: Mapped[list["Opportunity"]] = relationship(
         "Opportunity",
         back_populates="organization",
@@ -224,12 +220,6 @@ class Product(Base):
         nullable=True,
         index=True,
     )
-    line_of_business_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("lines_of_business.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-    )
     main_coverage_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     additional_coverages: Mapped[list[Any]] = mapped_column(
         JSONB,
@@ -257,10 +247,6 @@ class Product(Base):
         back_populates="products",
     )
     insurer: Mapped["Insurer | None"] = relationship("Insurer", back_populates="products")
-    line_of_business: Mapped["LineOfBusiness | None"] = relationship(
-        "LineOfBusiness",
-        back_populates="catalog_products",
-    )
     opportunities: Mapped[list["Opportunity"]] = relationship(
         "Opportunity",
         back_populates="product",
@@ -268,50 +254,6 @@ class Product(Base):
     held_placements: Mapped[list["ClientHeldProduct"]] = relationship(
         "ClientHeldProduct",
         back_populates="product",
-    )
-
-
-class LineOfBusiness(Base):
-    __tablename__ = "lines_of_business"
-    __table_args__ = (
-        UniqueConstraint(
-            "organization_id",
-            "code",
-            name="uq_lines_of_business_org_code",
-        ),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    code: Mapped[str] = mapped_column(String(64), nullable=False)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    organization: Mapped["Organization"] = relationship(
-        "Organization",
-        back_populates="lines_of_business",
-    )
-    client_links: Mapped[list["ClientLineOfBusiness"]] = relationship(
-        "ClientLineOfBusiness",
-        back_populates="line_of_business",
-    )
-    catalog_products: Mapped[list["Product"]] = relationship(
-        "Product",
-        back_populates="line_of_business",
     )
 
 
@@ -380,11 +322,6 @@ class Client(Base):
     opportunities: Mapped[list["Opportunity"]] = relationship(
         "Opportunity",
         back_populates="client",
-    )
-    line_of_business_links: Mapped[list["ClientLineOfBusiness"]] = relationship(
-        "ClientLineOfBusiness",
-        back_populates="client",
-        cascade="all, delete-orphan",
     )
     held_products: Mapped[list["ClientHeldProduct"]] = relationship(
         "ClientHeldProduct",
@@ -513,46 +450,6 @@ class BatchJobRun(Base):
     organization: Mapped["Organization"] = relationship(
         "Organization",
         back_populates="batch_job_runs",
-    )
-
-
-class ClientLineOfBusiness(Base):
-    __tablename__ = "client_lines_of_business"
-    __table_args__ = (
-        UniqueConstraint("client_id", "line_of_business_id", name="uq_client_line_of_business"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-    client_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("clients.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    line_of_business_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("lines_of_business.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    ingestion_source: Mapped[IngestionSource] = mapped_column(
-        _varchar_enum(IngestionSource),
-        nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    client: Mapped["Client"] = relationship("Client", back_populates="line_of_business_links")
-    line_of_business: Mapped["LineOfBusiness"] = relationship(
-        "LineOfBusiness",
-        back_populates="client_links",
     )
 
 

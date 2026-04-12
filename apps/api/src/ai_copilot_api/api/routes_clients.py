@@ -15,10 +15,8 @@ from ai_copilot_api.db.models import (
     Client,
     ClientAdequacySnapshot,
     ClientHeldProduct,
-    ClientLineOfBusiness,
     CrmAuditEvent,
     InsuredPerson,
-    LineOfBusiness,
     Product,
     User,
 )
@@ -43,8 +41,6 @@ from ai_copilot_api.schemas.crm import (
     ClientHeldProductCreate,
     ClientHeldProductOut,
     ClientHeldProductUpdate,
-    ClientLineOfBusinessCreate,
-    ClientLineOfBusinessOut,
     ClientOut,
     ClientUpdate,
     CrmAuditEventOut,
@@ -114,9 +110,6 @@ def _build_client_detail_out(row: Client) -> ClientDetailOut:
     insured = getattr(row, "insured_persons", []) or []
     return ClientDetailOut(
         **base.model_dump(),
-        lines_of_business=[
-            ClientLineOfBusinessOut.model_validate(link) for link in row.line_of_business_links
-        ],
         held_products=[ClientHeldProductOut.model_validate(h) for h in row.held_products],
         insured_persons=[InsuredPersonOut.model_validate(p) for p in insured],
         profile=prof,
@@ -142,20 +135,6 @@ def _product_in_org_or_404(db: Session, org_id: uuid.UUID, product_id: uuid.UUID
     )
     if p is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-
-
-def _lob_in_org_or_404(db: Session, org_id: uuid.UUID, lob_id: uuid.UUID) -> None:
-    lob = db.scalar(
-        select(LineOfBusiness).where(
-            LineOfBusiness.id == lob_id,
-            LineOfBusiness.organization_id == org_id,
-        ),
-    )
-    if lob is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Line of business not found",
-        )
 
 
 @router.get("", response_model=list[ClientOut])
@@ -304,9 +283,6 @@ def get_client(
         .options(
             joinedload(Client.owner),
             selectinload(Client.insured_persons),
-            selectinload(Client.line_of_business_links).selectinload(
-                ClientLineOfBusiness.line_of_business
-            ),
             selectinload(Client.held_products).selectinload(ClientHeldProduct.product),
         )
         .where(
@@ -605,82 +581,6 @@ def delete_insured_person(
         action=CrmAuditAction.DELETE,
     )
     db.delete(row)
-    db.commit()
-
-
-@router.get("/{client_id}/lines-of-business", response_model=list[ClientLineOfBusinessOut])
-def list_client_lines_of_business(
-    client_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> list[ClientLineOfBusinessOut]:
-    _client_or_404(db, current_user.organization_id, client_id)
-    rows = db.scalars(
-        select(ClientLineOfBusiness)
-        .options(selectinload(ClientLineOfBusiness.line_of_business))
-        .where(ClientLineOfBusiness.client_id == client_id)
-        .order_by(ClientLineOfBusiness.created_at),
-    ).all()
-    return [ClientLineOfBusinessOut.model_validate(r) for r in rows]
-
-
-@router.post(
-    "/{client_id}/lines-of-business",
-    response_model=ClientLineOfBusinessOut,
-    status_code=status.HTTP_201_CREATED,
-)
-def add_client_line_of_business(
-    client_id: uuid.UUID,
-    body: ClientLineOfBusinessCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> ClientLineOfBusinessOut:
-    _client_or_404(db, current_user.organization_id, client_id)
-    _lob_in_org_or_404(db, current_user.organization_id, body.line_of_business_id)
-    link = ClientLineOfBusiness(
-        client_id=client_id,
-        line_of_business_id=body.line_of_business_id,
-        ingestion_source=body.ingestion_source,
-    )
-    db.add(link)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Client already linked to this line of business",
-        ) from None
-    db.refresh(link)
-    link = db.scalar(
-        select(ClientLineOfBusiness)
-        .options(selectinload(ClientLineOfBusiness.line_of_business))
-        .where(ClientLineOfBusiness.id == link.id),
-    )
-    assert link is not None
-    return ClientLineOfBusinessOut.model_validate(link)
-
-
-@router.delete(
-    "/{client_id}/lines-of-business/{link_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def remove_client_line_of_business(
-    client_id: uuid.UUID,
-    link_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> None:
-    _client_or_404(db, current_user.organization_id, client_id)
-    link = db.scalar(
-        select(ClientLineOfBusiness).where(
-            ClientLineOfBusiness.id == link_id,
-            ClientLineOfBusiness.client_id == client_id,
-        ),
-    )
-    if link is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link not found")
-    db.delete(link)
     db.commit()
 
 
