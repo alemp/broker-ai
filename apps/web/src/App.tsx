@@ -8,8 +8,12 @@ import { ClientCreatePage } from '@/pages/ClientCreatePage'
 import { ClientDetailPage } from '@/pages/ClientDetailPage'
 import { ClientImportPage } from '@/pages/ClientImportPage'
 import { ClientsPage } from '@/pages/ClientsPage'
+import { InsurerDetailPage } from '@/pages/InsurerDetailPage'
 import { InsurerNewPage } from '@/pages/InsurerNewPage'
 import { InsurersPage } from '@/pages/InsurersPage'
+import { ProductDetailPage } from '@/pages/ProductDetailPage'
+import { ProductNewPage } from '@/pages/ProductNewPage'
+import { ProductsPage } from '@/pages/ProductsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { LeadCreatePage } from '@/pages/LeadCreatePage'
@@ -46,6 +50,10 @@ export default function App() {
         <Route path="/opportunities/:opportunityId" element={<OpportunityDetailPage />} />
         <Route path="/insurers" element={<InsurersPage />} />
         <Route path="/insurers/new" element={<InsurerNewPage />} />
+        <Route path="/insurers/:insurerId" element={<InsurerDetailPage />} />
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/products/new" element={<ProductNewPage />} />
+        <Route path="/products/:productId" element={<ProductDetailPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/campaigns/new" element={<CampaignNewPage />} />
         <Route path="/release-notes" element={<ReleaseNotesPage />} />

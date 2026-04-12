@@ -114,135 +114,164 @@ export function LeadCreatePage() {
           <CardTitle className="text-base">{t('crm.leads.new')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 sm:grid-cols-2" onSubmit={onCreate}>
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="lead-name">{t('crm.clients.field.name')}</Label>
-              <Input
-                id="lead-name"
-                value={fullName}
-                onChange={(ev) => setFullName(ev.target.value)}
-                autoComplete="name"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-email">{t('crm.clients.field.emailOptional')}</Label>
-              <Input
-                id="lead-email"
-                type="email"
-                value={email}
-                onChange={(ev) => setEmail(ev.target.value)}
-                autoComplete="email"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-phone">{t('crm.leads.field.phoneOptional')}</Label>
-              <Input
-                id="lead-phone"
-                type="tel"
-                value={phone}
-                onChange={(ev) => setPhone(ev.target.value)}
-                autoComplete="tel"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-dob">{t('crm.clients.field.dateOfBirthOptional')}</Label>
-              <Input
-                id="lead-dob"
-                type="date"
-                value={dateOfBirth}
-                onChange={(ev) => setDateOfBirth(ev.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-ext">{t('crm.leads.field.externalIdOptional')}</Label>
-              <Input
-                id="lead-ext"
-                value={externalId}
-                onChange={(ev) => setExternalId(ev.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-owner">{t('crm.leads.ownerOptional')}</Label>
-              <FormSelect
-                id="lead-owner"
-                value={ownerId}
-                onValueChange={setOwnerId}
-                allowEmpty
-                emptyLabel={t('crm.leads.noOwner')}
-                placeholder={t('crm.leads.noOwner')}
-                options={users.map((u) => ({
-                  value: u.id,
-                  label: u.full_name ?? u.email,
-                }))}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="lead-kind">{t('crm.core.kind')}</Label>
-              <FormSelect
-                id="lead-kind"
-                value={clientKind}
-                onValueChange={setClientKind}
-                options={[
-                  { value: 'INDIVIDUAL', label: t('crm.core.kindIndividual') },
-                  { value: 'COMPANY', label: t('crm.core.kindCompany') },
-                ]}
-              />
-            </div>
-            {clientKind === 'COMPANY' ? (
-              <>
+          <form className="space-y-8" onSubmit={onCreate}>
+            <section className="space-y-4" aria-labelledby="lead-create-party-heading">
+              <div>
+                <h3
+                  id="lead-create-party-heading"
+                  className="text-foreground text-sm font-semibold tracking-tight"
+                >
+                  {t('crm.form.sectionLead')}
+                </h3>
+                <p className="text-muted-foreground mt-1 text-xs">{t('crm.form.sectionLeadSubtitle')}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2 sm:col-span-2">
-                  <Label htmlFor="lead-legal">{t('crm.core.companyLegal')}</Label>
+                  <Label htmlFor="lead-name">{t('crm.clients.field.name')}</Label>
                   <Input
-                    id="lead-legal"
-                    value={companyLegal}
-                    onChange={(ev) => setCompanyLegal(ev.target.value)}
+                    id="lead-name"
+                    value={fullName}
+                    onChange={(ev) => setFullName(ev.target.value)}
+                    autoComplete="name"
+                    required
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
-                  <Label htmlFor="lead-tax">{t('crm.core.companyTax')}</Label>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-email">{t('crm.clients.field.emailOptional')}</Label>
                   <Input
-                    id="lead-tax"
-                    value={companyTax}
-                    onChange={(ev) => setCompanyTax(ev.target.value)}
+                    id="lead-email"
+                    type="email"
+                    value={email}
+                    onChange={(ev) => setEmail(ev.target.value)}
+                    autoComplete="email"
                   />
                 </div>
-              </>
-            ) : null}
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <input
-                id="lead-mkt"
-                type="checkbox"
-                checked={marketingOptIn}
-                onChange={(ev) => setMarketingOptIn(ev.target.checked)}
-                className="h-4 w-4 rounded border"
-              />
-              <Label htmlFor="lead-mkt" className="font-normal">
-                {t('crm.leads.field.marketingOptIn')}
-              </Label>
-            </div>
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="lead-channel">{t('crm.core.marketingChannel')}</Label>
-              <FormSelect
-                id="lead-channel"
-                value={preferredChannel}
-                onValueChange={setPreferredChannel}
-                allowEmpty
-                emptyLabel={t('crm.core.marketingChannelNone')}
-                placeholder={t('crm.core.marketingChannelNone')}
-                extraOptions={
-                  preferredChannel &&
-                  !MARKETING_CHANNELS.some((c) => c === preferredChannel)
-                    ? [{ value: preferredChannel, label: preferredChannel }]
-                    : undefined
-                }
-                options={MARKETING_CHANNELS.map((c) => ({
-                  value: c,
-                  label: t(`crm.core.marketingChannelOption.${c}`),
-                }))}
-              />
-            </div>
-            <div className="sm:col-span-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-phone">{t('crm.leads.field.phoneOptional')}</Label>
+                  <Input
+                    id="lead-phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(ev) => setPhone(ev.target.value)}
+                    autoComplete="tel"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-dob">{t('crm.clients.field.dateOfBirthOptional')}</Label>
+                  <Input
+                    id="lead-dob"
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(ev) => setDateOfBirth(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-ext">{t('crm.leads.field.externalIdOptional')}</Label>
+                  <Input
+                    id="lead-ext"
+                    value={externalId}
+                    onChange={(ev) => setExternalId(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="lead-kind">{t('crm.core.kind')}</Label>
+                  <FormSelect
+                    id="lead-kind"
+                    value={clientKind}
+                    onValueChange={setClientKind}
+                    options={[
+                      { value: 'INDIVIDUAL', label: t('crm.core.kindIndividual') },
+                      { value: 'COMPANY', label: t('crm.core.kindCompany') },
+                    ]}
+                  />
+                </div>
+                {clientKind === 'COMPANY' ? (
+                  <>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="lead-legal">{t('crm.core.companyLegal')}</Label>
+                      <Input
+                        id="lead-legal"
+                        value={companyLegal}
+                        onChange={(ev) => setCompanyLegal(ev.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="lead-tax">{t('crm.core.companyTax')}</Label>
+                      <Input
+                        id="lead-tax"
+                        value={companyTax}
+                        onChange={(ev) => setCompanyTax(ev.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : null}
+                <div className="flex items-center gap-2 sm:col-span-2">
+                  <input
+                    id="lead-mkt"
+                    type="checkbox"
+                    checked={marketingOptIn}
+                    onChange={(ev) => setMarketingOptIn(ev.target.checked)}
+                    className="h-4 w-4 rounded border"
+                  />
+                  <Label htmlFor="lead-mkt" className="font-normal">
+                    {t('crm.leads.field.marketingOptIn')}
+                  </Label>
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="lead-channel">{t('crm.core.marketingChannel')}</Label>
+                  <FormSelect
+                    id="lead-channel"
+                    value={preferredChannel}
+                    onValueChange={setPreferredChannel}
+                    allowEmpty
+                    emptyLabel={t('crm.core.marketingChannelNone')}
+                    placeholder={t('crm.core.marketingChannelNone')}
+                    extraOptions={
+                      preferredChannel &&
+                      !MARKETING_CHANNELS.some((c) => c === preferredChannel)
+                        ? [{ value: preferredChannel, label: preferredChannel }]
+                        : undefined
+                    }
+                    options={MARKETING_CHANNELS.map((c) => ({
+                      value: c,
+                      label: t(`crm.core.marketingChannelOption.${c}`),
+                    }))}
+                  />
+                </div>
+              </div>
+            </section>
+            <section
+              className="border-border space-y-4 border-t pt-8"
+              aria-labelledby="lead-create-broker-heading"
+            >
+              <div>
+                <h3
+                  id="lead-create-broker-heading"
+                  className="text-foreground text-sm font-semibold tracking-tight"
+                >
+                  {t('crm.form.sectionBroker')}
+                </h3>
+                <p className="text-muted-foreground mt-1 text-xs">{t('crm.form.sectionBrokerSubtitle')}</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2 sm:max-w-md">
+                  <Label htmlFor="lead-owner">{t('crm.core.owner')}</Label>
+                  <FormSelect
+                    id="lead-owner"
+                    value={ownerId}
+                    onValueChange={setOwnerId}
+                    allowEmpty
+                    emptyLabel={t('crm.core.noOwner')}
+                    placeholder={t('crm.core.noOwner')}
+                    options={users.map((u) => ({
+                      value: u.id,
+                      label: u.full_name ?? u.email,
+                    }))}
+                  />
+                </div>
+              </div>
+            </section>
+            <div>
               <Button type="submit" disabled={creating}>
                 {creating ? t('crm.leads.creating') : t('crm.leads.create')}
               </Button>

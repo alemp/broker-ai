@@ -204,6 +204,7 @@ class Product(Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    product_line: Mapped[str | None] = mapped_column(String(255), nullable=True)
     category: Mapped[ProductCategory] = mapped_column(
         _varchar_enum(ProductCategory),
         nullable=False,

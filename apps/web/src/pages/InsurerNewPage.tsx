@@ -15,6 +15,7 @@ export function InsurerNewPage() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,7 +29,12 @@ export function InsurerNewPage() {
     try {
       await apiFetch('/v1/insurers', {
         method: 'POST',
-        json: { name: name.trim(), code: code.trim() || undefined, active: true },
+        json: {
+          name: name.trim(),
+          code: code.trim() || undefined,
+          active: true,
+          notes: notes.trim() || undefined,
+        },
       })
       toast.success(t('toast.insurerCreated'))
       void navigate('/insurers', { replace: true })
@@ -54,18 +60,29 @@ export function InsurerNewPage() {
           <CardTitle className="text-base">{t('crm.insurers.add')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="flex flex-wrap items-end gap-3" onSubmit={onCreate}>
-            <div className="grid min-w-[200px] flex-1 gap-2">
-              <Label htmlFor="ins-name">{t('crm.insurers.name')}</Label>
-              <Input id="ins-name" value={name} onChange={(ev) => setName(ev.target.value)} />
+          <form className="space-y-4" onSubmit={onCreate}>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="grid min-w-[200px] flex-1 gap-2">
+                <Label htmlFor="ins-name">{t('crm.insurers.name')}</Label>
+                <Input id="ins-name" value={name} onChange={(ev) => setName(ev.target.value)} />
+              </div>
+              <div className="grid w-32 gap-2">
+                <Label htmlFor="ins-code">{t('crm.insurers.code')}</Label>
+                <Input id="ins-code" value={code} onChange={(ev) => setCode(ev.target.value)} />
+              </div>
+              <Button type="submit" disabled={saving || !name.trim()}>
+                {saving ? t('crm.insurers.saving') : t('crm.insurers.create')}
+              </Button>
             </div>
-            <div className="grid w-32 gap-2">
-              <Label htmlFor="ins-code">{t('crm.insurers.code')}</Label>
-              <Input id="ins-code" value={code} onChange={(ev) => setCode(ev.target.value)} />
+            <div className="grid gap-2">
+              <Label htmlFor="ins-notes">{t('crm.clientDetail.summary.notes')}</Label>
+              <textarea
+                id="ins-notes"
+                className="border-input bg-background min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+                value={notes}
+                onChange={(ev) => setNotes(ev.target.value)}
+              />
             </div>
-            <Button type="submit" disabled={saving || !name.trim()}>
-              {saving ? t('crm.insurers.saving') : t('crm.insurers.create')}
-            </Button>
           </form>
         </CardContent>
       </Card>

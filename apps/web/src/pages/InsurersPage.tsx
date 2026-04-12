@@ -125,7 +125,11 @@ export function InsurersPage() {
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link className="text-primary hover:underline" to={`/insurers/${r.id}`}>
+                        {r.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{r.code ?? '—'}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {r.active ? t('crm.insurers.active') : t('crm.insurers.inactive')}
@@ -147,7 +151,12 @@ export function InsurersPage() {
                   <Card className="border-border/80 h-full shadow-sm transition-shadow hover:shadow-md">
                     <CardContent className="flex h-full flex-col gap-3 p-4">
                       <div className="min-w-0 flex-1 space-y-2">
-                        <p className="text-foreground line-clamp-2 text-base font-semibold">{r.name}</p>
+                        <Link
+                          className="text-foreground line-clamp-2 text-base font-semibold hover:underline"
+                          to={`/insurers/${r.id}`}
+                        >
+                          {r.name}
+                        </Link>
                         <dl className="text-muted-foreground space-y-1 text-sm">
                           <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                             <dt className="text-foreground/80 font-medium">{t('crm.insurers.code')}</dt>

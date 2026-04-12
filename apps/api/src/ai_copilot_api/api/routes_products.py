@@ -7,6 +7,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from ai_copilot_api.api.deps import get_current_user
+from ai_copilot_api.db.enums import ProductCategory
 from ai_copilot_api.db.models import Insurer, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.schemas.crm import ProductCreate, ProductOut, ProductUpdate
@@ -27,23 +28,35 @@ def list_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     active_only: bool = Query(default=True),
+    category: ProductCategory | None = Query(default=None),
+    insurer_id: uuid.UUID | None = Query(default=None),
     q: str | None = Query(default=None, max_length=255),
 ) -> list[ProductOut]:
+    org_id = current_user.organization_id
     stmt = (
         select(Product)
+        .outerjoin(Insurer, Product.insurer_id == Insurer.id)
         .options(joinedload(Product.insurer))
-        .where(Product.organization_id == current_user.organization_id)
+        .where(Product.organization_id == org_id)
     )
     if active_only:
         stmt = stmt.where(Product.active.is_(True))
+    if category is not None:
+        stmt = stmt.where(Product.category == category)
+    if insurer_id is not None:
+        stmt = stmt.where(Product.insurer_id == insurer_id)
     if q and q.strip():
         pat = f"%{q.strip()}%"
         stmt = stmt.where(
             or_(
                 Product.name.ilike(pat),
+                Product.product_line.ilike(pat),
                 Product.description.ilike(pat),
                 Product.main_coverage_summary.ilike(pat),
                 Product.commercial_arguments.ilike(pat),
+                Product.exclusions_notes.ilike(pat),
+                Product.recommended_profile_summary.ilike(pat),
+                Insurer.name.ilike(pat),
             ),
         )
     stmt = stmt.order_by(Product.name)
@@ -63,6 +76,7 @@ def create_product(
     row = Product(
         organization_id=org_id,
         name=body.name,
+        product_line=body.product_line,
         category=body.category,
         description=body.description,
         risk_level=body.risk_level,

@@ -294,3 +294,65 @@ def test_recommendation_rules_catalog_lists_builtins(client: TestClient) -> None
         assert row.get("title")
         assert "description" in row
         assert isinstance(row.get("inputs"), list)
+
+
+def test_catalog_product_line_category_filter_and_insurer_products(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    code = f"CAT{uuid.uuid4().hex[:8].upper()}"
+    ins = client.post(
+        "/v1/insurers",
+        headers=headers,
+        json={"name": "Seguradora Catálogo", "code": code, "active": True},
+    )
+    assert ins.status_code == 201, ins.text
+    insurer_id = ins.json()["id"]
+
+    auto = client.post(
+        "/v1/products",
+        headers=headers,
+        json={
+            "name": "Auto Cat Test",
+            "product_line": "Particulares",
+            "category": "AUTO_INSURANCE",
+            "risk_level": "MEDIUM",
+            "active": True,
+            "insurer_id": insurer_id,
+            "main_coverage_summary": "RCO",
+        },
+    )
+    assert auto.status_code == 201, auto.text
+    assert auto.json()["product_line"] == "Particulares"
+
+    life = client.post(
+        "/v1/products",
+        headers=headers,
+        json={
+            "name": "Vida Cat Test",
+            "category": "LIFE_INSURANCE",
+            "risk_level": "LOW",
+            "active": True,
+            "insurer_id": insurer_id,
+        },
+    )
+    assert life.status_code == 201, life.text
+
+    only_life = client.get(
+        "/v1/products?category=LIFE_INSURANCE&active_only=false",
+        headers=headers,
+    )
+    assert only_life.status_code == 200
+    life_names = {row["name"] for row in only_life.json()}
+    assert "Vida Cat Test" in life_names
+    assert "Auto Cat Test" not in life_names
+
+    by_insurer = client.get(
+        f"/v1/insurers/{insurer_id}/products?active_only=false",
+        headers=headers,
+    )
+    assert by_insurer.status_code == 200
+    names = {row["name"] for row in by_insurer.json()}
+    assert names >= {"Auto Cat Test", "Vida Cat Test"}
+
+    nf = client.get(f"/v1/insurers/{uuid.uuid4()}/products", headers=headers)
+    assert nf.status_code == 404

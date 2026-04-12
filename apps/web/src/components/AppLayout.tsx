@@ -18,6 +18,7 @@ const mainNavItems = [
 
 const adminNavItems = [
   { to: '/insurers', labelKey: 'nav.insurers' as const },
+  { to: '/products', labelKey: 'nav.products' as const },
   { to: '/campaigns', labelKey: 'nav.campaigns' as const },
 ] satisfies readonly { to: string; labelKey: string }[]
 
@@ -45,6 +46,8 @@ function isAdminPath(pathname: string) {
   return (
     pathname === '/insurers' ||
     pathname.startsWith('/insurers/') ||
+    pathname === '/products' ||
+    pathname.startsWith('/products/') ||
     pathname === '/campaigns' ||
     pathname.startsWith('/campaigns/')
   )

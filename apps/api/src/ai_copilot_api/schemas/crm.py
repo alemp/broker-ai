@@ -388,6 +388,7 @@ class LeadConvertResponse(BaseModel):
 
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    product_line: str | None = Field(default=None, max_length=255)
     category: ProductCategory
     description: str | None = None
     risk_level: ProductRiskLevel
@@ -404,6 +405,7 @@ class ProductCreate(BaseModel):
 
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
+    product_line: str | None = Field(default=None, max_length=255)
     category: ProductCategory | None = None
     description: str | None = None
     risk_level: ProductRiskLevel | None = None
@@ -424,6 +426,7 @@ class ProductOut(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     name: str
+    product_line: str | None
     category: ProductCategory
     description: str | None
     risk_level: ProductRiskLevel
