@@ -30,6 +30,19 @@ type TodayInteractionRow = {
   opportunity_id: string | null
 }
 
+type AdequacySummary = {
+  total_clients: number
+  snapshot_green: number
+  snapshot_yellow: number
+  snapshot_red: number
+  clients_without_snapshot: number
+  last_job: {
+    status: string
+    finished_at: string | null
+    clients_processed: number
+  } | null
+}
+
 function todayIxPartyLink(row: TodayInteractionRow): { to: string; labelKey: string } | null {
   if (row.client_id) {
     return { to: `/clients/${row.client_id}`, labelKey: 'crm.dashboard.openClient' }
@@ -50,6 +63,9 @@ export function DashboardPage() {
   const [overdue, setOverdue] = useState<OverdueOppRow[]>([])
   const [todayIx, setTodayIx] = useState<TodayInteractionRow[]>([])
   const [panelLoading, setPanelLoading] = useState(true)
+  const [adequacySummary, setAdequacySummary] = useState<AdequacySummary | null>(null)
+  const [adequacyLoading, setAdequacyLoading] = useState(true)
+  const [jobRunning, setJobRunning] = useState(false)
 
   const loadHealth = useCallback(async () => {
     try {
@@ -71,6 +87,18 @@ export function DashboardPage() {
       }
     } catch {
       setState('error')
+    }
+  }, [])
+
+  const loadAdequacySummary = useCallback(async () => {
+    setAdequacyLoading(true)
+    try {
+      const s = await apiFetch<AdequacySummary>('/v1/dashboard/adequacy-summary')
+      setAdequacySummary(s)
+    } catch {
+      setAdequacySummary(null)
+    } finally {
+      setAdequacyLoading(false)
     }
   }, [])
 
@@ -105,10 +133,27 @@ export function DashboardPage() {
     void loadTodayPanel()
   }, [loadTodayPanel])
 
+  useEffect(() => {
+    void loadAdequacySummary()
+  }, [loadAdequacySummary])
+
   const onRefresh = () => {
     setState('loading')
     void loadHealth()
     void loadTodayPanel()
+    void loadAdequacySummary()
+  }
+
+  const onRunAdequacyJob = async () => {
+    setJobRunning(true)
+    try {
+      await apiFetch<unknown>('/v1/jobs/adequacy-refresh', { method: 'POST' })
+      await loadAdequacySummary()
+    } catch {
+      // non-blocking; user can refresh
+    } finally {
+      setJobRunning(false)
+    }
   }
 
   const statusLabel =
@@ -160,6 +205,70 @@ export function DashboardPage() {
             <Link to="/opportunities">{t('nav.opportunities')}</Link>
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold">{t('crm.dashboard.adequacyTitle')}</h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t('crm.dashboard.adequacySubtitle')}</p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={jobRunning}
+            onClick={() => void onRunAdequacyJob()}
+          >
+            {jobRunning ? t('crm.dashboard.adequacyJobRunning') : t('crm.dashboard.runAdequacyJob')}
+          </Button>
+        </div>
+        {adequacyLoading ? (
+          <div className="mt-4 space-y-2" aria-busy="true" aria-label={t('auth.loading')}>
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ) : adequacySummary ? (
+          <div className="mt-4 space-y-3 text-sm">
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <li>
+                <span className="text-muted-foreground">{t('crm.dashboard.adequacyGreen')}: </span>
+                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                  {adequacySummary.snapshot_green}
+                </span>
+              </li>
+              <li>
+                <span className="text-muted-foreground">{t('crm.dashboard.adequacyYellow')}: </span>
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  {adequacySummary.snapshot_yellow}
+                </span>
+              </li>
+              <li>
+                <span className="text-muted-foreground">{t('crm.dashboard.adequacyRed')}: </span>
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  {adequacySummary.snapshot_red}
+                </span>
+              </li>
+              <li>
+                <span className="text-muted-foreground">{t('crm.dashboard.adequacyPending')}: </span>
+                <span className="font-medium">{adequacySummary.clients_without_snapshot}</span>
+              </li>
+            </ul>
+            {adequacySummary.last_job?.finished_at ? (
+              <p className="text-muted-foreground text-xs">
+                {t('crm.dashboard.lastJob', {
+                  status: adequacySummary.last_job.status,
+                  when: new Date(adequacySummary.last_job.finished_at).toLocaleString(),
+                  count: String(adequacySummary.last_job.clients_processed),
+                })}
+              </p>
+            ) : (
+              <p className="text-muted-foreground text-xs">{t('crm.dashboard.noAdequacyJobYet')}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-muted-foreground mt-4 text-sm">{t('apiStatus.error')}</p>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

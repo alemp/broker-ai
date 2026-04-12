@@ -190,19 +190,6 @@ function profileIntStr(v: unknown): string {
   return typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
 }
 
-type LineOfBusinessDto = {
-  id: string
-  code: string
-  name: string
-}
-
-type LobLinkDto = {
-  id: string
-  line_of_business_id: string
-  ingestion_source: string
-  line_of_business: LineOfBusinessDto
-}
-
 type ProductBrief = {
   id: string
   name: string
@@ -252,6 +239,10 @@ type AdequacyDto = {
   needs_human_review: boolean
   profile_completeness_score: number
   profile_alert_codes: string[]
+  source?: string
+  computed_at?: string | null
+  inputs_hash?: string | null
+  rule_version?: string | null
 }
 
 type RecItemDto = {
@@ -291,7 +282,6 @@ type ClientDetail = {
   company_tax_id: string | null
   marketing_opt_in: boolean
   preferred_marketing_channel: string | null
-  lines_of_business: LobLinkDto[]
   held_products: HeldDto[]
   insured_persons: InsuredDto[]
   profile: Record<string, ProfileBlock>
@@ -549,12 +539,6 @@ function buildGeneralSummarySections(
   ])
 
   const portfolioItems: { label: string; value: string }[] = []
-  if (d.lines_of_business.length > 0) {
-    portfolioItems.push({
-      label: t('crm.clientDetail.summary.linesOfBusiness'),
-      value: d.lines_of_business.map((l) => l.line_of_business.name).join(', '),
-    })
-  }
   if (d.held_products.length > 0) {
     portfolioItems.push({
       label: t('crm.clientDetail.summary.heldProducts'),
@@ -602,12 +586,9 @@ export function ClientDetailPage() {
   const { t } = useTranslation('common')
   const { clientId } = useParams<{ clientId: string }>()
   const [detail, setDetail] = useState<ClientDetail | null>(null)
-  const [lobs, setLobs] = useState<LineOfBusinessDto[]>([])
   const [products, setProducts] = useState<ProductBrief[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedLob, setSelectedLob] = useState('')
-  const [addingLob, setAddingLob] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState('')
   const [insurer, setInsurer] = useState('')
   const [addingHeld, setAddingHeld] = useState(false)
@@ -681,9 +662,8 @@ export function ClientDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [d, catalog, plist, ixList, users, audits, adeq, recRuns] = await Promise.all([
+      const [d, plist, ixList, users, audits, adeq, recRuns] = await Promise.all([
           apiFetch<ClientDetail>(`/v1/clients/${clientId}`),
-          apiFetch<LineOfBusinessDto[]>('/v1/lines-of-business'),
           apiFetch<ProductBrief[]>('/v1/products'),
           apiFetch<InteractionDto[]>(`/v1/interactions?client_id=${clientId}&limit=100`),
           apiFetch<UserBrief[]>('/v1/org/users'),
@@ -806,7 +786,6 @@ export function ClientDetailPage() {
       setBehDates(profileStr(beh?.relevant_dates_note))
       setBehComm(profileStr(beh?.communication_preferences))
       setBehLifeEvents(profileStr(beh?.life_events_note))
-      setLobs(catalog)
       setProducts(plist)
       try {
         const prev = await apiFetch<RecPreviewDto>(`/v1/clients/${clientId}/recommendations`)
@@ -840,28 +819,6 @@ export function ClientDetailPage() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
-
-  const onAddLob = async (ev: React.FormEvent) => {
-    ev.preventDefault()
-    if (!clientId || !selectedLob) {
-      return
-    }
-    setAddingLob(true)
-    setError(null)
-    try {
-      await apiFetch(`/v1/clients/${clientId}/lines-of-business`, {
-        method: 'POST',
-        json: { line_of_business_id: selectedLob, ingestion_source: 'internal_crm' },
-      })
-      setSelectedLob('')
-      await loadAll()
-      toast.success(t('toast.lobAdded'))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('crm.error.generic'))
-    } finally {
-      setAddingLob(false)
-    }
-  }
 
   const onAddHeld = async (ev: React.FormEvent) => {
     ev.preventDefault()
@@ -1518,6 +1475,15 @@ export function ClientDetailPage() {
                       {adequacy.traffic_light}
                     </span>
                   </p>
+                  {adequacy.source === 'batch' && adequacy.computed_at ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t('crm.intel.adequacyBatchLine', {
+                        when: new Date(adequacy.computed_at).toLocaleString(),
+                      })}
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">{t('crm.intel.adequacyLiveLine')}</p>
+                  )}
                   <p>
                     <span className="text-muted-foreground">{t('crm.intel.summary')}: </span>
                     {adequacy.summary}
@@ -2479,65 +2445,6 @@ export function ClientDetailPage() {
             </TabsContent>
 
             <TabsContent value="portfolio" className="mt-6 space-y-6 outline-none">
-          <Card className="border-border/80 shadow-sm">
-            <CardHeader className="flex flex-row items-start gap-4 pb-2">
-              <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
-                <FolderTree className="size-5" aria-hidden />
-              </div>
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-lg tracking-tight">{t('crm.portfolio.lobTitle')}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {detail.lines_of_business.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('crm.portfolio.lobEmpty')}</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('crm.table.lineName')}</TableHead>
-                      <TableHead>{t('crm.table.code')}</TableHead>
-                      <TableHead>{t('crm.table.source')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detail.lines_of_business.map((l) => (
-                      <TableRow key={l.id}>
-                        <TableCell className="font-medium">{l.line_of_business.name}</TableCell>
-                        <TableCell className="text-muted-foreground font-mono text-sm">
-                          {l.line_of_business.code}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {translateIngestionSource(l.ingestion_source, t)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-              <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={onAddLob}>
-                <div className="grid flex-1 gap-2">
-                  <Label htmlFor="add-lob">{t('crm.portfolio.addLob')}</Label>
-                  <FormSelect
-                    id="add-lob"
-                    value={selectedLob}
-                    onValueChange={setSelectedLob}
-                    allowEmpty
-                    emptyLabel={t('crm.portfolio.selectLob')}
-                    placeholder={t('crm.portfolio.selectLob')}
-                    options={lobs.map((l) => ({
-                      value: l.id,
-                      label: `${l.code} — ${l.name}`,
-                    }))}
-                  />
-                </div>
-                <Button type="submit" disabled={addingLob || !selectedLob}>
-                  {addingLob ? t('crm.portfolio.adding') : t('crm.action.add')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
           <Card className="border-border/80 shadow-sm">
             <CardHeader className="flex flex-row items-start gap-4 pb-2">
               <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">

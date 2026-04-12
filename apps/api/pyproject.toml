@@ -1,11 +1,12 @@
 [project]
 name = "ai-copilot-api"
 version = "0.1.0"
-description = "AI Copilot HTTP API (MVP through Phase 5 client import)."
+description = "AI Copilot HTTP API (MVP through Phase 9 batch adequacy)."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.14.0",
+    "apscheduler>=3.10.4",
     "argon2-cffi>=23.1.0",
     "boto3>=1.35.0",
     "email-validator>=2.2.0",

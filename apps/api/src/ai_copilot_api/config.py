@@ -61,6 +61,11 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="AWS_ENDPOINT_URL",
     )
+    adequacy_refresh_interval_minutes: int = Field(
+        default=0,
+        validation_alias="ADEQUACY_REFRESH_INTERVAL_MINUTES",
+        description="0 disables scheduled adequacy batch; otherwise interval in minutes (Phase 9).",
+    )
 
     @field_validator("local_storage_path", mode="before")
     @classmethod

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.db.enums import AdequacyTrafficLight, ProductCategory
 from ai_copilot_api.db.models import Client, ClientHeldProduct
-from ai_copilot_api.domain.adequacy_rules import evaluate_adequacy
+from ai_copilot_api.domain.adequacy_batch import traffic_light_for_segmentation
 
 
 def _truthy_segment_flag(raw: dict[str, Any], key: str) -> bool | None:
@@ -112,8 +112,8 @@ def clients_matching_segment_criteria(
         if miss_cat is not None and not _client_missing_category(c, miss_cat):
             continue
         if max_light is not None:
-            ad = evaluate_adequacy(c)
-            if _severity(ad.traffic_light) < _severity(max_light):
+            light = traffic_light_for_segmentation(db, c)
+            if _severity(light) < _severity(max_light):
                 continue
         out.append(c)
     return out

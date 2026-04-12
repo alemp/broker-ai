@@ -3,12 +3,13 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from ai_copilot_api.db.enums import (
     AdequacyTrafficLight,
+    BatchJobStatus,
     CampaignKind,
     CampaignTouchStatus,
     ClientKind,
@@ -106,6 +107,8 @@ class ClientOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     owner: UserBrief | None = Field(default=None, validation_alias="owner")
+    adequacy_traffic_light: AdequacyTrafficLight | None = None
+    adequacy_computed_at: datetime | None = None
 
 
 class LineOfBusinessCreate(BaseModel):
@@ -679,6 +682,10 @@ class ClientAdequacyOut(BaseModel):
     needs_human_review: bool
     profile_completeness_score: int
     profile_alert_codes: list[str]
+    source: Literal["batch", "live"] = "live"
+    computed_at: datetime | None = None
+    inputs_hash: str | None = None
+    rule_version: str | None = None
 
 
 class ClientAdequacyReviewBrief(BaseModel):
@@ -748,3 +755,25 @@ class CampaignTouchPatch(BaseModel):
     status: CampaignTouchStatus | None = None
     sent_at: datetime | None = None
     notes: str | None = None
+
+
+class BatchJobRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    job_type: str
+    status: BatchJobStatus
+    started_at: datetime
+    finished_at: datetime | None
+    clients_processed: int
+    error_message: str | None
+
+
+class AdequacyDashboardSummaryOut(BaseModel):
+    total_clients: int
+    snapshot_green: int
+    snapshot_yellow: int
+    snapshot_red: int
+    clients_without_snapshot: int
+    last_job: BatchJobRunOut | None = None

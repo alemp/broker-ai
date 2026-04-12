@@ -148,10 +148,6 @@ export function ClientImportPage() {
                 </ul>
               </div>
               <div className="space-y-2">
-                <h3 className="text-foreground text-sm font-medium">{t('crm.import.guide.lobHeading')}</h3>
-                <p>{t('crm.import.guide.lobBody')}</p>
-              </div>
-              <div className="space-y-2">
                 <h3 className="text-foreground text-sm font-medium">{t('crm.import.guide.heldHeading')}</h3>
                 <p>{t('crm.import.guide.heldBody')}</p>
               </div>

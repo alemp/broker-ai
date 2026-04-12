@@ -117,3 +117,11 @@ class AdequacyTrafficLight(StrEnum):
     GREEN = "GREEN"
     YELLOW = "YELLOW"
     RED = "RED"
+
+
+class BatchJobStatus(StrEnum):
+    """Batch / scheduled job execution state (Phase 9)."""
+
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"

@@ -35,3 +35,4 @@
 
 - Pre–Phase 6 intel slice: [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md).
 - Plan: [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) §Phase 6.
+- Post–Phase 6 backlog (DB-driven rule matrix, more rules, UX): [`IMPLEMENTATION-PLAN.md`](./IMPLEMENTATION-PLAN.md) — subsection *Post–Phase 6 backlog* immediately after Phase 6.

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     SmallInteger,
@@ -26,6 +27,8 @@ from sqlalchemy.sql import text
 
 from ai_copilot_api.db.base import Base
 from ai_copilot_api.db.enums import (
+    AdequacyTrafficLight,
+    BatchJobStatus,
     CampaignKind,
     CampaignTouchStatus,
     ClientKind,
@@ -88,6 +91,10 @@ class Organization(Base):
     campaigns: Mapped[list["Campaign"]] = relationship("Campaign", back_populates="organization")
     client_import_batches: Mapped[list["ClientImportBatch"]] = relationship(
         "ClientImportBatch",
+        back_populates="organization",
+    )
+    batch_job_runs: Mapped[list["BatchJobRun"]] = relationship(
+        "BatchJobRun",
         back_populates="organization",
     )
 
@@ -393,6 +400,119 @@ class Client(Base):
         "InsuredPerson",
         back_populates="client",
         cascade="all, delete-orphan",
+    )
+    adequacy_snapshot: Mapped["ClientAdequacySnapshot | None"] = relationship(
+        "ClientAdequacySnapshot",
+        back_populates="client",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+
+class ClientAdequacySnapshot(Base):
+    """Batch-computed adequacy semáforo (Phase 9) — one row per client."""
+
+    __tablename__ = "client_adequacy_snapshots"
+    __table_args__ = (
+        UniqueConstraint("client_id", name="uq_client_adequacy_snapshots_client"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    traffic_light: Mapped[AdequacyTrafficLight] = mapped_column(
+        _varchar_enum(AdequacyTrafficLight),
+        nullable=False,
+    )
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    reasons: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        insert_default=list,
+    )
+    needs_human_review: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    profile_completeness_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    profile_alert_codes: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        insert_default=list,
+    )
+    inputs_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    client: Mapped["Client"] = relationship("Client", back_populates="adequacy_snapshot")
+
+
+class BatchJobRun(Base):
+    """Recorded execution of a batch job (Phase 9)."""
+
+    __tablename__ = "batch_job_runs"
+    __table_args__ = (
+        Index(
+            "ix_batch_job_runs_org_type_finished",
+            "organization_id",
+            "job_type",
+            "finished_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    job_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[BatchJobStatus] = mapped_column(
+        _varchar_enum(BatchJobStatus),
+        nullable=False,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    clients_processed: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    organization: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="batch_job_runs",
     )
 
 

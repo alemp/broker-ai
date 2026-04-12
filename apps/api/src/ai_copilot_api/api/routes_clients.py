@@ -10,9 +10,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ai_copilot_api.api.deps import get_current_user
-from ai_copilot_api.db.enums import ClientKind, CrmAuditAction, CrmEntityType
+from ai_copilot_api.db.enums import AdequacyTrafficLight, ClientKind, CrmAuditAction, CrmEntityType
 from ai_copilot_api.db.models import (
     Client,
+    ClientAdequacySnapshot,
     ClientHeldProduct,
     ClientLineOfBusiness,
     CrmAuditEvent,
@@ -22,7 +23,7 @@ from ai_copilot_api.db.models import (
     User,
 )
 from ai_copilot_api.db.session import get_db
-from ai_copilot_api.domain.adequacy_rules import evaluate_adequacy
+from ai_copilot_api.domain.adequacy_batch import effective_adequacy_assessment
 from ai_copilot_api.domain.client_profile import (
     completeness_score,
     merge_profile_dict,
@@ -164,6 +165,10 @@ def list_clients(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=_MAX_PAGE),
     q: str | None = Query(default=None, max_length=200),
+    adequacy_traffic_light: AdequacyTrafficLight | None = Query(
+        default=None,
+        description="When set, only clients whose last batch snapshot matches this semáforo",
+    ),
 ) -> list[ClientOut]:
     stmt = (
         select(Client)
@@ -173,9 +178,35 @@ def list_clients(
     if q and q.strip():
         pat = f"%{q.strip()}%"
         stmt = stmt.where(or_(Client.full_name.ilike(pat), Client.email.ilike(pat)))
+    if adequacy_traffic_light is not None:
+        stmt = stmt.join(ClientAdequacySnapshot).where(
+            ClientAdequacySnapshot.traffic_light == adequacy_traffic_light,
+        )
     stmt = stmt.order_by(Client.updated_at.desc()).offset(skip).limit(limit)
-    rows = db.scalars(stmt).all()
-    return [ClientOut.model_validate(r) for r in rows]
+    rows = db.scalars(stmt).unique().all()
+    ids = [r.id for r in rows]
+    snaps: dict[uuid.UUID, ClientAdequacySnapshot] = {}
+    if ids:
+        for snap in db.scalars(
+            select(ClientAdequacySnapshot).where(ClientAdequacySnapshot.client_id.in_(ids)),
+        ).all():
+            snaps[snap.client_id] = snap
+    out: list[ClientOut] = []
+    for r in rows:
+        base = ClientOut.model_validate(r)
+        s = snaps.get(r.id)
+        if s is not None:
+            out.append(
+                base.model_copy(
+                    update={
+                        "adequacy_traffic_light": s.traffic_light,
+                        "adequacy_computed_at": s.computed_at,
+                    },
+                ),
+            )
+        else:
+            out.append(base)
+    return out
 
 
 @router.get("/adequacy-review-queue", response_model=list[ClientAdequacyReviewBrief])
@@ -197,7 +228,7 @@ def list_adequacy_review_queue(
     rows = db.scalars(stmt).unique().all()
     out: list[ClientAdequacyReviewBrief] = []
     for row in rows:
-        ad = evaluate_adequacy(row)
+        ad = effective_adequacy_assessment(db, row)
         if not ad.needs_human_review:
             continue
         out.append(

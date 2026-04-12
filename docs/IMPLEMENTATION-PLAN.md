@@ -1,6 +1,6 @@
 # Implementation plan (MVP)
 
-**Status:** **Phases 0–6** are implemented in-repo (Phase 5: [`PHASE-5.md`](./PHASE-5.md); Phase 6: [`PHASE-6.md`](./PHASE-6.md)), plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 7+** remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
+**Status:** **Phases 0–6** and **Phase 9** are implemented in-repo (Phase 5: [`PHASE-5.md`](./PHASE-5.md); Phase 6: [`PHASE-6.md`](./PHASE-6.md); Phase 9: [`PHASE-9.md`](./PHASE-9.md)), plus **PRODUCT §5.2 (pre–Phase 5)** — leads, client broker assignment (`owner_id`), individual vs company client, insured persons (`InsuredPerson`), append-only CRM audit trail, lead→client conversion (optional opportunity), `GET /v1/org/users`, and matching web flows. **Phase 7–8, 10+** remain as planned until executed. See [`PHASE-0-STACK.md`](./PHASE-0-STACK.md), [`PHASE-1-AUTH.md`](./PHASE-1-AUTH.md), [`PHASE-2-CRM.md`](./PHASE-2-CRM.md), [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`PHASE-4-INTERACTIONS.md`](./PHASE-4-INTERACTIONS.md), and [`DEVELOPMENT.md`](./DEVELOPMENT.md).  
 **Living checklist:** Stakeholder scope from [`PRODUCT.md`](./PRODUCT.md) vs repo status is maintained in [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) — update that file when phases ship or scope shifts.  
 **Authority:** Decisions and constraints live in [`IMPLEMENTATION-SPEC.md`](./IMPLEMENTATION-SPEC.md). Long-range progression (MVP → final product, CRM ingress) is in [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md). This file turns them into phased work, dependencies, and acceptance checks.
 
@@ -169,7 +169,7 @@
 
 **Status:** **Done** — see [`PHASE-6.md`](./PHASE-6.md).
 
-**Pre–Phase 6 slice (shipped before this phase):** PRODUCT §5.6–§5.9 MVP backend + web parcial — `Insurer` master, produtos enriquecidos, `recommendation_runs` + feedback, semáforo + fila de revisão, campanhas/toques, consentimento de marketing no cliente. Ver [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md). **Post–Phase 6 backlog:** parametrização avançada (matriz DB-driven), mais regras, UX adicional.
+**Pre–Phase 6 slice (shipped before this phase):** PRODUCT §5.6–§5.9 MVP backend + web parcial — `Insurer` master, produtos enriquecidos, `recommendation_runs` + feedback, semáforo + fila de revisão, campanhas/toques, consentimento de marketing no cliente. Ver [`PHASE-PRE6-MODULES-56-59.md`](./PHASE-PRE6-MODULES-56-59.md). **Post–Phase 6 backlog** (parametrização avançada, mais regras, UX adicional): ver subsecção **Post–Phase 6 backlog** logo abaixo.
 
 **Goal:** Explainable recommendations from client attributes **and** portfolio (LOB + held products) **and profile fields** where available.
 
@@ -183,6 +183,47 @@
 **Exit criteria:** Changing a rule changes output predictably; UI shows why a product was suggested; **at least one** demo rule uses portfolio data (e.g. cross-sell gap); **at least one** demo rule uses a profile field **or** documented fallback when profile not yet populated.
 
 **Depends on:** Phase 2 (portfolio model); **Phase 3** recommended before production cut of rules-rich MVP; Phase 5 optional for bulk-loaded clients.
+
+---
+
+### Post–Phase 6 backlog — DB-driven parametrization, rule catalog, and UX
+
+**Status:** **Tracked** — not part of the closed Phase 6 milestone; ships as one or more follow-up increments after [`PHASE-6.md`](./PHASE-6.md) (code-defined rules in `recommendation_rules.py`, `GET /v1/recommendation-rules`, explainable UI).
+
+**Goal:** Move from **deploy-only** rule tuning to **broker-operable** configuration where safe, grow the **catalog** of consultative rules with tests, and deepen **UX** for transparency and operations — without arbitrary code execution from the database.
+
+#### 1) Advanced parametrization (DB-driven matrix)
+
+| Theme | Direction |
+|-------|-----------|
+| **Separation of concerns** | Keep **rule logic** in versioned application code (typed conditions, no `eval` of strings). Store **parameters** the logic reads (thresholds, allowed `product_id` / LOB codes, copy templates, relative priorities) in **Postgres** — the “matrix”. |
+| **Schema shape (illustrative)** | Rows keyed by `rule_id` (+ optional `organization_id` for future multi-tenant rule packs), JSON payload validated against a **JSON Schema** per rule family, plus metadata: `status` (draft / published), `effective_from` / `effective_to`, `updated_at`, actor for audit. |
+| **Evaluation** | At runtime, evaluator loads builtin rule + **merges** DB params; missing or invalid params → safe fallback or skip with logged detail. **Reject** storing executable expressions or raw code in DB for this backlog slice. |
+| **Migration** | Incrementally **extract literals** from `recommendation_rules.py` into seeded matrix rows + Alembic; feature-flag or env to compare old vs new output in staging. |
+| **Governance** | Align with **Phase 10**: who may publish, immutable history or append-only audit for matrix changes, optional “preview run” before effective date. |
+
+#### 2) More rules
+
+| Theme | Direction |
+|-------|-----------|
+| **Catalog growth** | Add domain packs (e.g. SME guarantees, life riders, cross-line bundles) as new `rule_id`s with the same **explainability contract** (`rule_ids`, `rule_trace`, structured rationale fields). |
+| **Quality bar** | Each rule: **unit tests** with frozen portfolio + profile fixtures; regression on `rule_trace` for fired / not-fired cases; update **`GET /v1/recommendation-rules`** metadata (`inputs`, description) when behavior or inputs change. |
+| **Operations** | Optional later: analytics on **fire rate** / “never fired in N days” to retire or refactor stale rules. |
+
+#### 3) Additional UX
+
+| Theme | Direction |
+|-------|-----------|
+| **Matrix admin** | Role-gated UI (or internal tool) to edit **published parameters** within schema validation; clear **draft vs published** workflow. |
+| **Preview** | “Run recommendations as if draft params were live” for a selected client or opportunity (read-only, no silent prod impact). |
+| **Explainability** | Client / opportunity surfaces: filter trace to **fired rules only**; optional export-friendly summary for training or compliance conversations. |
+| **Discoverability** | Link from Intel / recommendation panels to **rule catalog** (`/v1/recommendation-rules`) descriptions where it helps brokers trust the engine. |
+
+**Dependencies:** Phase 6 (current engine and API); Phase 3 for richer inputs into new rules; Phase 5 for bulk-loaded clients in tests; Phase 10 for audit and access control on matrix edits.
+
+**Exit criteria (when this backlog is delivered):** At least one production path reads **parameters from the DB**; brokers (or designated operators) can change a **documented knob** without an application deploy; new rules ship with tests + updated rule catalog metadata; UX includes **preview** and/or an explicit **publish** step for matrix changes.
+
+**Explicit non-goals for this backlog:** End-user-authored arbitrary rule expressions from the DB; a full visual rule builder (revisit in a later roadmap item).
 
 ---
 
@@ -244,16 +285,18 @@
 
 ### Phase 9 — Batch scoring and dashboard
 
+**Status:** **Done** — see [`PHASE-9.md`](./PHASE-9.md).
+
 **Goal:** “High potential” and similar flags without real-time streaming; **adequacy semáforo** (green/yellow/red) per [`PRODUCT.md`](./PRODUCT.md) §5.8 as explicit scored output + explanation where feasible.
 
 | Work item | Notes |
 |-----------|--------|
-| Job scheduler | Cron or queue worker on interval. |
-| Scoring rules | Versionable; log inputs snapshot or hash for debugging; map to **adequacy** states + human-readable reason. |
-| API | Expose scores/flags on list endpoints or dedicated resource. |
-| Web | Dashboard widgets / filters on opportunities or clients. |
+| Job scheduler | Optional APScheduler interval via `ADEQUACY_REFRESH_INTERVAL_MINUTES` (0 = off); manual `POST /v1/jobs/adequacy-refresh`. |
+| Scoring rules | Reuses `evaluate_adequacy`; **rule_version** + **inputs_hash** on each snapshot row. |
+| API | `client_adequacy_snapshots`, `batch_job_runs`; list filter `adequacy_traffic_light`; dashboard summary + last job. |
+| Web | Início: counts + last job + trigger batch; client list semáforo + filter. |
 
-**Exit criteria:** Scores refresh on schedule; UI reflects last job run time; semáforo or equivalent flags documented for stakeholders.
+**Exit criteria:** Scores refresh on schedule (when configured) or on demand; UI reflects last job run time; semáforo counts and per-client flags on list.
 
 **Depends on:** Phase 2; Phase 6 optional for richer signals; **Phase 3** improves signal quality.
 
@@ -331,7 +374,8 @@ All relevant → Phase 10
 | [`PRODUCT.md`](./PRODUCT.md) | Stakeholder product brief (Portuguese); §5.3 / §5.5 referenced by Phases 3–4 |
 | [`PHASE-5.md`](./PHASE-5.md) | CSV/Excel client import (Phase 5) |
 | [`PHASE-6.md`](./PHASE-6.md) | Rule engine + explainable recommendations (Phase 6) |
-| **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan** |
+| [`PHASE-9.md`](./PHASE-9.md) | Batch adequacy semáforo, job audit, dashboard summary (Phase 9) |
+| **`IMPLEMENTATION-PLAN.md`** | **This file — phased plan**; **Post–Phase 6 backlog** (DB-driven rule matrix, more rules, UX) in §4 after Phase 6 |
 | [`OPPORTUNITY.md`](./OPPORTUNITY.md) | Opportunity domain attributes |
 | [`PDF-UPLOAD.md`](./PDF-UPLOAD.md), [`EXTRACTION.md`](./EXTRACTION.md) | Document flows |
 

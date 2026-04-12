@@ -6,6 +6,8 @@ import { CrmListCardHeader } from '@/components/CrmListCardHeader'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { FormSelect } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -26,6 +28,8 @@ type ClientListItem = {
   email: string | null
   client_kind: string
   owner: UserBrief | null
+  adequacy_traffic_light?: string | null
+  adequacy_computed_at?: string | null
 }
 
 function clientKindLabel(kind: string, translate: (key: string) => string): string {
@@ -45,6 +49,19 @@ function brokerLabel(owner: UserBrief | null, translate: (key: string) => string
   return owner.full_name?.trim() || owner.email
 }
 
+function adequacyBadgeClass(light: string): string {
+  if (light === 'RED') {
+    return 'font-medium text-red-600 dark:text-red-400'
+  }
+  if (light === 'YELLOW') {
+    return 'font-medium text-amber-600 dark:text-amber-400'
+  }
+  if (light === 'GREEN') {
+    return 'font-medium text-emerald-600 dark:text-emerald-400'
+  }
+  return 'text-muted-foreground'
+}
+
 export function ClientsPage() {
   const { t } = useTranslation('common')
   const [items, setItems] = useState<ClientListItem[]>([])
@@ -53,6 +70,7 @@ export function ClientsPage() {
   const [listSearch, setListSearch] = useState('')
   const debouncedListSearch = useDebouncedValue(listSearch, 350)
   const [viewMode, setViewMode] = usePersistedListViewMode(LIST_VIEW_STORAGE_KEY)
+  const [adequacyFilter, setAdequacyFilter] = useState('')
 
   const loadClients = useCallback(async () => {
     setLoading(true)
@@ -63,6 +81,9 @@ export function ClientsPage() {
       if (q) {
         params.set('q', q)
       }
+      if (adequacyFilter) {
+        params.set('adequacy_traffic_light', adequacyFilter)
+      }
       const qs = params.toString()
       const data = await apiFetch<ClientListItem[]>(qs ? `/v1/clients?${qs}` : '/v1/clients')
       setItems(data)
@@ -71,7 +92,7 @@ export function ClientsPage() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedListSearch, t])
+  }, [adequacyFilter, debouncedListSearch, t])
 
   useEffect(() => {
     void loadClients()
@@ -104,6 +125,24 @@ export function ClientsPage() {
           onSearchChange={setListSearch}
           searchPlaceholder={t('crm.clients.listSearch')}
           searchAriaLabel={t('crm.clients.listSearchAria')}
+          beforeSearch={
+            <div className="grid max-w-md gap-2">
+              <Label htmlFor="clients-filter-adequacy">{t('crm.clients.filterAdequacy')}</Label>
+              <FormSelect
+                id="clients-filter-adequacy"
+                value={adequacyFilter}
+                onValueChange={setAdequacyFilter}
+                allowEmpty
+                emptyLabel={t('crm.clients.filterAdequacyAll')}
+                placeholder={t('crm.clients.filterAdequacyAll')}
+                options={[
+                  { value: 'GREEN', label: t('crm.dashboard.adequacyGreen') },
+                  { value: 'YELLOW', label: t('crm.dashboard.adequacyYellow') },
+                  { value: 'RED', label: t('crm.dashboard.adequacyRed') },
+                ]}
+              />
+            </div>
+          }
         />
         <CardContent>
           {loading ? (
@@ -153,6 +192,7 @@ export function ClientsPage() {
                   <TableHead>{t('crm.clients.field.name')}</TableHead>
                   <TableHead>{t('crm.clients.tableType')}</TableHead>
                   <TableHead>{t('crm.clients.tableBroker')}</TableHead>
+                  <TableHead>{t('crm.clients.tableAdequacy')}</TableHead>
                   <TableHead className="w-[1%] whitespace-nowrap text-right">
                     {t('crm.clients.tableActions')}
                   </TableHead>
@@ -171,6 +211,9 @@ export function ClientsPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {brokerLabel(c.owner, t)}
+                    </TableCell>
+                    <TableCell className={adequacyBadgeClass(c.adequacy_traffic_light ?? '')}>
+                      {c.adequacy_traffic_light ?? t('crm.clients.adequacyDash')}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" asChild>
@@ -202,6 +245,12 @@ export function ClientsPage() {
                           <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                             <dt className="text-foreground/80 font-medium">{t('crm.clients.tableBroker')}</dt>
                             <dd className="min-w-0 break-words">{brokerLabel(c.owner, t)}</dd>
+                          </div>
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                            <dt className="text-foreground/80 font-medium">{t('crm.clients.tableAdequacy')}</dt>
+                            <dd className={adequacyBadgeClass(c.adequacy_traffic_light ?? '')}>
+                              {c.adequacy_traffic_light ?? t('crm.clients.adequacyDash')}
+                            </dd>
                           </div>
                         </dl>
                       </div>

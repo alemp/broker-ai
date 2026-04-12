@@ -23,3 +23,8 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def new_session() -> Session:
+    """Standalone session for background jobs (caller must close)."""
+    return _session_factory()()

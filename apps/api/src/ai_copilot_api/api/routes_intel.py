@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -17,7 +17,7 @@ from ai_copilot_api.db.models import (
     User,
 )
 from ai_copilot_api.db.session import get_db
-from ai_copilot_api.domain.adequacy_rules import evaluate_adequacy
+from ai_copilot_api.domain.adequacy_batch import resolve_adequacy_for_api
 from ai_copilot_api.domain.recommendation_rules import (
     evaluate_rules_for_client,
     load_client_for_intel,
@@ -139,11 +139,15 @@ def _run_to_out(row: RecommendationRun) -> RecommendationRunOut:
 @router.get("/{client_id}/adequacy", response_model=ClientAdequacyOut)
 def get_client_adequacy(
     client_id: uuid.UUID,
+    source: Literal["batch_first", "live"] = Query(
+        default="batch_first",
+        description="batch_first: use last batch snapshot when present; live: always recompute",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ClientAdequacyOut:
     row = _client_or_404(db, current_user.organization_id, client_id)
-    ad = evaluate_adequacy(row)
+    ad, src, computed_at, inputs_hash, rule_version = resolve_adequacy_for_api(db, row, source)
     return ClientAdequacyOut(
         traffic_light=ad.traffic_light,
         summary=ad.summary,
@@ -151,6 +155,10 @@ def get_client_adequacy(
         needs_human_review=ad.needs_human_review,
         profile_completeness_score=ad.profile_completeness_score,
         profile_alert_codes=ad.profile_alert_codes,
+        source=src,
+        computed_at=computed_at,
+        inputs_hash=inputs_hash,
+        rule_version=rule_version,
     )
 
 

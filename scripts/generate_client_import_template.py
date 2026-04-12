@@ -37,7 +37,6 @@ def main() -> None:
         "NIF",
         "Consentimento marketing",
         "Canal preferido",
-        "Linhas de negócio",
         "Produtos detidos",
         "Perfil JSON",
         "Segurados JSON",
@@ -64,12 +63,11 @@ def main() -> None:
         "",
         "",
         "",
-        "",
     ]
     ws.append(example)
     ws.freeze_panes = "A2"
 
-    widths = [22, 28, 14, 16, 40, 28, 14, 28, 14, 16, 22, 24, 48, 20, 28]
+    widths = [22, 28, 14, 16, 40, 28, 14, 28, 14, 16, 22, 48, 20, 28]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -124,10 +122,6 @@ def main() -> None:
             "Canal de contato de marketing. Também: preferred_marketing_channel, canal_marketing.",
         ),
         (
-            "Linhas de negócio",
-            "Códigos na app, separados por vírgula ou ;. Vazio se não usar. Também: lob_codes.",
-        ),
-        (
             "Produtos detidos",
             "Carteira: vários produtos separados por ;. Cada um: produto|seguradora|estado|início|fim "
             "(AAAA-MM-DD). Também: held_products.",
@@ -146,8 +140,8 @@ def main() -> None:
         ),
         (
             "Validação",
-            "Use Visualizar na aplicação antes de confirmar. Códigos LOB e nomes de produtos são "
-            "validados com o catálogo da sua corretora.",
+            "Use Visualizar na aplicação antes de confirmar. Nomes de produtos são validados com o "
+            "catálogo da sua corretora.",
         ),
     ]
 
