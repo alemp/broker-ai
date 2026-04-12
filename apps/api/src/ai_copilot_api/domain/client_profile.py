@@ -100,14 +100,22 @@ def profile_alerts(profile: ClientInsuranceProfile) -> list[str]:
     if per is not None:
         if per.number_of_children is not None and per.number_of_children > 0 and not per.life_stage:
             codes.append("life_stage_missing_when_children")
+        if per.number_of_children is not None and per.number_of_children > 0:
+            ages = (per.children_ages_summary or "").strip()
+            if not ages:
+                codes.append("children_ages_missing_when_children")
     res = profile.residence
     if res is not None:
         if res.owns_property is True and not res.property_type:
             codes.append("property_type_missing_when_owns_property")
+        if res.owns_property is True and not (res.property_use and str(res.property_use).strip()):
+            codes.append("property_use_missing_when_owns_property")
     mob = profile.mobility
     if mob is not None:
         if mob.owns_vehicle is True and not mob.vehicle_primary_use:
             codes.append("vehicle_use_missing_when_owns_vehicle")
+        if mob.owns_vehicle is True and not (mob.vehicle_type and str(mob.vehicle_type).strip()):
+            codes.append("vehicle_type_missing_when_owns_vehicle")
     pro = profile.professional
     if pro is not None:
         if pro.employment_type and not pro.profession:

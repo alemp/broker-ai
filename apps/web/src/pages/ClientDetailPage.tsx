@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom'
 import {
   Briefcase,
   Building2,
+  Car,
   ClipboardCheck,
   ClipboardList,
   Contact,
@@ -78,6 +79,26 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: 'owned' },
   { value: 'financed' },
   { value: 'rented' },
+] as const
+
+const PROPERTY_USE_OPTIONS = [
+  { value: 'primary_residence' },
+  { value: 'rental_income' },
+  { value: 'vacation' },
+] as const
+
+const PROPERTY_STYLE_OPTIONS = [
+  { value: 'condo' },
+  { value: 'house' },
+] as const
+
+const MARITAL_STATUS_OPTIONS = [
+  { value: 'single' },
+  { value: 'married' },
+  { value: 'civil_union' },
+  { value: 'divorced' },
+  { value: 'widowed' },
+  { value: 'other' },
 ] as const
 
 const VEHICLE_PRIMARY_USE_OPTIONS = [
@@ -177,7 +198,7 @@ function ProfileInsuranceBlock({
           ) : null}
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+      <div className="grid min-w-0 grid-cols-2 gap-4">{children}</div>
     </section>
   )
 }
@@ -385,12 +406,19 @@ function buildGeneralSummarySections(
   const res = d.profile.residence as Record<string, unknown> | null | undefined
   const mob = d.profile.mobility as Record<string, unknown> | null | undefined
 
-  add('personal', t('crm.clientDetail.summary.sectionPersonal'), Home, [
+  add('family', t('crm.clientDetail.summary.sectionFamily'), Users, [
     {
       label: t('crm.profile.lifeStage'),
       value:
         typeof per?.life_stage === 'string' && per.life_stage
           ? i18nProfileOption('crm.profile.lifeStageOption', per.life_stage, t)
+          : null,
+    },
+    {
+      label: t('crm.profile.maritalStatus'),
+      value:
+        typeof per?.marital_status === 'string' && per.marital_status
+          ? i18nProfileOption('crm.profile.maritalStatusOption', per.marital_status, t)
           : null,
     },
     {
@@ -400,6 +428,28 @@ function buildGeneralSummarySections(
           ? String(per.number_of_children)
           : null,
     },
+    {
+      label: t('crm.profile.childrenAgesSummary'),
+      value: profileStr(per?.children_ages_summary) || null,
+    },
+    {
+      label: t('crm.profile.financialDependents'),
+      value:
+        typeof per?.financial_dependents === 'number' && Number.isFinite(per.financial_dependents)
+          ? String(per.financial_dependents)
+          : null,
+    },
+    {
+      label: t('crm.profile.mainIncomeProvider'),
+      value: profileStr(per?.main_income_provider) || null,
+    },
+    {
+      label: t('crm.profile.hasPartner'),
+      value: triBoolToLabel(per?.has_partner, t),
+    },
+  ])
+
+  add('property', t('crm.clientDetail.summary.sectionProperty'), Home, [
     {
       label: t('crm.profile.ownsProperty'),
       value: triBoolToLabel(res?.owns_property, t),
@@ -412,8 +462,55 @@ function buildGeneralSummarySections(
           : null,
     },
     {
+      label: t('crm.profile.propertyUse'),
+      value:
+        typeof res?.property_use === 'string' && res.property_use
+          ? i18nProfileOption('crm.profile.propertyUseOption', res.property_use, t)
+          : null,
+    },
+    {
+      label: t('crm.profile.propertyValueBand'),
+      value: profileStr(res?.property_value_band) || null,
+    },
+    {
+      label: t('crm.profile.propertyLocation'),
+      value: profileStr(res?.property_location) || null,
+    },
+    {
+      label: t('crm.profile.propertyStyle'),
+      value:
+        typeof res?.property_style === 'string' && res.property_style
+          ? i18nProfileOption('crm.profile.propertyStyleOption', res.property_style, t)
+          : null,
+    },
+    {
+      label: t('crm.profile.highValueItems'),
+      value: triBoolToLabel(res?.high_value_items, t),
+    },
+  ])
+
+  add('vehicle', t('crm.clientDetail.summary.sectionVehicle'), Car, [
+    {
       label: t('crm.profile.ownsVehicle'),
       value: triBoolToLabel(mob?.owns_vehicle, t),
+    },
+    {
+      label: t('crm.profile.vehicleCount'),
+      value:
+        typeof mob?.vehicle_count === 'number' && Number.isFinite(mob.vehicle_count)
+          ? String(mob.vehicle_count)
+          : null,
+    },
+    {
+      label: t('crm.profile.vehicleType'),
+      value: profileStr(mob?.vehicle_type) || null,
+    },
+    {
+      label: t('crm.profile.vehicleYear'),
+      value:
+        typeof mob?.vehicle_year === 'number' && Number.isFinite(mob.vehicle_year)
+          ? String(mob.vehicle_year)
+          : null,
     },
     {
       label: t('crm.profile.vehicleUse'),
@@ -421,6 +518,18 @@ function buildGeneralSummarySections(
         typeof mob?.vehicle_primary_use === 'string' && mob.vehicle_primary_use
           ? i18nProfileOption('crm.profile.vehicleUseOption', mob.vehicle_primary_use, t)
           : null,
+    },
+    {
+      label: t('crm.profile.primaryDriver'),
+      value: profileStr(mob?.primary_driver) || null,
+    },
+    {
+      label: t('crm.profile.hasGarage'),
+      value: triBoolToLabel(mob?.has_garage, t),
+    },
+    {
+      label: t('crm.profile.circulationCity'),
+      value: profileStr(mob?.circulation_city) || null,
     },
   ])
 
@@ -598,6 +707,22 @@ export function ClientDetailPage() {
   const [propertyType, setPropertyType] = useState('')
   const [ownsVehicle, setOwnsVehicle] = useState('')
   const [vehicleUse, setVehicleUse] = useState('')
+  const [maritalStatus, setMaritalStatus] = useState('')
+  const [childrenAgesSummary, setChildrenAgesSummary] = useState('')
+  const [financialDependents, setFinancialDependents] = useState('')
+  const [mainIncomeProvider, setMainIncomeProvider] = useState('')
+  const [hasPartner, setHasPartner] = useState('')
+  const [propertyUse, setPropertyUse] = useState('')
+  const [propertyValueBand, setPropertyValueBand] = useState('')
+  const [propertyLocation, setPropertyLocation] = useState('')
+  const [propertyStyle, setPropertyStyle] = useState('')
+  const [highValueItems, setHighValueItems] = useState('')
+  const [vehicleCount, setVehicleCount] = useState('')
+  const [vehicleType, setVehicleType] = useState('')
+  const [vehicleYear, setVehicleYear] = useState('')
+  const [primaryDriver, setPrimaryDriver] = useState('')
+  const [hasGarage, setHasGarage] = useState('')
+  const [circulationCity, setCirculationCity] = useState('')
   const [profProfession, setProfProfession] = useState('')
   const [profEmployment, setProfEmployment] = useState('')
   const [profIncomeBand, setProfIncomeBand] = useState('')
@@ -692,6 +817,19 @@ export function ClientDetailPage() {
       setNumChildren(
         typeof per?.number_of_children === 'number' ? String(per.number_of_children) : '',
       )
+      setMaritalStatus(typeof per?.marital_status === 'string' ? per.marital_status : '')
+      setChildrenAgesSummary(profileStr(per?.children_ages_summary))
+      setFinancialDependents(
+        typeof per?.financial_dependents === 'number' ? String(per.financial_dependents) : '',
+      )
+      setMainIncomeProvider(profileStr(per?.main_income_provider))
+      if (per?.has_partner === true) {
+        setHasPartner('yes')
+      } else if (per?.has_partner === false) {
+        setHasPartner('no')
+      } else {
+        setHasPartner('')
+      }
       if (res?.owns_property === true) {
         setOwnsProperty('yes')
       } else if (res?.owns_property === false) {
@@ -700,6 +838,17 @@ export function ClientDetailPage() {
         setOwnsProperty('')
       }
       setPropertyType(typeof res?.property_type === 'string' ? res.property_type : '')
+      setPropertyUse(typeof res?.property_use === 'string' ? res.property_use : '')
+      setPropertyValueBand(profileStr(res?.property_value_band))
+      setPropertyLocation(profileStr(res?.property_location))
+      setPropertyStyle(typeof res?.property_style === 'string' ? res.property_style : '')
+      if (res?.high_value_items === true) {
+        setHighValueItems('yes')
+      } else if (res?.high_value_items === false) {
+        setHighValueItems('no')
+      } else {
+        setHighValueItems('')
+      }
       if (mob?.owns_vehicle === true) {
         setOwnsVehicle('yes')
       } else if (mob?.owns_vehicle === false) {
@@ -708,6 +857,20 @@ export function ClientDetailPage() {
         setOwnsVehicle('')
       }
       setVehicleUse(typeof mob?.vehicle_primary_use === 'string' ? mob.vehicle_primary_use : '')
+      setVehicleCount(
+        typeof mob?.vehicle_count === 'number' ? String(mob.vehicle_count) : '',
+      )
+      setVehicleType(profileStr(mob?.vehicle_type))
+      setVehicleYear(typeof mob?.vehicle_year === 'number' ? String(mob.vehicle_year) : '')
+      setPrimaryDriver(profileStr(mob?.primary_driver))
+      if (mob?.has_garage === true) {
+        setHasGarage('yes')
+      } else if (mob?.has_garage === false) {
+        setHasGarage('no')
+      } else {
+        setHasGarage('')
+      }
+      setCirculationCity(profileStr(mob?.circulation_city))
       const pro = d.profile.professional as Record<string, unknown> | null | undefined
       setProfProfession(profileStr(pro?.profession))
       setProfEmployment(profileStr(pro?.employment_type))
@@ -865,6 +1028,27 @@ export function ClientDetailPage() {
           personal.number_of_children = n
         }
       }
+      if (maritalStatus.trim()) {
+        personal.marital_status = maritalStatus.trim()
+      }
+      if (childrenAgesSummary.trim()) {
+        personal.children_ages_summary = childrenAgesSummary.trim()
+      }
+      if (financialDependents.trim() !== '') {
+        const n = parseInt(financialDependents, 10)
+        if (!Number.isNaN(n)) {
+          personal.financial_dependents = n
+        }
+      }
+      if (mainIncomeProvider.trim()) {
+        personal.main_income_provider = mainIncomeProvider.trim()
+      }
+      if (hasPartner === 'yes') {
+        personal.has_partner = true
+      }
+      if (hasPartner === 'no') {
+        personal.has_partner = false
+      }
       const residence: Record<string, unknown> = {}
       if (ownsProperty === 'yes') {
         residence.owns_property = true
@@ -875,6 +1059,24 @@ export function ClientDetailPage() {
       if (propertyType.trim()) {
         residence.property_type = propertyType.trim()
       }
+      if (propertyUse.trim()) {
+        residence.property_use = propertyUse.trim()
+      }
+      if (propertyValueBand.trim()) {
+        residence.property_value_band = propertyValueBand.trim()
+      }
+      if (propertyLocation.trim()) {
+        residence.property_location = propertyLocation.trim()
+      }
+      if (propertyStyle.trim()) {
+        residence.property_style = propertyStyle.trim()
+      }
+      if (highValueItems === 'yes') {
+        residence.high_value_items = true
+      }
+      if (highValueItems === 'no') {
+        residence.high_value_items = false
+      }
       const mobility: Record<string, unknown> = {}
       if (ownsVehicle === 'yes') {
         mobility.owns_vehicle = true
@@ -884,6 +1086,33 @@ export function ClientDetailPage() {
       }
       if (vehicleUse.trim()) {
         mobility.vehicle_primary_use = vehicleUse.trim()
+      }
+      if (vehicleCount.trim() !== '') {
+        const n = parseInt(vehicleCount, 10)
+        if (!Number.isNaN(n)) {
+          mobility.vehicle_count = n
+        }
+      }
+      if (vehicleType.trim()) {
+        mobility.vehicle_type = vehicleType.trim()
+      }
+      if (vehicleYear.trim() !== '') {
+        const y = parseInt(vehicleYear, 10)
+        if (!Number.isNaN(y)) {
+          mobility.vehicle_year = y
+        }
+      }
+      if (primaryDriver.trim()) {
+        mobility.primary_driver = primaryDriver.trim()
+      }
+      if (hasGarage === 'yes') {
+        mobility.has_garage = true
+      }
+      if (hasGarage === 'no') {
+        mobility.has_garage = false
+      }
+      if (circulationCity.trim()) {
+        mobility.circulation_city = circulationCity.trim()
       }
       const professional: Record<string, unknown> = {}
       if (profProfession.trim()) {
@@ -1827,25 +2056,29 @@ export function ClientDetailPage() {
                     <p className="text-muted-foreground text-sm">{t('crm.profile.noAlerts')}</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {detail.profile_alerts.map((code) => (
-                        <span
-                          key={code}
-                          className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-950 dark:text-amber-100"
-                        >
-                          {code}
-                        </span>
-                      ))}
+                      {detail.profile_alerts.map((code) => {
+                        const alertKey = `crm.profile.alert.${code}`
+                        const alertLabel = t(alertKey)
+                        return (
+                          <span
+                            key={code}
+                            className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-950 dark:text-amber-100"
+                          >
+                            {alertLabel === alertKey ? code : alertLabel}
+                          </span>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
               </div>
               <form className="space-y-6" onSubmit={onSaveProfile}>
                 <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.personal')}
-                  subtitle={t('crm.profile.insuranceSection.personalHint')}
-                  icon={Home}
+                  title={t('crm.profile.insuranceSection.family')}
+                  subtitle={t('crm.profile.insuranceSection.familyHint')}
+                  icon={Users}
                 >
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-life">{t('crm.profile.lifeStage')}</Label>
                   <FormSelect
                     id="pf-life"
@@ -1877,6 +2110,75 @@ export function ClientDetailPage() {
                   />
                 </div>
                 <div className="grid gap-2">
+                  <Label htmlFor="pf-marital">{t('crm.profile.maritalStatus')}</Label>
+                  <FormSelect
+                    id="pf-marital"
+                    value={maritalStatus}
+                    onValueChange={setMaritalStatus}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      maritalStatus &&
+                      !MARITAL_STATUS_OPTIONS.some((o) => o.value === maritalStatus)
+                        ? [{ value: maritalStatus, label: maritalStatus }]
+                        : undefined
+                    }
+                    options={MARITAL_STATUS_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.maritalStatusOption.${o.value}`),
+                    }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-children-ages">{t('crm.profile.childrenAgesSummary')}</Label>
+                  <Input
+                    id="pf-children-ages"
+                    value={childrenAgesSummary}
+                    onChange={(ev) => setChildrenAgesSummary(ev.target.value)}
+                    placeholder={t('crm.profile.childrenAgesHint')}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-fin-dep">{t('crm.profile.financialDependents')}</Label>
+                  <Input
+                    id="pf-fin-dep"
+                    type="number"
+                    min={0}
+                    value={financialDependents}
+                    onChange={(ev) => setFinancialDependents(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-main-income">{t('crm.profile.mainIncomeProvider')}</Label>
+                  <Input
+                    id="pf-main-income"
+                    value={mainIncomeProvider}
+                    onChange={(ev) => setMainIncomeProvider(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-partner">{t('crm.profile.hasPartner')}</Label>
+                  <FormSelect
+                    id="pf-partner"
+                    value={hasPartner}
+                    onValueChange={setHasPartner}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
+                </div>
+                </ProfileInsuranceBlock>
+
+                <ProfileInsuranceBlock
+                  title={t('crm.profile.insuranceSection.property')}
+                  subtitle={t('crm.profile.insuranceSection.propertyHint')}
+                  icon={Building2}
+                >
+                <div className="grid gap-2">
                   <Label htmlFor="pf-owns-prop">{t('crm.profile.ownsProperty')}</Label>
                   <FormSelect
                     id="pf-owns-prop"
@@ -1890,7 +2192,7 @@ export function ClientDetailPage() {
                     ]}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-prop-type">{t('crm.profile.propertyType')}</Label>
                   <FormSelect
                     id="pf-prop-type"
@@ -1911,6 +2213,86 @@ export function ClientDetailPage() {
                     }))}
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-prop-use">{t('crm.profile.propertyUse')}</Label>
+                  <FormSelect
+                    id="pf-prop-use"
+                    value={propertyUse}
+                    onValueChange={setPropertyUse}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      propertyUse &&
+                      !PROPERTY_USE_OPTIONS.some((o) => o.value === propertyUse)
+                        ? [{ value: propertyUse, label: propertyUse }]
+                        : undefined
+                    }
+                    options={PROPERTY_USE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.propertyUseOption.${o.value}`),
+                    }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-prop-val">{t('crm.profile.propertyValueBand')}</Label>
+                  <Input
+                    id="pf-prop-val"
+                    value={propertyValueBand}
+                    onChange={(ev) => setPropertyValueBand(ev.target.value)}
+                    placeholder={t('crm.profile.propertyValueBandHint')}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-prop-loc">{t('crm.profile.propertyLocation')}</Label>
+                  <Input
+                    id="pf-prop-loc"
+                    value={propertyLocation}
+                    onChange={(ev) => setPropertyLocation(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-prop-style">{t('crm.profile.propertyStyle')}</Label>
+                  <FormSelect
+                    id="pf-prop-style"
+                    value={propertyStyle}
+                    onValueChange={setPropertyStyle}
+                    allowEmpty
+                    emptyLabel={t('crm.profile.selectPlaceholder')}
+                    placeholder={t('crm.profile.selectPlaceholder')}
+                    extraOptions={
+                      propertyStyle &&
+                      !PROPERTY_STYLE_OPTIONS.some((o) => o.value === propertyStyle)
+                        ? [{ value: propertyStyle, label: propertyStyle }]
+                        : undefined
+                    }
+                    options={PROPERTY_STYLE_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: t(`crm.profile.propertyStyleOption.${o.value}`),
+                    }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-high-val">{t('crm.profile.highValueItems')}</Label>
+                  <FormSelect
+                    id="pf-high-val"
+                    value={highValueItems}
+                    onValueChange={setHighValueItems}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
+                </div>
+                </ProfileInsuranceBlock>
+
+                <ProfileInsuranceBlock
+                  title={t('crm.profile.insuranceSection.vehicle')}
+                  subtitle={t('crm.profile.insuranceSection.vehicleHint')}
+                  icon={Car}
+                >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-owns-veh">{t('crm.profile.ownsVehicle')}</Label>
                   <FormSelect
@@ -1946,6 +2328,66 @@ export function ClientDetailPage() {
                     }))}
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-veh-count">{t('crm.profile.vehicleCount')}</Label>
+                  <Input
+                    id="pf-veh-count"
+                    type="number"
+                    min={0}
+                    value={vehicleCount}
+                    onChange={(ev) => setVehicleCount(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-veh-type">{t('crm.profile.vehicleType')}</Label>
+                  <Input
+                    id="pf-veh-type"
+                    value={vehicleType}
+                    onChange={(ev) => setVehicleType(ev.target.value)}
+                    placeholder={t('crm.profile.vehicleTypeHint')}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-veh-year">{t('crm.profile.vehicleYear')}</Label>
+                  <Input
+                    id="pf-veh-year"
+                    type="number"
+                    min={1950}
+                    max={2100}
+                    value={vehicleYear}
+                    onChange={(ev) => setVehicleYear(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-veh-driver">{t('crm.profile.primaryDriver')}</Label>
+                  <Input
+                    id="pf-veh-driver"
+                    value={primaryDriver}
+                    onChange={(ev) => setPrimaryDriver(ev.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-veh-garage">{t('crm.profile.hasGarage')}</Label>
+                  <FormSelect
+                    id="pf-veh-garage"
+                    value={hasGarage}
+                    onValueChange={setHasGarage}
+                    allowEmpty
+                    emptyLabel="—"
+                    options={[
+                      { value: 'yes', label: t('crm.profile.yes') },
+                      { value: 'no', label: t('crm.profile.no') },
+                    ]}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="pf-veh-city">{t('crm.profile.circulationCity')}</Label>
+                  <Input
+                    id="pf-veh-city"
+                    value={circulationCity}
+                    onChange={(ev) => setCirculationCity(ev.target.value)}
+                  />
+                </div>
                 </ProfileInsuranceBlock>
 
                 <ProfileInsuranceBlock
@@ -1953,7 +2395,7 @@ export function ClientDetailPage() {
                   subtitle={t('crm.profile.insuranceSection.professionalHint')}
                   icon={Briefcase}
                 >
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-prof">{t('crm.profile.profession')}</Label>
                   <Input
                     id="pf-prof"
@@ -2089,7 +2531,7 @@ export function ClientDetailPage() {
                     onChange={(ev) => setHlthSatisfaction(ev.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-hlth-int">{t('crm.profile.healthInterest')}</Label>
                   <Input
                     id="pf-hlth-int"
@@ -2118,7 +2560,7 @@ export function ClientDetailPage() {
                     ]}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-bus-seg">{t('crm.profile.businessSegment')}</Label>
                   <Input
                     id="pf-bus-seg"
@@ -2241,7 +2683,7 @@ export function ClientDetailPage() {
                     onChange={(ev) => setPetCount(ev.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-pet-vet">{t('crm.profile.vetUsage')}</Label>
                   <FormSelect
                     id="pf-pet-vet"
@@ -2297,7 +2739,7 @@ export function ClientDetailPage() {
                     placeholder={t('crm.profile.preferredTimeHint')}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid gap-2">
                   <Label htmlFor="pf-beh-team">{t('crm.profile.footballTeam')}</Label>
                   <Input
                     id="pf-beh-team"
@@ -2305,7 +2747,7 @@ export function ClientDetailPage() {
                     onChange={(ev) => setBehTeam(ev.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid min-w-0 gap-2 col-span-2">
                   <Label htmlFor="pf-beh-dates">{t('crm.profile.relevantDates')}</Label>
                   <textarea
                     id="pf-beh-dates"
@@ -2314,7 +2756,7 @@ export function ClientDetailPage() {
                     onChange={(ev) => setBehDates(ev.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid min-w-0 gap-2 col-span-2">
                   <Label htmlFor="pf-beh-comm">{t('crm.profile.communicationPrefs')}</Label>
                   <textarea
                     id="pf-beh-comm"
@@ -2323,7 +2765,7 @@ export function ClientDetailPage() {
                     onChange={(ev) => setBehComm(ev.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid min-w-0 gap-2 col-span-2">
                   <Label htmlFor="pf-beh-life">{t('crm.profile.lifeEvents')}</Label>
                   <textarea
                     id="pf-beh-life"

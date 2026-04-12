@@ -87,6 +87,8 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
     assert patched["profile"]["personal"]["number_of_children"] == 2
     assert patched["profile"]["residence"]["owns_property"] is True
     assert "property_type_missing_when_owns_property" in patched["alerts"]
+    assert "property_use_missing_when_owns_property" in patched["alerts"]
+    assert "children_ages_missing_when_children" in patched["alerts"]
 
     detail2 = client.get(f"/v1/clients/{client_id}", headers=headers)
     assert detail2.status_code == 200

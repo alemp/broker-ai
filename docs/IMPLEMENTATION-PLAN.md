@@ -21,7 +21,7 @@
 - **Client** and **Opportunity** CRUD, pipeline stages per `OPPORTUNITY.md`.
 - **Lines of business** (`LineOfBusiness`, `ClientLineOfBusiness`) and **held products** (`ClientHeldProduct`) on the client, with **`ingestion_source`**, maintained in-app and via bulk import.
 - **MVP product lines** (catalog + LOB labels): **Auto**, **Ramos elementares** (general / multirisco), **Vida (Life)** — see Alembic `mvp_catalog_007` and `ProductCategory.GENERAL_INSURANCE`.
-- **Enriched insurance-oriented client profile** per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3** (**partial** today: API + schema A–H + score/alerts; web só subconjunto de campos; ver [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)).
+- **Enriched insurance-oriented client profile** per [`PRODUCT.md`](./PRODUCT.md) §5.3 — **Phase 3** (**partial**: API + schema A–H + score/alerts + **formulário web com todos os campos**; faltam obrigatoriedade mínima, coleta assistida, governança — ver [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`CHECKLIST-PROFILE-5.3.md`](./CHECKLIST-PROFILE-5.3.md)).
 - **Interactions** (types, timeline, link to client/opportunity, next-action and overdue signals) per [`PRODUCT.md`](./PRODUCT.md) §5.5 — **Phase 4**.
 - **Product** catalog and **rule-based** recommendations with explainability (which rule matched); rules consume **portfolio** data and **profile** fields where modeled (LOB + held products per spec §3.2) — **Phase 6**.
 - **PDF** upload: 100 MB max, PDF only, validation (extension, MIME, magic bytes), **100 uploads/user/day** default — **Phase 7**.
@@ -107,7 +107,7 @@
 
 ### Phase 3 — Enriched client profile ([`PRODUCT.md`](./PRODUCT.md) §5.3)
 
-**Status:** **Partial** — backend schema (A–H), persistence, merge API, completeness score, and a **small** web form subset are in place; full §5.3 UX, alert coverage, rule consumption, and governance remain open. Details: [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md).
+**Status:** **Partial** — backend schema (A–H), merge API, completeness score, consistency **alerts** (ampliados), and **full-field** web editing on client detail; still open: configurable required fields, assisted capture, broader “business-critical” gap rules, governance. Details: [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md), [`CHECKLIST-PROFILE-5.3.md`](./CHECKLIST-PROFILE-5.3.md).
 
 **Implementation (current):** [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md).
 
@@ -123,7 +123,7 @@
 
 **Exit criteria (target):** Broker fills **all** blocks via UI (or API + import) with progressive UX; completeness score and **expanded** critical-gap alerts; Phase 6 rules read profile keys in production paths; governance hooks documented or enforced per Phase 10.
 
-**Currently met:** Profile persisted and patchable for all blocks via API; completeness + alerts on client detail; **partial** web editing (see [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)).
+**Currently met:** Profile persisted and patchable for all blocks via API **and** UI (all schema fields); completeness + alerts on client detail; PT labels for alert codes in-app (see [`PHASE-3-PROFILE.md`](./PHASE-3-PROFILE.md)).
 
 **Depends on:** Phase 2.
 
@@ -372,6 +372,7 @@ All relevant → Phase 10
 | [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) | MVP → final product; CRM ingress |
 | [`STRATEGIC-PRODUCT-ALIGNMENT.md`](./STRATEGIC-PRODUCT-ALIGNMENT.md) | **Living checklist:** stakeholder scope ([`PRODUCT.md`](./PRODUCT.md)) ↔ repo; update when phases complete |
 | [`PRODUCT.md`](./PRODUCT.md) | Stakeholder product brief (Portuguese); §5.3 / §5.5 referenced by Phases 3–4 |
+| [`CHECKLIST-PROFILE-5.3.md`](./CHECKLIST-PROFILE-5.3.md) | §5.3 profile: blocks, functional reqs, import — tracked vs repo |
 | [`PHASE-5.md`](./PHASE-5.md) | CSV/Excel client import (Phase 5) |
 | [`PHASE-6.md`](./PHASE-6.md) | Rule engine + explainable recommendations (Phase 6) |
 | [`PHASE-9.md`](./PHASE-9.md) | Batch adequacy semáforo, job audit, dashboard summary (Phase 9) |
