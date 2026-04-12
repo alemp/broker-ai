@@ -503,6 +503,133 @@ def test_lead_opportunity_convert_repoints_and_intel_blocked_until_client(
     assert intel_ok.status_code == 200
 
 
+def test_lead_insured_held_and_source_convert_to_client(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = client.get("/v1/me", headers=headers)
+    assert me.status_code == 200
+    my_id = me.json()["user"]["id"]
+
+    products = client.get("/v1/products", headers=headers)
+    assert products.status_code == 200
+    product_id = products.json()[0]["id"]
+
+    lead = client.post(
+        "/v1/leads",
+        headers=headers,
+        json={
+            "full_name": "Lead Parity",
+            "email": f"lp-{uuid.uuid4().hex}@example.com",
+            "owner_id": my_id,
+            "source": "Facebook Ads",
+        },
+    )
+    assert lead.status_code == 201, lead.text
+    lead_id = lead.json()["id"]
+
+    detail = client.get(f"/v1/leads/{lead_id}", headers=headers)
+    assert detail.status_code == 200
+    d0 = detail.json()
+    assert d0["insured_persons"] == []
+    assert d0["held_products"] == []
+
+    ins = client.post(
+        f"/v1/leads/{lead_id}/insured-persons",
+        headers=headers,
+        json={"full_name": "Dependente", "relation": "DEPENDENT"},
+    )
+    assert ins.status_code == 201, ins.text
+
+    hp = client.post(
+        f"/v1/leads/{lead_id}/held-products",
+        headers=headers,
+        json={"product_id": product_id, "insurer_name": "ACME"},
+    )
+    assert hp.status_code == 201, hp.text
+
+    conv = client.post(
+        f"/v1/leads/{lead_id}/convert",
+        headers=headers,
+        json={"client_owner_id": my_id},
+    )
+    assert conv.status_code == 200, conv.text
+    body = conv.json()
+    assert body["client"]["source"] == "Facebook Ads"
+    assert len(body["client"]["insured_persons"]) == 1
+    assert body["client"]["insured_persons"][0]["full_name"] == "Dependente"
+    assert len(body["client"]["held_products"]) == 1
+    assert body["client"]["held_products"][0]["insurer_name"] == "ACME"
+    cid = body["client"]["id"]
+
+    cget = client.get(f"/v1/clients/{cid}", headers=headers)
+    assert cget.status_code == 200
+    cg = cget.json()
+    assert cg["source"] == "Facebook Ads"
+    assert len(cg["insured_persons"]) == 1
+    assert len(cg["held_products"]) == 1
+
+
+def test_lead_profile_endpoints_and_convert_copies_profile(client: TestClient) -> None:
+    token, _email = _register(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me = client.get("/v1/me", headers=headers)
+    assert me.status_code == 200
+    my_id = me.json()["user"]["id"]
+
+    lead = client.post(
+        "/v1/leads",
+        headers=headers,
+        json={
+            "full_name": "Lead Profile",
+            "email": f"lpf-{uuid.uuid4().hex}@example.com",
+            "owner_id": my_id,
+        },
+    )
+    assert lead.status_code == 201, lead.text
+    lead_id = lead.json()["id"]
+
+    g0 = client.get(f"/v1/leads/{lead_id}", headers=headers)
+    assert g0.status_code == 200
+    assert g0.json()["profile_completeness_score"] == 0
+    assert g0.json()["profile_alerts"] == []
+
+    patch = client.patch(
+        f"/v1/leads/{lead_id}/profile",
+        headers=headers,
+        json={"personal": {"life_stage": "young_family", "number_of_children": 2}},
+    )
+    assert patch.status_code == 200, patch.text
+    assert patch.json()["completeness_score"] > 0
+
+    g1 = client.get(f"/v1/leads/{lead_id}/profile", headers=headers)
+    assert g1.status_code == 200
+    assert g1.json()["profile"]["personal"]["life_stage"] == "young_family"
+    assert g1.json()["profile"]["personal"]["number_of_children"] == 2
+
+    g2 = client.get(f"/v1/leads/{lead_id}", headers=headers)
+    assert g2.status_code == 200
+    assert g2.json()["profile"]["personal"]["life_stage"] == "young_family"
+
+    conv = client.post(
+        f"/v1/leads/{lead_id}/convert",
+        headers=headers,
+        json={"client_owner_id": my_id},
+    )
+    assert conv.status_code == 200, conv.text
+    cid = conv.json()["client"]["id"]
+    assert conv.json()["client"]["profile"]["personal"]["life_stage"] == "young_family"
+    assert conv.json()["client"]["profile"]["personal"]["number_of_children"] == 2
+
+    cg = client.get(f"/v1/clients/{cid}", headers=headers)
+    assert cg.status_code == 200
+    assert cg.json()["profile"]["personal"]["life_stage"] == "young_family"
+
+    closed = client.patch(f"/v1/leads/{lead_id}/profile", headers=headers, json={"personal": {}})
+    assert closed.status_code == 409
+
+
 def test_insurer_list_search_by_code_and_campaign_list_search(client: TestClient) -> None:
     token, _ = _register(client)
     headers = {"Authorization": f"Bearer {token}"}

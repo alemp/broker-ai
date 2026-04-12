@@ -23,6 +23,7 @@ from ai_copilot_api.db.models import (
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.domain.adequacy_batch import effective_adequacy_assessment
 from ai_copilot_api.domain.client_profile import (
+    coerce_profile_dict,
     completeness_score,
     merge_profile_dict,
     parse_profile,
@@ -57,7 +58,9 @@ _CLIENT_AUDIT_KEYS = (
     "full_name",
     "email",
     "phone",
+    "date_of_birth",
     "external_id",
+    "source",
     "notes",
     "owner_id",
     "client_kind",
@@ -73,7 +76,9 @@ def _client_audit_dict(row: Client) -> dict:
         "full_name": row.full_name,
         "email": row.email,
         "phone": row.phone,
+        "date_of_birth": row.date_of_birth,
         "external_id": row.external_id,
+        "source": row.source,
         "notes": row.notes,
         "owner_id": row.owner_id,
         "client_kind": row.client_kind.value,
@@ -91,12 +96,7 @@ def _user_in_org(db: Session, org_id: uuid.UUID, user_id: uuid.UUID) -> None:
 
 
 def _raw_profile_data(row: Client) -> dict[str, Any]:
-    raw = row.profile_data
-    if raw is None:
-        return {}
-    if isinstance(raw, dict):
-        return raw
-    return {}
+    return coerce_profile_dict(row.profile_data)
 
 
 def _client_profile_bundle(row: Client) -> tuple[ClientInsuranceProfile, int, list[str]]:
@@ -238,7 +238,9 @@ def create_client(
         full_name=body.full_name,
         email=str(body.email) if body.email is not None else None,
         phone=body.phone,
+        date_of_birth=body.date_of_birth,
         external_id=body.external_id,
+        source=body.source,
         notes=body.notes,
         owner_id=body.owner_id,
         client_kind=body.client_kind,
@@ -401,7 +403,7 @@ def delete_client(
     db.commit()
 
 
-_INSURED_AUDIT_KEYS = ("full_name", "relation", "notes", "client_id")
+_INSURED_AUDIT_KEYS = ("full_name", "relation", "notes", "client_id", "lead_id")
 
 
 def _insured_audit_dict(row: InsuredPerson) -> dict:
@@ -410,6 +412,7 @@ def _insured_audit_dict(row: InsuredPerson) -> dict:
         "relation": row.relation.value,
         "notes": row.notes,
         "client_id": row.client_id,
+        "lead_id": row.lead_id,
     }
 
 

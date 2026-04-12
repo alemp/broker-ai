@@ -29,6 +29,7 @@ export function LeadCreatePage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
   const [externalId, setExternalId] = useState('')
   const [ownerId, setOwnerId] = useState('')
   const [clientKind, setClientKind] = useState('INDIVIDUAL')
@@ -74,6 +75,7 @@ export function LeadCreatePage() {
           full_name: fullName.trim(),
           email: email.trim() || undefined,
           phone: phone.trim() || undefined,
+          date_of_birth: dateOfBirth.trim() || undefined,
           external_id: externalId.trim() || undefined,
           owner_id: ownerId || undefined,
           status: 'NEW',
@@ -141,6 +143,15 @@ export function LeadCreatePage() {
                 value={phone}
                 onChange={(ev) => setPhone(ev.target.value)}
                 autoComplete="tel"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="lead-dob">{t('crm.clients.field.dateOfBirthOptional')}</Label>
+              <Input
+                id="lead-dob"
+                type="date"
+                value={dateOfBirth}
+                onChange={(ev) => setDateOfBirth(ev.target.value)}
               />
             </div>
             <div className="grid gap-2">

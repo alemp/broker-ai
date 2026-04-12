@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -274,6 +275,7 @@ class Client(Base):
     external_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     owner_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -292,6 +294,7 @@ class Client(Base):
     company_tax_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     marketing_opt_in: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     preferred_marketing_channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(255), nullable=True)
     profile_data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
@@ -326,6 +329,7 @@ class Client(Base):
     held_products: Mapped[list["ClientHeldProduct"]] = relationship(
         "ClientHeldProduct",
         back_populates="client",
+        foreign_keys="ClientHeldProduct.client_id",
         cascade="all, delete-orphan",
     )
     interactions: Mapped[list["Interaction"]] = relationship(
@@ -336,6 +340,7 @@ class Client(Base):
     insured_persons: Mapped[list["InsuredPerson"]] = relationship(
         "InsuredPerson",
         back_populates="client",
+        foreign_keys="InsuredPerson.client_id",
         cascade="all, delete-orphan",
     )
     adequacy_snapshot: Mapped["ClientAdequacySnapshot | None"] = relationship(
@@ -455,16 +460,28 @@ class BatchJobRun(Base):
 
 class ClientHeldProduct(Base):
     __tablename__ = "client_held_products"
+    __table_args__ = (
+        CheckConstraint(
+            "(client_id IS NOT NULL)::int + (lead_id IS NOT NULL)::int = 1",
+            name="ck_client_held_product_client_xor_lead",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
     )
-    client_id: Mapped[uuid.UUID] = mapped_column(
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("clients.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("leads.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     product_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -494,7 +511,16 @@ class ClientHeldProduct(Base):
         nullable=False,
     )
 
-    client: Mapped["Client"] = relationship("Client", back_populates="held_products")
+    client: Mapped["Client | None"] = relationship(
+        "Client",
+        back_populates="held_products",
+        foreign_keys=[client_id],
+    )
+    lead: Mapped["Lead | None"] = relationship(
+        "Lead",
+        back_populates="held_products",
+        foreign_keys=[lead_id],
+    )
     product: Mapped["Product | None"] = relationship(
         "Product",
         back_populates="held_placements",
@@ -702,6 +728,7 @@ class Lead(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     source: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     client_kind: Mapped[ClientKind] = mapped_column(
@@ -767,10 +794,28 @@ class Lead(Base):
         back_populates="lead",
         foreign_keys="Interaction.lead_id",
     )
+    insured_persons: Mapped[list["InsuredPerson"]] = relationship(
+        "InsuredPerson",
+        back_populates="lead",
+        foreign_keys="InsuredPerson.lead_id",
+        cascade="all, delete-orphan",
+    )
+    held_products: Mapped[list["ClientHeldProduct"]] = relationship(
+        "ClientHeldProduct",
+        back_populates="lead",
+        foreign_keys="ClientHeldProduct.lead_id",
+        cascade="all, delete-orphan",
+    )
 
 
 class InsuredPerson(Base):
     __tablename__ = "insured_persons"
+    __table_args__ = (
+        CheckConstraint(
+            "(client_id IS NOT NULL)::int + (lead_id IS NOT NULL)::int = 1",
+            name="ck_insured_person_client_xor_lead",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -783,10 +828,16 @@ class InsuredPerson(Base):
         nullable=False,
         index=True,
     )
-    client_id: Mapped[uuid.UUID] = mapped_column(
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("clients.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("leads.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -810,7 +861,16 @@ class InsuredPerson(Base):
     )
 
     organization: Mapped["Organization"] = relationship("Organization")
-    client: Mapped["Client"] = relationship("Client", back_populates="insured_persons")
+    client: Mapped["Client | None"] = relationship(
+        "Client",
+        back_populates="insured_persons",
+        foreign_keys=[client_id],
+    )
+    lead: Mapped["Lead | None"] = relationship(
+        "Lead",
+        back_populates="insured_persons",
+        foreign_keys=[lead_id],
+    )
 
 
 class CrmAuditEvent(Base):

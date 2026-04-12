@@ -56,7 +56,9 @@ class ClientCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
+    date_of_birth: date | None = None
     external_id: str | None = Field(default=None, max_length=128)
+    source: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     owner_id: uuid.UUID | None = None
     client_kind: ClientKind = ClientKind.INDIVIDUAL
@@ -78,7 +80,9 @@ class ClientUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
+    date_of_birth: date | None = None
     external_id: str | None = Field(default=None, max_length=128)
+    source: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     owner_id: uuid.UUID | None = None
     client_kind: ClientKind | None = None
@@ -96,7 +100,9 @@ class ClientOut(BaseModel):
     external_id: str | None
     email: str | None
     phone: str | None
+    date_of_birth: date | None
     full_name: str
+    source: str | None
     notes: str | None
     owner_id: uuid.UUID | None
     client_kind: ClientKind
@@ -176,7 +182,8 @@ class ClientHeldProductOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None
+    lead_id: uuid.UUID | None = None
     product_id: uuid.UUID | None
     insurer_name: str | None
     policy_status: str | None
@@ -206,7 +213,8 @@ class InsuredPersonOut(BaseModel):
 
     id: uuid.UUID
     organization_id: uuid.UUID
-    client_id: uuid.UUID
+    client_id: uuid.UUID | None
+    lead_id: uuid.UUID | None = None
     full_name: str
     relation: InsuredRelation
     notes: str | None
@@ -267,6 +275,7 @@ class LeadCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
+    date_of_birth: date | None = None
     external_id: str | None = Field(default=None, max_length=128)
     source: str | None = Field(default=None, max_length=255)
     notes: str | None = None
@@ -292,6 +301,7 @@ class LeadUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     email: EmailStr | None = None
     phone: str | None = Field(default=None, max_length=64)
+    date_of_birth: date | None = None
     external_id: str | None = Field(default=None, max_length=128)
     source: str | None = Field(default=None, max_length=255)
     notes: str | None = None
@@ -315,6 +325,7 @@ class LeadOut(BaseModel):
     full_name: str
     email: str | None
     phone: str | None
+    date_of_birth: date | None
     source: str | None
     notes: str | None
     client_kind: ClientKind
@@ -328,6 +339,16 @@ class LeadOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     owner: UserBrief | None = Field(default=None, validation_alias="owner_user")
+
+
+class LeadDetailOut(LeadOut):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    held_products: list[ClientHeldProductOut] = Field(default_factory=list)
+    insured_persons: list[InsuredPersonOut] = Field(default_factory=list)
+    profile: ClientInsuranceProfile = Field(default_factory=ClientInsuranceProfile)
+    profile_completeness_score: int = Field(default=0, ge=0, le=100)
+    profile_alerts: list[str] = Field(default_factory=list)
 
 
 class LeadOpportunityPayload(BaseModel):
@@ -361,7 +382,7 @@ class LeadConvertRequest(BaseModel):
 
 
 class LeadConvertResponse(BaseModel):
-    client: ClientOut
+    client: ClientDetailOut
     opportunity: OpportunityOut | None = None
 
 

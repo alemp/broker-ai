@@ -129,3 +129,18 @@ def profile_alerts(profile: ClientInsuranceProfile) -> list[str]:
         if pet.has_pet is True and not pet.pet_species:
             codes.append("pet_species_missing_when_has_pet")
     return codes
+
+
+def coerce_profile_dict(raw: Any) -> dict[str, Any]:
+    """Normalize JSONB / API profile payload to a plain dict for merge/parse."""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
+def profile_bundle_from_raw(raw: Any) -> tuple[ClientInsuranceProfile, int, list[str]]:
+    d = coerce_profile_dict(raw)
+    prof = parse_profile(d)
+    return prof, completeness_score(prof), profile_alerts(prof)

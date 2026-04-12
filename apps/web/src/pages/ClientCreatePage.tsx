@@ -26,6 +26,8 @@ export function ClientCreatePage() {
   const navigate = useNavigate()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
   const [ownerId, setOwnerId] = useState('')
   const [clientKind, setClientKind] = useState('INDIVIDUAL')
   const [companyLegal, setCompanyLegal] = useState('')
@@ -68,6 +70,8 @@ export function ClientCreatePage() {
         json: {
           full_name: fullName.trim(),
           email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+          date_of_birth: dateOfBirth.trim() || undefined,
           owner_id: ownerId || undefined,
           client_kind: clientKind,
           ...(clientKind === 'COMPANY'
@@ -121,6 +125,25 @@ export function ClientCreatePage() {
                 value={email}
                 onChange={(ev) => setEmail(ev.target.value)}
                 autoComplete="email"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="client-phone">{t('crm.clients.field.phoneOptional')}</Label>
+              <Input
+                id="client-phone"
+                type="tel"
+                value={phone}
+                onChange={(ev) => setPhone(ev.target.value)}
+                autoComplete="tel"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="client-dob">{t('crm.clients.field.dateOfBirthOptional')}</Label>
+              <Input
+                id="client-dob"
+                type="date"
+                value={dateOfBirth}
+                onChange={(ev) => setDateOfBirth(ev.target.value)}
               />
             </div>
             <div className="grid gap-2">
