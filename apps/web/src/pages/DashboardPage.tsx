@@ -17,7 +17,8 @@ type OverdueOppRow = {
   stage: string
   next_action: string | null
   next_action_due_at: string | null
-  client: { full_name: string }
+  client: { full_name: string } | null
+  lead: { full_name: string } | null
 }
 
 type TodayInteractionRow = {
@@ -41,6 +42,10 @@ type AdequacySummary = {
     finished_at: string | null
     clients_processed: number
   } | null
+}
+
+function overduePartyLabel(o: OverdueOppRow): string {
+  return o.client?.full_name?.trim() || o.lead?.full_name?.trim() || '—'
 }
 
 function todayIxPartyLink(row: TodayInteractionRow): { to: string; labelKey: string } | null {
@@ -291,7 +296,7 @@ export function DashboardPage() {
               {overdue.map((o) => (
                 <li key={o.id} className="border-b pb-3 last:border-0">
                   <Link to={`/opportunities/${o.id}`} className="font-medium text-primary hover:underline">
-                    {o.client.full_name}
+                    {overduePartyLabel(o)}
                   </Link>
                   <p className="text-muted-foreground text-xs">
                     {translateOpportunityStage(o.stage, t)}
