@@ -125,3 +125,11 @@ class BatchJobStatus(StrEnum):
     RUNNING = "RUNNING"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
+
+
+class UserRole(StrEnum):
+    """Minimal roles (PRODUCT.md §5.1 perfis mínimos)."""
+
+    ADMIN = "ADMIN"
+    SALES_MANAGER = "SALES_MANAGER"
+    BROKER = "BROKER"

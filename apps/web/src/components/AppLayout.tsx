@@ -17,10 +17,11 @@ const mainNavItems = [
 ] satisfies readonly { to: string; labelKey: string; end?: boolean }[]
 
 const adminNavItems = [
+  { to: '/users', labelKey: 'nav.users' as const, adminOnly: true as const },
   { to: '/insurers', labelKey: 'nav.insurers' as const },
   { to: '/products', labelKey: 'nav.products' as const },
   { to: '/campaigns', labelKey: 'nav.campaigns' as const },
-] satisfies readonly { to: string; labelKey: string }[]
+] satisfies readonly { to: string; labelKey: string; adminOnly?: boolean }[]
 
 const adminDropdownItemClass = cn(
   'focus:bg-accent focus:text-accent-foreground relative flex cursor-default select-none items-center rounded-sm py-1.5 pr-2 pl-2 text-sm outline-none',
@@ -44,6 +45,7 @@ function navLinkClassName(isActive: boolean) {
 
 function isAdminPath(pathname: string) {
   return (
+    pathname === '/users' ||
     pathname === '/insurers' ||
     pathname.startsWith('/insurers/') ||
     pathname === '/products' ||
@@ -78,7 +80,9 @@ export function AppLayout() {
     ))
 
   const renderAdminNavLinks = (onNavigate?: () => void) =>
-    adminNavItems.map((item) => (
+    adminNavItems
+      .filter((item) => !item.adminOnly || user?.role === 'ADMIN')
+      .map((item) => (
       <NavLink
         key={item.to}
         to={item.to}
@@ -87,7 +91,7 @@ export function AppLayout() {
       >
         {t(item.labelKey)}
       </NavLink>
-    ))
+      ))
 
   const renderDesktopNav = () => (
     <>
@@ -115,6 +119,7 @@ export function AppLayout() {
             collisionPadding={12}
           >
             {adminNavItems.map((item) => (
+              (item.adminOnly && user?.role !== 'ADMIN') ? null : (
               <DropdownMenu.Item key={item.to} asChild>
                 <NavLink
                   to={item.to}
@@ -123,6 +128,7 @@ export function AppLayout() {
                   {t(item.labelKey)}
                 </NavLink>
               </DropdownMenu.Item>
+              )
             ))}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

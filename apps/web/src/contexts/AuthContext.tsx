@@ -17,6 +17,8 @@ export type AuthUser = {
   id: string
   email: string
   full_name: string | null
+  role: 'ADMIN' | 'SALES_MANAGER' | 'BROKER' | string
+  active: boolean
   organization: OrganizationBrief
 }
 

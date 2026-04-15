@@ -24,6 +24,7 @@ from ai_copilot_api.db.enums import (
     ProductCategory,
     ProductRiskLevel,
     RecommendationFeedbackAction,
+    UserRole,
 )
 from ai_copilot_api.schemas.client_profile import ClientInsuranceProfile
 
@@ -34,6 +35,39 @@ class UserBrief(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str | None
+
+
+class OrgUserAdminOut(BaseModel):
+    """Admin view of org users (PRODUCT.md §5.1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    full_name: str | None
+    role: UserRole
+    active: bool
+    created_at: datetime
+
+
+class OrgUserAdminCreate(BaseModel):
+    email: EmailStr
+    full_name: str | None = Field(default=None, max_length=255)
+    role: UserRole = UserRole.BROKER
+    active: bool = True
+    password: str | None = Field(default=None, min_length=8, max_length=256)
+
+
+class OrgUserAdminUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+    role: UserRole | None = None
+    active: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=256)
+
+
+class OrgUserAdminCreatedOut(BaseModel):
+    user: OrgUserAdminOut
+    temporary_password: str | None = None
 
 
 class ClientBrief(BaseModel):

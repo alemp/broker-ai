@@ -10,6 +10,80 @@ This document is the **single technical source of truth for the MVP scope**, rep
 
 ---
 
+## 0. Implementation status (current)
+
+Legend:
+
+- **Done**: implemented end-to-end (DB + API + UI where applicable)
+- **Partially done**: implemented in part, or missing a key required sub-piece
+- **Not started**: no implementation present yet
+
+### Status summary
+
+| Area | Status | Notes |
+|---|---|---|
+| Tenancy (single partner, `organization_id` everywhere) | **Done** | Tenant scoping is present across major tables (`organization_id`). |
+| Users / Organization (membership, auth) | **Done** | Auth is implemented (`/register`, `/login`, `/me`). Admin-only user management is implemented end-to-end (DB fields `role`+`active` + migration + API `/org/admin/users` + UI `/users`). |
+| Core CRM entities (Clients, Leads, Opportunities, Interactions) | **Done** | CRUD + UI pages exist for these entities. |
+| Portfolio (held products + provenance) | **Done** | `ClientHeldProduct` with `ingestion_source` is implemented; import supports held products. |
+| Portfolio (LOB as first-class entity) | **Not started** | No `LineOfBusiness` / `ClientLineOfBusiness` tables or UI surfaced yet. |
+| Enriched client profile (A–H blocks), completeness score + alerts | **Done** | Profile is stored as JSON (`profile_data`) and used by adequacy/rules. |
+| Rule-based recommendations + explainability (rule trace) | **Done** | Rules run, trace returned/stored; builtin rule catalog endpoint exists. |
+| Adequacy semáforo (client-level) + batch snapshots + dashboard aggregates | **Done** | Batch job persists `ClientAdequacySnapshot`; dashboard exposes counts + last job. |
+| Campaign segmentation + scheduled touches (internal) | **Partially done** | Campaign CRUD + segment refresh exist and create `CampaignTouch` rows, but there is **no UI** to list/manage touches or schedule them beyond “segment refresh now”. Provider sending is post-MVP. |
+| Client import (CSV + Excel) with upload→validate→preview→commit + audit trail | **Done** | `/clients/import/preview` + `/commit` + `ClientImportBatch` implemented; UI supports preview/commit. |
+| Documents + extraction (PDF upload + structured extraction) | **Partially done** | Storage abstraction exists (`local` + `s3`), but no PDF upload/extraction pipeline yet. |
+
+### What is missing to finish (precise)
+
+This checklist is split into:
+
+- **Stage 1 — MVP “done”**: what must exist to claim the Stage 1 MVP scope is fully delivered
+- **Full “policy adequacy” product**: what is required to reach the final vision described in `PRODUCT_ADDITIONAL_INFO.md` (Stages 2–4)
+
+#### Stage 1 — MVP “done” checklist
+
+- **Users / Organization**
+  - Admin-only access: only **Administrator** can manage users (per `PRODUCT.md` minimal profiles)
+  - Minimal roles implemented (from `PRODUCT.md`): **Administrator**, **Sales manager**, **Broker**
+  - User admin management (API + UI): **Done** (create user, update role/active, reset password)
+  - Still missing to be fully “operational” (optional for MVP, but recommended):
+    - Add **audit log** for admin user-management actions (who changed what, when)
+    - Add “first login must change password” flow (enforced), or “set password” action in UI
+    - Add email delivery for temporary passwords / reset links (if required)
+
+- **Portfolio: Lines of business (LOB)**
+  - Add DB models + migrations for `LineOfBusiness` and `ClientLineOfBusiness` (tenant-scoped)
+  - Add API endpoints to manage LOBs and client LOB links (create/list/update/delete)
+  - Add UI in client detail to view/edit LOBs (and use them in segmentation + recommendations if they are required MVP inputs)
+
+- **Campaigns (internal tooling)**
+  - Add UI to **view campaign audience/touches** (list touches, status, scheduled_at, channel)
+  - Add UI controls to **reschedule/cancel/mark-sent** touches (or document a manual operational flow)
+  - Add ability to run segmentation for “scheduled” times (even if sending is post-MVP, the scheduling + touch lifecycle should be usable)
+
+#### Full “policy adequacy” product checklist (Stages 2–4)
+
+- **Documents**
+  - Implement PDF upload endpoints with constraints (PDF-only, size limit, magic-bytes validation)
+  - Add storage-backed persistence (already abstracted as `local` + `s3`) and a document metadata model
+  - Add document type classification (policy vs general conditions vs proposal vs endorsement)
+
+- **Extraction + normalization**
+  - Define structured extraction schemas for policy + general conditions
+  - Implement hybrid extraction workflow (auto extract + manual confirmation/edit when low confidence)
+  - Build coverage normalization taxonomy (carrier text → canonical coverage)
+
+- **Adequacy (coverage-level)**
+  - Implement per-coverage adequacy matrix and semáforo by coverage (not just client-level)
+  - Add executive report generation (coverage gaps + next best offer narrative)
+
+- **Connectors / platformization**
+  - External CRM connectors (Stage 2)
+  - Optional upload malware scanning hook (Stage 2)
+  - Event-driven patterns + BI foundations (Stage 3)
+  - Copilot / gen-AI grounded on CRM + portfolio + documents (Stage 4)
+
 ## 1. Product scope (MVP)
 
 ### Tenancy

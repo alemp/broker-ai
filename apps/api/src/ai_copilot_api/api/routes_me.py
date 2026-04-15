@@ -17,6 +17,8 @@ def read_me(
             id=current_user.id,
             email=current_user.email,
             full_name=current_user.full_name,
+            role=current_user.role,
+            active=current_user.active,
             organization=OrganizationBrief(
                 id=org.id,
                 name=org.name,

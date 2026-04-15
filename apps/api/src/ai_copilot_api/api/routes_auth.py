@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from ai_copilot_api.auth import create_access_token, hash_password, verify_password
 from ai_copilot_api.config import Settings, get_settings
+from ai_copilot_api.db.enums import UserRole
 from ai_copilot_api.db.models import Organization, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
@@ -35,6 +36,8 @@ def register(
         email=str(body.email).lower(),
         password_hash=hash_password(body.password),
         full_name=body.full_name,
+        role=UserRole.ADMIN,
+        active=True,
     )
     db.add(user)
     db.commit()

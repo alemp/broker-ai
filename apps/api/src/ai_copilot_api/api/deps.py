@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ai_copilot_api.auth.jwt_tokens import decode_access_token
 from ai_copilot_api.config import Settings, get_settings
+from ai_copilot_api.db.enums import UserRole
 from ai_copilot_api.db.models import User
 from ai_copilot_api.db.session import get_db
 
@@ -62,4 +63,19 @@ def get_current_user(
             detail="User not found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User is inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user

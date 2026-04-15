@@ -2,6 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
+from ai_copilot_api.db.enums import UserRole
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -30,6 +32,8 @@ class UserMe(BaseModel):
     id: UUID
     email: EmailStr
     full_name: str | None
+    role: UserRole
+    active: bool
     organization: OrganizationBrief
 
 

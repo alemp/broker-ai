@@ -24,6 +24,7 @@ import { OpportunityDetailPage } from '@/pages/OpportunityDetailPage'
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { ReleaseNotesPage } from '@/pages/ReleaseNotesPage'
+import { UsersPage } from '@/pages/UsersPage'
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/products/:productId" element={<ProductDetailPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/campaigns/new" element={<CampaignNewPage />} />
+        <Route path="/users" element={<UsersPage />} />
         <Route path="/release-notes" element={<ReleaseNotesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
