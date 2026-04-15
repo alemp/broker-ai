@@ -19,7 +19,10 @@ from ai_copilot_api.db.models import (
 )
 from ai_copilot_api.db.session import get_db, new_session
 from ai_copilot_api.domain.coverage_normalization import normalize_coverages
-from ai_copilot_api.domain.document_extraction import extract_structured
+from ai_copilot_api.domain.document_extraction import (
+    extract_pdf_text_with_ocr,
+    extract_structured_with_text,
+)
 from ai_copilot_api.schemas.crm import BatchJobRunOut
 from ai_copilot_api.schemas.extraction import DocumentExtractionConfirmIn, DocumentExtractionRunOut
 from ai_copilot_api.storage.factory import get_object_storage
@@ -68,7 +71,23 @@ def _run_document_extraction_job(job_id: uuid.UUID, *, settings: Settings) -> No
 
         storage = get_object_storage(settings)
         pdf_bytes = storage.get_object(doc.storage_key)
-        result = extract_structured(doc.document_type, pdf_bytes)
+        raw_text, extraction_meta = extract_pdf_text_with_ocr(
+            pdf_bytes,
+            ocr_enabled=settings.ocr_enabled,
+            min_text_chars=settings.ocr_min_text_chars,
+            language=settings.ocr_language,
+            provider_url=settings.ocr_provider_url,
+            provider_timeout_seconds=settings.ocr_provider_timeout_seconds,
+            provider_max_pages=settings.ocr_provider_max_pages,
+            provider_dpi=settings.ocr_provider_dpi,
+        )
+        compact = " ".join(raw_text.split())
+        result = extract_structured_with_text(
+            doc.document_type,
+            compact_text=compact,
+            raw_text=raw_text,
+            extraction_meta=extraction_meta,
+        )
 
         taxonomy = _load_taxonomy(db, org_id)
         if isinstance(result.extracted_data, dict):

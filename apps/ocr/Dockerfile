@@ -7,13 +7,6 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-COPY pyproject.toml uv.lock ./
-COPY src ./src
-COPY alembic ./alembic
-COPY alembic.ini .
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         poppler-utils \
@@ -21,10 +14,15 @@ RUN apt-get update \
         tesseract-ocr-por \
     && rm -rf /var/lib/apt/lists/*
 
-RUN uv sync --frozen --no-dev
+COPY pyproject.toml ./
+COPY src ./src
+
+RUN uv sync --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
 
-EXPOSE 8000
+EXPOSE 9001
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["uvicorn", "ai_copilot_ocr.main:app", "--host", "0.0.0.0", "--port", "9001"]
+

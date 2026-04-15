@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -112,6 +112,7 @@ export function DocumentDetailPage() {
     () => runs.find((r) => r.id === selectedRunId) ?? null,
     [runs, selectedRunId],
   )
+  const reviewRef = useRef<HTMLDivElement | null>(null)
   const [extractedText, setExtractedText] = useState('')
   const [normalizedText, setNormalizedText] = useState('')
 
@@ -172,6 +173,11 @@ export function DocumentDetailPage() {
     if (!selectedRun) return
     setExtractedText(prettyJson(selectedRun.extracted_data))
     setNormalizedText(prettyJson(selectedRun.normalized_data))
+  }, [selectedRun])
+
+  useEffect(() => {
+    if (!selectedRun) return
+    reviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [selectedRun])
 
   const onExtract = async () => {
@@ -369,7 +375,12 @@ export function DocumentDetailPage() {
           ) : (
             <ul className="space-y-3">
               {runs.map((r) => (
-                <li key={r.id} className="border-border/80 rounded-xl border p-4">
+                <li
+                  key={r.id}
+                  className={`border-border/80 rounded-xl border p-4 ${
+                    selectedRunId === r.id ? 'ring-ring/40 ring-2' : ''
+                  }`}
+                >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
                       <p className="text-sm font-medium">
@@ -393,7 +404,8 @@ export function DocumentDetailPage() {
       </Card>
 
       {selectedRun ? (
-        <Card>
+        <div ref={reviewRef}>
+          <Card>
           <CardHeader>
             <CardTitle className="text-base">Revisão / confirmação</CardTitle>
           </CardHeader>
@@ -420,7 +432,8 @@ export function DocumentDetailPage() {
               <p className="text-muted-foreground text-sm">Somente administradores podem confirmar extrações.</p>
             ) : null}
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       ) : null}
     </div>
   )

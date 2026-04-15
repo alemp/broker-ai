@@ -28,6 +28,9 @@ services:
       ADEQUACY_REFRESH_INTERVAL_MINUTES: ${ADEQUACY_REFRESH_INTERVAL_MINUTES:-0}
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       LOCAL_STORAGE_PATH: ${LOCAL_STORAGE_PATH:-/data/objects}
+      OCR_PROVIDER_URL: ${OCR_PROVIDER_URL:-http://ocr:9001/v1/ocr}
+      OCR_LANGUAGE: ${OCR_LANGUAGE:-por}
+      OCR_MIN_TEXT_CHARS: ${OCR_MIN_TEXT_CHARS:-300}
     ports:
       - '${API_PORT:-8000}:8000'
     volumes:
@@ -35,6 +38,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ocr:
+        condition: service_started
+
+  ocr:
+    build:
+      context: ./apps/ocr
+    ports:
+      - '${OCR_PORT:-9001}:9001'
 
   web:
     build:

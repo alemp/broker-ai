@@ -19,6 +19,10 @@ dependencies = [
     "sqlalchemy>=2.0.36",
     "uvicorn[standard]>=0.32.0",
     "pypdf>=6.10.1",
+    "pytesseract>=0.3.13",
+    "pdf2image>=1.17.0",
+    "pillow>=12.2.0",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]

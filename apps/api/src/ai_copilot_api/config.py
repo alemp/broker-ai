@@ -67,6 +67,38 @@ class Settings(BaseSettings):
         description="0 disables scheduled adequacy batch; otherwise interval in minutes (Phase 9).",
     )
 
+    ocr_enabled: bool = Field(default=True, validation_alias="OCR_ENABLED")
+    ocr_min_text_chars: int = Field(
+        default=300,
+        validation_alias="OCR_MIN_TEXT_CHARS",
+        description="If extracted text is shorter than this, fallback to OCR.",
+    )
+    ocr_language: str = Field(
+        default="por",
+        validation_alias="OCR_LANGUAGE",
+        description="Tesseract language code(s), e.g. 'por' or 'por+eng'.",
+    )
+    ocr_provider_url: str | None = Field(
+        default=None,
+        validation_alias="OCR_PROVIDER_URL",
+        description="When set, OCR is performed by calling this HTTP endpoint.",
+    )
+    ocr_provider_timeout_seconds: int = Field(
+        default=300,
+        validation_alias="OCR_PROVIDER_TIMEOUT_SECONDS",
+        description="HTTP timeout when calling OCR_PROVIDER_URL.",
+    )
+    ocr_provider_max_pages: int = Field(
+        default=10,
+        validation_alias="OCR_PROVIDER_MAX_PAGES",
+        description="Max pages to OCR per document when using provider.",
+    )
+    ocr_provider_dpi: int = Field(
+        default=150,
+        validation_alias="OCR_PROVIDER_DPI",
+        description="Render DPI hint passed to OCR provider.",
+    )
+
     @field_validator("local_storage_path", mode="before")
     @classmethod
     def expand_path(cls, value: str | Path) -> Path:
