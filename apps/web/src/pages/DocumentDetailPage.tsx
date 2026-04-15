@@ -104,6 +104,8 @@ export function DocumentDetailPage() {
   const [extractJobId, setExtractJobId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [uploadingVersion, setUploadingVersion] = useState(false)
+  const [deletingDocument, setDeletingDocument] = useState(false)
+  const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [newVersionFile, setNewVersionFile] = useState<File | null>(null)
 
@@ -246,6 +248,46 @@ export function DocumentDetailPage() {
     }
   }
 
+  const onDeleteDocument = async () => {
+    if (!isAdmin || !doc) return
+    const ok = window.confirm(
+      'Apagar este documento e todas as suas versões/extrações? Esta ação não pode ser desfeita.',
+    )
+    if (!ok) return
+    setDeletingDocument(true)
+    setError(null)
+    try {
+      await apiFetch(`/v1/documents/${doc.id}`, { method: 'DELETE' })
+      toast.success('Documento apagado.')
+      navigate('/documents')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setDeletingDocument(false)
+    }
+  }
+
+  const onDeleteVersion = async (v: DocumentVersionOut) => {
+    if (!isAdmin || !doc) return
+    const isCurrent = v.version === doc.current_version
+    const msg = isCurrent
+      ? `Apagar a versão v${v.version} (atual)? O sistema vai promover automaticamente outra versão.`
+      : `Apagar a versão v${v.version}?`
+    const ok = window.confirm(`${msg}\n\nEsta ação não pode ser desfeita.`)
+    if (!ok) return
+    setDeletingVersionId(v.id)
+    setError(null)
+    try {
+      await apiFetch(`/v1/documents/${doc.id}/versions/${v.id}`, { method: 'DELETE' })
+      toast.success('Versão apagada.')
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setDeletingVersionId(null)
+    }
+  }
+
   if (!documentId) return null
 
   return (
@@ -303,6 +345,16 @@ export function DocumentDetailPage() {
                 <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
                   {t('action.refresh')}
                 </Button>
+                {isAdmin ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={deletingDocument || extracting || uploadingVersion}
+                    onClick={() => void onDeleteDocument()}
+                  >
+                    {deletingDocument ? 'A apagar…' : 'Apagar documento'}
+                  </Button>
+                ) : null}
                 {!isAdmin ? (
                   <Button type="button" variant="ghost" onClick={() => void navigate('/profile')}>
                     Somente admin pode extrair
@@ -349,7 +401,10 @@ export function DocumentDetailPage() {
           ) : (
             <div className="space-y-2 text-sm">
               {versions.map((v) => (
-                <div key={v.id} className="flex flex-col gap-1 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div
+                  key={v.id}
+                  className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
                   <div className="space-y-1">
                     <p className="font-medium">v{v.version}</p>
                     <p className="text-muted-foreground">
@@ -357,7 +412,20 @@ export function DocumentDetailPage() {
                     </p>
                     <p className="font-mono text-xs text-muted-foreground">{v.sha256}</p>
                   </div>
-                  <div className="text-muted-foreground">{(v.size_bytes / (1024 * 1024)).toFixed(1)} MB</div>
+                  <div className="flex flex-col gap-2 sm:items-end">
+                    <div className="text-muted-foreground">{(v.size_bytes / (1024 * 1024)).toFixed(1)} MB</div>
+                    {isAdmin ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={deletingVersionId === v.id || deletingDocument}
+                        onClick={() => void onDeleteVersion(v)}
+                      >
+                        {deletingVersionId === v.id ? 'A apagar…' : 'Apagar versão'}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

@@ -48,3 +48,7 @@ class S3ObjectStorage:
             if code in {"404", "NoSuchKey", "NotFound"}:
                 return False
             raise
+
+    def delete_object(self, key: str) -> None:
+        # S3 delete is idempotent; no error if key is missing.
+        self._client.delete_object(Bucket=self._bucket, Key=key)

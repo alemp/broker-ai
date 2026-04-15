@@ -30,3 +30,10 @@ class LocalObjectStorage:
     def exists_object(self, key: str) -> bool:
         path = self._path(key)
         return path.exists()
+
+    def delete_object(self, key: str) -> None:
+        path = self._path(key)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            raise

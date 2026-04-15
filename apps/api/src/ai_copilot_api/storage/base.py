@@ -16,3 +16,7 @@ class ObjectStorage(Protocol):
     def exists_object(self, key: str) -> bool:
         """Return True if object exists for `key`."""
         ...
+
+    def delete_object(self, key: str) -> None:
+        """Delete object by key. Raises FileNotFoundError if missing (local)."""
+        ...

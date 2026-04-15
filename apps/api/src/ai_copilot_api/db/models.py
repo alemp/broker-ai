@@ -250,10 +250,14 @@ class Document(Base):
     extraction_runs: Mapped[list["DocumentExtractionRun"]] = relationship(
         "DocumentExtractionRun",
         back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     versions: Mapped[list["DocumentVersion"]] = relationship(
         "DocumentVersion",
         back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 

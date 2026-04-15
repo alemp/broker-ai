@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from ai_copilot_api.api.deps import get_current_user, require_admin
@@ -293,4 +293,139 @@ def list_document_versions(
         .order_by(DocumentVersion.version.desc()),
     ).all()
     return [DocumentVersionOut.model_validate(r) for r in rows]
+
+
+def _delete_storage_object_if_unreferenced(
+    db: Session,
+    *,
+    org_id: uuid.UUID,
+    storage_key: str,
+    settings: Settings,
+) -> None:
+    remaining = db.scalar(
+        select(func.count()).select_from(DocumentVersion).where(
+            DocumentVersion.organization_id == org_id,
+            DocumentVersion.storage_key == storage_key,
+        ),
+    )
+    if isinstance(remaining, int) and remaining > 0:
+        return
+    storage = get_object_storage(settings)
+    try:
+        storage.delete_object(storage_key)
+    except FileNotFoundError:
+        # Best-effort; the DB is the source of truth.
+        return
+
+
+@router.delete("/{document_id}/versions/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document_version(
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(require_admin),
+) -> None:
+    org_id = current_user.organization_id
+
+    doc = db.scalar(
+        select(Document).where(Document.id == document_id, Document.organization_id == org_id),
+    )
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    version = db.scalar(
+        select(DocumentVersion).where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+            DocumentVersion.organization_id == org_id,
+        ),
+    )
+    if version is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document version not found",
+        )
+
+    total_versions = db.scalar(
+        select(func.count()).select_from(DocumentVersion).where(
+            DocumentVersion.document_id == document_id,
+            DocumentVersion.organization_id == org_id,
+        ),
+    )
+    if isinstance(total_versions, int) and total_versions <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the only version of a document",
+        )
+
+    deleted_storage_key = version.storage_key
+    deleted_version_number = version.version
+    db.delete(version)
+    db.flush()
+
+    # If we deleted the current version, promote the latest remaining version.
+    if doc.current_version == deleted_version_number:
+        promoted = db.scalar(
+            select(DocumentVersion)
+            .where(
+                DocumentVersion.document_id == document_id,
+                DocumentVersion.organization_id == org_id,
+            )
+            .order_by(DocumentVersion.version.desc())
+            .limit(1),
+        )
+        if promoted is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot promote a new current version",
+            )
+        doc.uploaded_by_id = promoted.uploaded_by_id
+        doc.content_type = promoted.content_type
+        doc.size_bytes = promoted.size_bytes
+        doc.sha256 = promoted.sha256
+        doc.storage_key = promoted.storage_key
+        doc.current_version = promoted.version
+
+    db.commit()
+    _delete_storage_object_if_unreferenced(
+        db,
+        org_id=org_id,
+        storage_key=deleted_storage_key,
+        settings=settings,
+    )
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(
+    document_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(require_admin),
+) -> None:
+    org_id = current_user.organization_id
+
+    doc = db.scalar(
+        select(Document).where(Document.id == document_id, Document.organization_id == org_id),
+    )
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    storage_keys = db.scalars(
+        select(DocumentVersion.storage_key).where(
+            DocumentVersion.document_id == document_id,
+            DocumentVersion.organization_id == org_id,
+        ),
+    ).all()
+
+    db.delete(doc)
+    db.commit()
+
+    for key in set(storage_keys):
+        _delete_storage_object_if_unreferenced(
+            db,
+            org_id=org_id,
+            storage_key=key,
+            settings=settings,
+        )
 
