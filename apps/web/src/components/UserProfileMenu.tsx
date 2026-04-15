@@ -1,5 +1,6 @@
 import { ChevronDown, LogOut, Monitor, Moon, Sun, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { DropdownMenu } from 'radix-ui'
 
 import { Button } from '@/components/ui/button'
@@ -54,6 +55,15 @@ export function UserProfileMenu() {
           <DropdownMenu.Label className={cn(labelClass, 'text-foreground font-normal')}>
             {user.email}
           </DropdownMenu.Label>
+          <DropdownMenu.Item className={itemClass} asChild>
+            <Link to="/profile">
+              <span className="absolute left-2 flex size-3.5 items-center justify-center">
+                <User className="size-4" aria-hidden />
+              </span>
+              {t('profile.menu')}
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator className="bg-border my-1 h-px" />
           <DropdownMenu.Label className={labelClass}>{t('theme.appearance')}</DropdownMenu.Label>
           <div
             className="flex items-center justify-center gap-1 px-2 pb-2"
