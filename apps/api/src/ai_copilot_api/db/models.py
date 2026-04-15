@@ -35,6 +35,7 @@ from ai_copilot_api.db.enums import (
     ClientKind,
     CrmAuditAction,
     CrmEntityType,
+    DocumentType,
     IngestionSource,
     InsuredRelation,
     InteractionType,
@@ -87,6 +88,7 @@ class Organization(Base):
     leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="organization")
     insurers: Mapped[list["Insurer"]] = relationship("Insurer", back_populates="organization")
     campaigns: Mapped[list["Campaign"]] = relationship("Campaign", back_populates="organization")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="organization")
     client_import_batches: Mapped[list["ClientImportBatch"]] = relationship(
         "ClientImportBatch",
         back_populates="organization",
@@ -162,6 +164,257 @@ class User(Base):
         back_populates="created_by_user",
         foreign_keys="RecommendationRun.created_by_id",
     )
+    uploaded_documents: Mapped[list["Document"]] = relationship(
+        "Document",
+        back_populates="uploaded_by_user",
+        foreign_keys="Document.uploaded_by_id",
+    )
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    __table_args__ = (
+        Index("ix_documents_org_created_at", "organization_id", "created_at"),
+        Index("ix_documents_org_sha256", "organization_id", "sha256"),
+        UniqueConstraint(
+            "organization_id",
+            "document_type",
+            "product_id",
+            "original_filename",
+            name="uq_documents_org_type_product_filename",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    uploaded_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("products.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    document_type: Mapped[DocumentType] = mapped_column(
+        _varchar_enum(DocumentType),
+        nullable=False,
+        index=True,
+    )
+    original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    content_type: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default="application/pdf",
+    )
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    current_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        insert_default=1,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization", back_populates="documents")
+    uploaded_by_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="uploaded_documents",
+        foreign_keys=[uploaded_by_id],
+    )
+    product: Mapped["Product | None"] = relationship("Product", back_populates="documents")
+    extraction_runs: Mapped[list["DocumentExtractionRun"]] = relationship(
+        "DocumentExtractionRun",
+        back_populates="document",
+    )
+    versions: Mapped[list["DocumentVersion"]] = relationship(
+        "DocumentVersion",
+        back_populates="document",
+    )
+
+
+class DocumentVersion(Base):
+    __tablename__ = "document_versions"
+    __table_args__ = (
+        UniqueConstraint("document_id", "version", name="uq_document_versions_doc_version"),
+        Index("ix_document_versions_doc_created_at", "document_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    uploaded_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_type: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default="application/pdf",
+    )
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    document: Mapped["Document"] = relationship("Document", back_populates="versions")
+    organization: Mapped["Organization"] = relationship("Organization")
+    uploaded_by_user: Mapped["User"] = relationship("User", foreign_keys=[uploaded_by_id])
+
+
+class DocumentExtractionRun(Base):
+    __tablename__ = "document_extraction_runs"
+    __table_args__ = (
+        Index("ix_doc_extract_org_created_at", "organization_id", "created_at"),
+        Index("ix_doc_extract_doc_created_at", "document_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    confirmed_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    confidence: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=0,
+        insert_default=0,
+    )
+    requires_review: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        insert_default=True,
+    )
+    extracted_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        insert_default=dict,
+    )
+    normalized_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        insert_default=dict,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    document: Mapped["Document"] = relationship("Document", back_populates="extraction_runs")
+    created_by_user: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
+    confirmed_by_user: Mapped["User | None"] = relationship("User", foreign_keys=[confirmed_by_id])
+
+
+class CoverageTaxonomy(Base):
+    __tablename__ = "coverage_taxonomy"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "code", name="uq_cov_taxonomy_org_code"),
+        Index("ix_cov_taxonomy_org_code", "organization_id", "code"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    synonyms: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        insert_default=list,
+    )
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, insert_default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
 
 
 class Insurer(Base):
@@ -258,6 +511,7 @@ class Product(Base):
         back_populates="products",
     )
     insurer: Mapped["Insurer | None"] = relationship("Insurer", back_populates="products")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="product")
     opportunities: Mapped[list["Opportunity"]] = relationship(
         "Opportunity",
         back_populates="product",
@@ -459,6 +713,12 @@ class BatchJobRun(Base):
         Integer,
         nullable=False,
         server_default=text("0"),
+    )
+    job_meta: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+        insert_default=dict,
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 

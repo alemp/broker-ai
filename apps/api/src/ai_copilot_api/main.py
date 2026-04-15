@@ -7,7 +7,10 @@ from ai_copilot_api.api.routes_auth import router as auth_router
 from ai_copilot_api.api.routes_campaigns import router as campaigns_router
 from ai_copilot_api.api.routes_client_import import router as client_import_router
 from ai_copilot_api.api.routes_clients import router as clients_router
+from ai_copilot_api.api.routes_coverage_taxonomy import router as coverage_taxonomy_router
 from ai_copilot_api.api.routes_dashboard import router as dashboard_router
+from ai_copilot_api.api.routes_document_extraction import router as document_extraction_router
+from ai_copilot_api.api.routes_documents import router as documents_router
 from ai_copilot_api.api.routes_insurers import router as insurers_router
 from ai_copilot_api.api.routes_intel import router as intel_router
 from ai_copilot_api.api.routes_intel_leads import router as intel_leads_router
@@ -73,6 +76,9 @@ app.include_router(intel_router, prefix="/v1")
 app.include_router(intel_leads_router, prefix="/v1")
 app.include_router(recommendation_rules_router, prefix="/v1")
 app.include_router(insurers_router, prefix="/v1")
+app.include_router(documents_router, prefix="/v1")
+app.include_router(document_extraction_router, prefix="/v1")
+app.include_router(coverage_taxonomy_router, prefix="/v1")
 app.include_router(leads_router, prefix="/v1")
 app.include_router(products_router, prefix="/v1")
 app.include_router(campaigns_router, prefix="/v1")

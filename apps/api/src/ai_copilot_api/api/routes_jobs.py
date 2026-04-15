@@ -1,8 +1,10 @@
-"""Phase 9 — manual batch job triggers."""
+"""Phase 9 — manual batch job triggers + async job status."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -50,3 +52,20 @@ def get_last_adequacy_refresh(
         .order_by(BatchJobRun.finished_at.desc())
         .limit(1),
     )
+
+
+@router.get("/{job_id}", response_model=BatchJobRunOut)
+def get_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> BatchJobRun:
+    row = db.scalar(
+        select(BatchJobRun).where(
+            BatchJobRun.id == job_id,
+            BatchJobRun.organization_id == current_user.organization_id,
+        ),
+    )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return row

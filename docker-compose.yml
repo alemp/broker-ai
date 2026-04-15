@@ -26,8 +26,12 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
       DEFAULT_ORGANIZATION_SLUG: ${DEFAULT_ORGANIZATION_SLUG:-default}
       ADEQUACY_REFRESH_INTERVAL_MINUTES: ${ADEQUACY_REFRESH_INTERVAL_MINUTES:-0}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      LOCAL_STORAGE_PATH: ${LOCAL_STORAGE_PATH:-/data/objects}
     ports:
       - '${API_PORT:-8000}:8000'
+    volumes:
+      - api_objects:/data/objects
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,3 +49,4 @@ services:
 
 volumes:
   postgres_data:
+  api_objects:

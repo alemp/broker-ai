@@ -133,3 +133,12 @@ class UserRole(StrEnum):
     ADMIN = "ADMIN"
     SALES_MANAGER = "SALES_MANAGER"
     BROKER = "BROKER"
+
+
+class DocumentType(StrEnum):
+    """Uploaded document classification for policy adequacy workflows."""
+
+    POLICY = "POLICY"
+    GENERAL_CONDITIONS = "GENERAL_CONDITIONS"
+    PROPOSAL = "PROPOSAL"
+    ENDORSEMENT = "ENDORSEMENT"

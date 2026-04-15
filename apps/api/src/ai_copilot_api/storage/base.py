@@ -12,3 +12,7 @@ class ObjectStorage(Protocol):
     def get_object(self, key: str) -> bytes:
         """Read object by key."""
         ...
+
+    def exists_object(self, key: str) -> bool:
+        """Return True if object exists for `key`."""
+        ...

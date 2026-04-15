@@ -37,6 +37,8 @@
   "nav.users": "Usuários",
   "nav.insurers": "Seguradoras",
   "nav.products": "Produtos (catálogo)",
+  "nav.documents": "Documentos",
+  "nav.coverageTaxonomy": "Taxonomia de coberturas",
   "nav.campaigns": "Campanhas",
   "releaseNotes.navButtonAria": "Notas de versão — ver alterações do sistema",
   "releaseNotes.title": "Notas de versão",

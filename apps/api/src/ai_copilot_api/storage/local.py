@@ -26,3 +26,7 @@ class LocalObjectStorage:
     def get_object(self, key: str) -> bytes:
         path = self._path(key)
         return path.read_bytes()
+
+    def exists_object(self, key: str) -> bool:
+        path = self._path(key)
+        return path.exists()

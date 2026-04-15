@@ -20,6 +20,8 @@ const adminNavItems = [
   { to: '/users', labelKey: 'nav.users' as const, adminOnly: true as const },
   { to: '/insurers', labelKey: 'nav.insurers' as const },
   { to: '/products', labelKey: 'nav.products' as const },
+  { to: '/documents', labelKey: 'nav.documents' as const },
+  { to: '/coverage-taxonomy', labelKey: 'nav.coverageTaxonomy' as const },
   { to: '/campaigns', labelKey: 'nav.campaigns' as const },
 ] satisfies readonly { to: string; labelKey: string; adminOnly?: boolean }[]
 
@@ -50,6 +52,9 @@ function isAdminPath(pathname: string) {
     pathname.startsWith('/insurers/') ||
     pathname === '/products' ||
     pathname.startsWith('/products/') ||
+    pathname === '/documents' ||
+    pathname.startsWith('/documents/') ||
+    pathname === '/coverage-taxonomy' ||
     pathname === '/campaigns' ||
     pathname.startsWith('/campaigns/')
   )

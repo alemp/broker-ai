@@ -782,6 +782,7 @@ class BatchJobRunOut(BaseModel):
     started_at: datetime
     finished_at: datetime | None
     clients_processed: int
+    job_meta: dict[str, Any]
     error_message: str | None
 
 

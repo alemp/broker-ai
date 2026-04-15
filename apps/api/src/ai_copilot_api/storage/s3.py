@@ -1,5 +1,6 @@
 import boto3
 from botocore.client import BaseClient
+from botocore.exceptions import ClientError
 
 
 class S3ObjectStorage:
@@ -37,3 +38,13 @@ class S3ObjectStorage:
         response = self._client.get_object(Bucket=self._bucket, Key=key)
         body = response["Body"]
         return body.read()
+
+    def exists_object(self, key: str) -> bool:
+        try:
+            self._client.head_object(Bucket=self._bucket, Key=key)
+            return True
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code")
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                return False
+            raise

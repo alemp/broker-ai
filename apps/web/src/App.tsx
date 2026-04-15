@@ -14,6 +14,9 @@ import { InsurersPage } from '@/pages/InsurersPage'
 import { ProductDetailPage } from '@/pages/ProductDetailPage'
 import { ProductNewPage } from '@/pages/ProductNewPage'
 import { ProductsPage } from '@/pages/ProductsPage'
+import { CoverageTaxonomyPage } from '@/pages/CoverageTaxonomyPage'
+import { DocumentDetailPage } from '@/pages/DocumentDetailPage'
+import { DocumentsPage } from '@/pages/DocumentsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { LeadCreatePage } from '@/pages/LeadCreatePage'
@@ -56,6 +59,9 @@ export default function App() {
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/products/new" element={<ProductNewPage />} />
         <Route path="/products/:productId" element={<ProductDetailPage />} />
+        <Route path="/documents" element={<DocumentsPage />} />
+        <Route path="/documents/:documentId" element={<DocumentDetailPage />} />
+        <Route path="/coverage-taxonomy" element={<CoverageTaxonomyPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/campaigns/new" element={<CampaignNewPage />} />
         <Route path="/users" element={<UsersPage />} />
