@@ -1,8 +1,22 @@
 # Notas de versão — Plataforma comercial inteligente
 
-**Última atualização deste sumário:** 5 de abril de 2026
+**Última atualização deste sumário:** 26 de abril de 2026
 
-Este documento é um **sumário executivo** das entregas do sistema, organizadas por versão. Cada versão está relacionada às **grandes áreas funcionais** da plataforma: jornada comercial do corretor, perfil orientado a seguros, carteira e recomendações, relacionamento e pós-venda, e inteligência sobre oportunidades — conforme a visão de produto acordada para o MVP.
+Este documento é um **sumário executivo** das entregas do sistema, organizadas por versão. Cada versão está relacionada às **grandes áreas funcionais** da plataforma: jornada comercial do corretor, perfil orientado a seguros, carteira e recomendações, relacionamento e pós-venda, inteligência sobre oportunidades e — nas entregas mais recentes — **documentos e extração**, além de **administração** (organização/usuários) e evolução contínua do CRM e do catálogo.
+
+---
+
+## v0.9.0 — Documentos, extração e evolução do CRM
+
+**Foco:** habilitar gestão de documentos e leitura assistida, enquanto consolida administração e paridade lead/cliente no CRM.
+
+- **Documentos (PDF):** versionamento, extração assíncrona e suporte a exclusão de documentos e versões.
+- **Extração híbrida:** serviço de **OCR** e fallback priorizando **pypdf** quando aplicável.
+- **CRM (leads e clientes):** evolução de formulários e dados pessoais; melhorias de paridade entre telas de lead/cliente e alinhamento de UX.
+- **Interações:** roteamento correto das interações do dia para cliente, lead ou oportunidade.
+- **Administração:** gestão de usuários e edição de organização; navegação agrupando itens administrativos (seguradoras e campanhas).
+- **Catálogo:** consolidação de cadastro e edição de seguradoras e produtos (base para recomendação e carteira).
+- **Áreas de produto:** documentos e extração; CRM e operação comercial; administração e catálogo.
 
 ---
 

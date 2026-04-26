@@ -69,6 +69,7 @@ export default function App() {
         <Route path="/organization" element={<OrganizationPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/release-notes" element={<ReleaseNotesPage />} />
+        <Route path="/release_notes" element={<Navigate to="/release-notes" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
