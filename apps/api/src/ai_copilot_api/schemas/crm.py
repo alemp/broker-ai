@@ -70,17 +70,28 @@ class OrgUserAdminCreatedOut(BaseModel):
     temporary_password: str | None = None
 
 
+class CurrencyOptionOut(BaseModel):
+    code: str = Field(min_length=3, max_length=3)
+    label: str = Field(min_length=1, max_length=128)
+
+
+class CurrencyOptionsOut(BaseModel):
+    options: list[CurrencyOptionOut]
+
+
 class OrganizationAdminOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str
     slug: str
+    currency: str
     created_at: datetime
 
 
 class OrganizationAdminUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
 
 
 class ClientBrief(BaseModel):
@@ -120,6 +131,8 @@ class ClientCreate(BaseModel):
             self.company_legal_name and self.company_legal_name.strip()
         ):
             raise ValueError("company_legal_name is required when client_kind is COMPANY")
+        if self.client_kind == ClientKind.COMPANY and not (self.company_tax_id and self.company_tax_id.strip()):
+            raise ValueError("company_tax_id is required when client_kind is COMPANY")
         return self
 
 
@@ -137,6 +150,13 @@ class ClientUpdate(BaseModel):
     company_tax_id: str | None = Field(default=None, max_length=32)
     marketing_opt_in: bool | None = None
     preferred_marketing_channel: str | None = Field(default=None, max_length=64)
+
+    @model_validator(mode="after")
+    def require_company_tax_id_when_company(self) -> Self:
+        # For updates, we can only validate when client_kind is explicitly being set to COMPANY.
+        if self.client_kind == ClientKind.COMPANY and not (self.company_tax_id and self.company_tax_id.strip()):
+            raise ValueError("company_tax_id is required when client_kind is COMPANY")
+        return self
 
 
 class ClientOut(BaseModel):

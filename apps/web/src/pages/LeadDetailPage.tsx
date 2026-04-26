@@ -27,6 +27,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { PartyOpportunitiesCard, type PartyOppRow } from '@/components/PartyOpportunitiesCard'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
@@ -39,6 +40,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs'
+import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
 import {
   translateIngestionSource,
@@ -49,6 +51,7 @@ import {
   translateProductCategory,
 } from '@/lib/crmEnumLabels'
 import { MARKETING_CHANNELS, marketingChannelSummaryLabel } from '@/lib/marketingChannels'
+import { formatCnpj, isValidCnpj } from '@/lib/cnpj'
 
 const INTERACTION_TYPES = [
   'CALL',
@@ -344,7 +347,9 @@ type ConvertResponse = {
 }
 
 export function LeadDetailPage() {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
+  const { user } = useAuth()
+  const isPtBr = (i18n.resolvedLanguage ?? 'pt-BR').toLowerCase() === 'pt-br'
   const { leadId } = useParams<{ leadId: string }>()
   const navigate = useNavigate()
   const [lead, setLead] = useState<LeadDetail | null>(null)
@@ -380,6 +385,7 @@ export function LeadDetailPage() {
   const [crmKind, setCrmKind] = useState('INDIVIDUAL')
   const [crmLegal, setCrmLegal] = useState('')
   const [crmTax, setCrmTax] = useState('')
+  const [touchedCrmTax, setTouchedCrmTax] = useState(false)
   const [crmMarketingOptIn, setCrmMarketingOptIn] = useState('yes')
   const [crmMarketingChannel, setCrmMarketingChannel] = useState('')
   const [savingCrm, setSavingCrm] = useState(false)
@@ -600,6 +606,16 @@ export function LeadDetailPage() {
     }
     if (crmKind === 'COMPANY' && !crmLegal.trim()) {
       setError(t('crm.core.companyLegalRequired'))
+      return
+    }
+    if (crmKind === 'COMPANY' && !crmTax.trim()) {
+      setTouchedCrmTax(true)
+      setError(t('crm.core.companyTaxRequired'))
+      return
+    }
+    if (isPtBr && crmKind === 'COMPANY' && !isValidCnpj(crmTax)) {
+      setTouchedCrmTax(true)
+      setError(t('crm.core.companyTaxInvalid'))
       return
     }
     setSavingCrm(true)
@@ -943,8 +959,29 @@ export function LeadDetailPage() {
                                 <Input
                                   id="lead-crm-tax"
                                   value={crmTax}
-                                  onChange={(ev) => setCrmTax(ev.target.value)}
+                                  onChange={(ev) =>
+                                    setCrmTax(isPtBr ? formatCnpj(ev.target.value) : ev.target.value)
+                                  }
+                                  onBlur={() => setTouchedCrmTax(true)}
+                                  aria-invalid={
+                                    crmKind === 'COMPANY' && (touchedCrmTax || crmTax !== '') && !crmTax.trim()
+                                      ? true
+                                      : undefined
+                                  }
+                                  required
                                 />
+                                {crmKind === 'COMPANY' &&
+                                (touchedCrmTax || crmTax !== '') &&
+                                !crmTax.trim() ? (
+                                  <p className="text-destructive text-xs">{t('crm.core.companyTaxRequired')}</p>
+                                ) : null}
+                                {isPtBr &&
+                                crmKind === 'COMPANY' &&
+                                (touchedCrmTax || crmTax !== '') &&
+                                crmTax.trim() &&
+                                !isValidCnpj(crmTax) ? (
+                                  <p className="text-destructive text-xs">{t('crm.core.companyTaxInvalid')}</p>
+                                ) : null}
                               </div>
                             </>
                           ) : null}
@@ -1619,11 +1656,15 @@ export function LeadDetailPage() {
                             </div>
                             <div className="grid gap-2">
                               <Label htmlFor="conv-val">{t('crm.leads.estimatedValue')}</Label>
-                              <Input
+                              <CurrencyInput
                                 id="conv-val"
                                 value={oppValue}
-                                onChange={(ev) => setOppValue(ev.target.value)}
-                                placeholder="0.00"
+                                onValueChange={setOppValue}
+                                placeholder="0"
+                                money={{
+                                  locale: i18n.resolvedLanguage ?? 'pt',
+                                  currency: user?.organization.currency ?? 'BRL',
+                                }}
                               />
                             </div>
                             <div className="grid gap-2">

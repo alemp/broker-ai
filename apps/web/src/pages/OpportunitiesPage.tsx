@@ -18,6 +18,7 @@ import {
   translateOpportunityStage,
   translateOpportunityStatus,
 } from '@/lib/crmEnumLabels'
+import { formatCurrency } from '@/lib/money'
 import { cn } from '@/lib/utils'
 
 const LIST_VIEW_STORAGE_KEY = 'ai-copilot:list-view:opportunities'
@@ -48,7 +49,7 @@ const PIPELINE_STAGES = [
 ] as const
 
 export function OpportunitiesPage() {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
   const { user } = useAuth()
   const [items, setItems] = useState<OpportunityRow[]>([])
   const [metrics, setMetrics] = useState<MetricsSummary | null>(null)
@@ -102,6 +103,13 @@ export function OpportunitiesPage() {
   }, [load])
 
   const partyLabel = (o: OpportunityRow) => o.client?.full_name ?? o.lead?.full_name ?? '—'
+  const money = useMemo(
+    () => ({
+      locale: i18n.resolvedLanguage ?? 'pt',
+      currency: user?.organization.currency ?? 'BRL',
+    }),
+    [i18n.resolvedLanguage, user?.organization.currency],
+  )
 
   const filterRow = (
     <div className="grid gap-4 sm:grid-cols-3">
@@ -280,7 +288,9 @@ export function OpportunitiesPage() {
                     <TableCell className="text-muted-foreground">
                       {translateOpportunityStatus(o.status, t)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{o.estimated_value ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {o.estimated_value ? formatCurrency(o.estimated_value, money) : '—'}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" asChild>
                         <Link to={`/opportunities/${o.id}`}>{t('crm.action.view')}</Link>
@@ -321,7 +331,7 @@ export function OpportunitiesPage() {
                               <dt className="text-foreground/80 font-medium">
                                 {t('crm.opportunities.tableValue')}
                               </dt>
-                              <dd>{o.estimated_value}</dd>
+                              <dd>{formatCurrency(o.estimated_value, money)}</dd>
                             </div>
                           ) : null}
                         </dl>

@@ -23,6 +23,7 @@ def _me_response(current_user: User) -> MeResponse:
                 id=org.id,
                 name=org.name,
                 slug=org.slug,
+                currency=org.currency,
             ),
         ),
     )

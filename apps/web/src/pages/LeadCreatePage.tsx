@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
 import { apiFetch } from '@/lib/api'
 import { MARKETING_CHANNELS } from '@/lib/marketingChannels'
+import { formatCnpj, isValidCnpj } from '@/lib/cnpj'
 
 type UserBrief = {
   id: string
@@ -23,7 +24,7 @@ type CreatedLead = {
 }
 
 export function LeadCreatePage() {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
   const navigate = useNavigate()
   const [users, setUsers] = useState<UserBrief[]>([])
   const [fullName, setFullName] = useState('')
@@ -41,11 +42,25 @@ export function LeadCreatePage() {
   const [error, setError] = useState<string | null>(null)
   const [touchedFullName, setTouchedFullName] = useState(false)
   const [touchedCompanyLegal, setTouchedCompanyLegal] = useState(false)
+  const [touchedCompanyTax, setTouchedCompanyTax] = useState(false)
 
   const fullNameError = (touchedFullName || fullName !== '') && !fullName.trim() ? t('crm.core.fullNameRequired') : null
   const companyLegalError =
     clientKind === 'COMPANY' && (touchedCompanyLegal || companyLegal !== '') && !companyLegal.trim()
       ? t('crm.core.companyLegalRequired')
+      : null
+  const companyTaxError =
+    clientKind === 'COMPANY' && (touchedCompanyTax || companyTax !== '') && !companyTax.trim()
+      ? t('crm.core.companyTaxRequired')
+      : null
+  const isPtBr = (i18n.resolvedLanguage ?? 'pt-BR').toLowerCase() === 'pt-br'
+  const companyTaxInvalidError =
+    isPtBr &&
+    clientKind === 'COMPANY' &&
+    (touchedCompanyTax || companyTax !== '') &&
+    companyTax.trim() &&
+    !isValidCnpj(companyTax)
+      ? t('crm.core.companyTaxInvalid')
       : null
 
   useEffect(() => {
@@ -76,6 +91,16 @@ export function LeadCreatePage() {
       setError(t('crm.core.companyLegalRequired'))
       return
     }
+    if (clientKind === 'COMPANY' && !companyTax.trim()) {
+      setTouchedCompanyTax(true)
+      setError(t('crm.core.companyTaxRequired'))
+      return
+    }
+    if (isPtBr && clientKind === 'COMPANY' && !isValidCnpj(companyTax)) {
+      setTouchedCompanyTax(true)
+      setError(t('crm.core.companyTaxInvalid'))
+      return
+    }
     setCreating(true)
     setError(null)
     try {
@@ -93,7 +118,7 @@ export function LeadCreatePage() {
           ...(clientKind === 'COMPANY'
             ? {
                 company_legal_name: companyLegal.trim(),
-                company_tax_id: companyTax.trim() || undefined,
+                company_tax_id: companyTax.trim(),
               }
             : {}),
           marketing_opt_in: marketingOptIn,
@@ -218,8 +243,15 @@ export function LeadCreatePage() {
                       <Input
                         id="lead-tax"
                         value={companyTax}
-                        onChange={(ev) => setCompanyTax(ev.target.value)}
+                        onChange={(ev) => setCompanyTax(isPtBr ? formatCnpj(ev.target.value) : ev.target.value)}
+                        onBlur={() => setTouchedCompanyTax(true)}
+                        aria-invalid={companyTaxError || companyTaxInvalidError ? true : undefined}
+                        required
                       />
+                      {companyTaxError ? <p className="text-destructive text-xs">{companyTaxError}</p> : null}
+                      {companyTaxInvalidError ? (
+                        <p className="text-destructive text-xs">{companyTaxInvalidError}</p>
+                      ) : null}
                     </div>
                   </>
                 ) : null}

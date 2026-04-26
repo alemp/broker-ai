@@ -51,6 +51,7 @@ import {
   translateProductCategory,
 } from '@/lib/crmEnumLabels'
 import { MARKETING_CHANNELS, marketingChannelSummaryLabel } from '@/lib/marketingChannels'
+import { formatCnpj, isValidCnpj } from '@/lib/cnpj'
 const INTERACTION_TYPES = [
   'CALL',
   'WHATSAPP',
@@ -602,7 +603,7 @@ type InteractionDto = {
 type ClientOppRow = Pick<PartyOppRow, 'id' | 'stage' | 'status'>
 
 export function ClientDetailPage() {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
   const { clientId } = useParams<{ clientId: string }>()
   const [detail, setDetail] = useState<ClientDetail | null>(null)
   const [products, setProducts] = useState<ProductBrief[]>([])
@@ -627,6 +628,7 @@ export function ClientDetailPage() {
   const [crmKind, setCrmKind] = useState('INDIVIDUAL')
   const [crmLegal, setCrmLegal] = useState('')
   const [crmTax, setCrmTax] = useState('')
+  const [touchedCrmTax, setTouchedCrmTax] = useState(false)
   const [savingCrm, setSavingCrm] = useState(false)
   const [insuredName, setInsuredName] = useState('')
   const [insuredRelation, setInsuredRelation] = useState('HOLDER')
@@ -639,6 +641,8 @@ export function ClientDetailPage() {
   const [runRecLoading, setRunRecLoading] = useState(false)
   const [recPreview, setRecPreview] = useState<RecPreviewDto | null>(null)
   const [recPreviewLoading, setRecPreviewLoading] = useState(false)
+
+  const isPtBr = (i18n.resolvedLanguage ?? 'pt-BR').toLowerCase() === 'pt-br'
 
   const loadAll = useCallback(async () => {
     if (!clientId) {
@@ -742,6 +746,16 @@ export function ClientDetailPage() {
     }
     if (!crmFullName.trim()) {
       setError(t('crm.core.fullNameRequired'))
+      return
+    }
+    if (crmKind === 'COMPANY' && !crmTax.trim()) {
+      setTouchedCrmTax(true)
+      setError(t('crm.core.companyTaxRequired'))
+      return
+    }
+    if (isPtBr && crmKind === 'COMPANY' && !isValidCnpj(crmTax)) {
+      setTouchedCrmTax(true)
+      setError(t('crm.core.companyTaxInvalid'))
       return
     }
     setSavingCrm(true)
@@ -1118,8 +1132,29 @@ export function ClientDetailPage() {
                               <Input
                                 id="crm-tax"
                                 value={crmTax}
-                                onChange={(ev) => setCrmTax(ev.target.value)}
+                                onChange={(ev) =>
+                                  setCrmTax(isPtBr ? formatCnpj(ev.target.value) : ev.target.value)
+                                }
+                                onBlur={() => setTouchedCrmTax(true)}
+                                aria-invalid={
+                                  crmKind === 'COMPANY' && (touchedCrmTax || crmTax !== '') && !crmTax.trim()
+                                    ? true
+                                    : undefined
+                                }
+                                required
                               />
+                              {crmKind === 'COMPANY' &&
+                              (touchedCrmTax || crmTax !== '') &&
+                              !crmTax.trim() ? (
+                                <p className="text-destructive text-xs">{t('crm.core.companyTaxRequired')}</p>
+                              ) : null}
+                              {isPtBr &&
+                              crmKind === 'COMPANY' &&
+                              (touchedCrmTax || crmTax !== '') &&
+                              crmTax.trim() &&
+                              !isValidCnpj(crmTax) ? (
+                                <p className="text-destructive text-xs">{t('crm.core.companyTaxInvalid')}</p>
+                              ) : null}
                             </div>
                           </>
                         ) : null}

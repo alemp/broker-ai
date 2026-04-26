@@ -4,12 +4,12 @@ import { initReactI18next } from 'react-i18next'
 import commonPt from '@/locales/pt/common.json'
 
 void i18n.use(initReactI18next).init({
-  lng: 'pt',
-  fallbackLng: 'pt',
+  lng: 'pt-BR',
+  fallbackLng: 'pt-BR',
   defaultNS: 'common',
   ns: ['common'],
   resources: {
-    pt: { common: commonPt },
+    'pt-BR': { common: commonPt },
   },
   interpolation: { escapeValue: false },
 })

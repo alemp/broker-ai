@@ -13,6 +13,8 @@ from ai_copilot_api.db.enums import UserRole
 from ai_copilot_api.db.models import Organization, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.schemas.crm import (
+    CurrencyOptionOut,
+    CurrencyOptionsOut,
     OrganizationAdminOut,
     OrganizationAdminUpdate,
     OrgUserAdminCreate,
@@ -23,6 +25,43 @@ from ai_copilot_api.schemas.crm import (
 )
 
 router = APIRouter(prefix="/org", tags=["organization"])
+
+_CURRENCY_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("BRL", "BRL — Real brasileiro (R$)"),
+    ("USD", "USD — Dólar americano ($)"),
+    ("EUR", "EUR — Euro (€)"),
+    ("GBP", "GBP — Libra esterlina (£)"),
+    ("CAD", "CAD — Dólar canadense (CA$)"),
+    ("CHF", "CHF — Franco suíço (CHF)"),
+    ("JPY", "JPY — Iene japonês (¥)"),
+    ("AUD", "AUD — Dólar australiano (A$)"),
+    ("NZD", "NZD — Dólar neozelandês (NZ$)"),
+    ("MXN", "MXN — Peso mexicano ($)"),
+    ("ARS", "ARS — Peso argentino ($)"),
+    ("CLP", "CLP — Peso chileno ($)"),
+    ("COP", "COP — Peso colombiano ($)"),
+    ("PEN", "PEN — Sol peruano (S/)"),
+    ("UYU", "UYU — Peso uruguaio ($U)"),
+    ("ZAR", "ZAR — Rand sul-africano (R)"),
+)
+
+
+@router.get("/currencies", response_model=CurrencyOptionsOut)
+def list_currencies() -> CurrencyOptionsOut:
+    return CurrencyOptionsOut(
+        options=[CurrencyOptionOut(code=code, label=label) for code, label in _CURRENCY_OPTIONS],
+    )
+
+
+def _validate_currency(code: str) -> str:
+    code_norm = code.strip().upper()
+    allowed = {c for c, _ in _CURRENCY_OPTIONS}
+    if code_norm not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid currency",
+        )
+    return code_norm
 
 
 def _org_user_or_404(db: Session, org_id: uuid.UUID, user_id: uuid.UUID) -> User:
@@ -79,6 +118,8 @@ def admin_update_organization(
     org = db.scalar(select(Organization).where(Organization.id == admin_user.organization_id))
     assert org is not None  # org is enforced by foreign key
     org.name = body.name.strip()
+    if body.currency is not None:
+        org.currency = _validate_currency(body.currency)
     db.commit()
     db.refresh(org)
     return OrganizationAdminOut.model_validate(org)

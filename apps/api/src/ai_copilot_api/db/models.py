@@ -68,6 +68,12 @@ class Organization(Base):
         unique=True,
         index=True,
     )
+    currency: Mapped[str] = mapped_column(
+        String(3),
+        nullable=False,
+        default="BRL",
+        insert_default="BRL",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

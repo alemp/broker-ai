@@ -15,6 +15,8 @@ import {
   translateOpportunityStage,
   translateOpportunityStatus,
 } from '@/lib/crmEnumLabels'
+import { formatCurrency } from '@/lib/money'
+import { useAuth } from '@/contexts/AuthContext'
 export type PartyOppRow = {
   id: string
   stage: string
@@ -64,7 +66,8 @@ export function PartyOpportunitiesCard({
   searchFieldId,
   onOpportunitiesLoaded,
 }: PartyOpportunitiesCardProps) {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
+  const { user } = useAuth()
   const onLoadedRef = useRef(onOpportunitiesLoaded)
   onLoadedRef.current = onOpportunitiesLoaded
 
@@ -109,6 +112,14 @@ export function PartyOpportunitiesCard({
   const items = useMemo(
     () => allRows.filter((r) => rowMatchesQuery(r, debouncedListSearch, t)),
     [allRows, debouncedListSearch, t],
+  )
+
+  const money = useMemo(
+    () => ({
+      locale: i18n.resolvedLanguage ?? 'pt',
+      currency: user?.organization.currency ?? 'BRL',
+    }),
+    [i18n.resolvedLanguage, user?.organization.currency],
   )
 
   return (
@@ -194,7 +205,9 @@ export function PartyOpportunitiesCard({
                   <TableCell className="text-muted-foreground">
                     {translateOpportunityStatus(o.status, t)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{o.estimated_value ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {o.estimated_value ? formatCurrency(o.estimated_value, money) : '—'}
+                  </TableCell>
                   <TableCell className="text-muted-foreground tabular-nums">
                     {o.closing_probability}%
                   </TableCell>
@@ -246,7 +259,7 @@ export function PartyOpportunitiesCard({
                             <dt className="text-foreground/80 font-medium">
                               {t('crm.opportunities.tableValue')}
                             </dt>
-                            <dd>{o.estimated_value}</dd>
+                            <dd>{formatCurrency(o.estimated_value, money)}</dd>
                           </div>
                         ) : null}
                         <div className="flex flex-wrap gap-x-2 gap-y-0.5">

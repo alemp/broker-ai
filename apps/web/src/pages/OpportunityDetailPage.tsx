@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
+import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
 import {
   translateInteractionType,
@@ -16,6 +17,7 @@ import {
   translateOpportunityStatus,
   translateProductCategory,
 } from '@/lib/crmEnumLabels'
+import { formatCurrency } from '@/lib/money'
 
 const STAGES = [
   'LEAD',
@@ -95,7 +97,8 @@ function toDatetimeLocalValue(iso: string | null): string {
 }
 
 export function OpportunityDetailPage() {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
+  const { user } = useAuth()
   const { opportunityId } = useParams<{ opportunityId: string }>()
   const [detail, setDetail] = useState<OpportunityDetail | null>(null)
   const [interactions, setInteractions] = useState<InteractionDto[]>([])
@@ -272,11 +275,16 @@ export function OpportunityDetailPage() {
   const canPostSale =
     detail?.stage === 'CLOSED_WON' || detail?.stage === 'POST_SALE' || detail?.status === 'WON'
 
+  const money = {
+    locale: i18n.resolvedLanguage ?? 'pt',
+    currency: user?.organization.currency ?? 'BRL',
+  }
+
   const oppDescription = detail
     ? [
         `${t('crm.opportunities.pipeline')}: ${translateOpportunityStage(detail.stage, t)} · ${translateOpportunityStatus(detail.status, t)}`,
         `${t('crm.opportunities.probability')}: ${detail.closing_probability}%${
-          detail.estimated_value ? ` · ${detail.estimated_value}` : ''
+          detail.estimated_value ? ` · ${formatCurrency(detail.estimated_value, money)}` : ''
         }`,
         detail.product
           ? `${t('crm.opportunities.productInterest')}: ${detail.product.name}`

@@ -11,6 +11,7 @@ export type OrganizationBrief = {
   id: string
   name: string
   slug: string
+  currency: string
 }
 
 export type AuthUser = {

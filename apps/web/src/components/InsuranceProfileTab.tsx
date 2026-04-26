@@ -16,11 +16,14 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
+import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { formatCurrency } from '@/lib/money'
 
 
 type ProfileInsuranceBlockProps = {
@@ -174,7 +177,8 @@ export function InsuranceProfileTab({
   readOnly = false,
   onAfterSave,
 }: InsuranceProfileTabProps) {
-  const { t } = useTranslation('common')
+  const { t, i18n } = useTranslation('common')
+  const { user } = useAuth()
   const [lifeStage, setLifeStage] = useState('')
   const [numChildren, setNumChildren] = useState('')
   const [ownsProperty, setOwnsProperty] = useState('')
@@ -231,6 +235,8 @@ export function InsuranceProfileTab({
   const [giActivity, setGiActivity] = useState('')
   const [giHasInsurance, setGiHasInsurance] = useState('')
   const [giPoliciesNote, setGiPoliciesNote] = useState('')
+  const [giPolicyDocIds, setGiPolicyDocIds] = useState<string[]>([])
+  const [giPolicyDocOptions, setGiPolicyDocOptions] = useState<{ id: string; label: string }[]>([])
   const [giValBuilding, setGiValBuilding] = useState('')
   const [giValMmu, setGiValMmu] = useState('')
   const [giValMmp, setGiValMmp] = useState('')
@@ -247,15 +253,47 @@ export function InsuranceProfileTab({
   const [giTheftGuardsArmed, setGiTheftGuardsArmed] = useState(false)
   const [giTheftGuardsUnarmed, setGiTheftGuardsUnarmed] = useState(false)
   const [giClaimsNote, setGiClaimsNote] = useState('')
+  const [giClaimsRows, setGiClaimsRows] = useState<
+    { occurred_at: string; claimed_amount: string; paid_amount: string; status: string; notes: string }[]
+  >([])
   const [giCurrentInsurer, setGiCurrentInsurer] = useState('')
   const [giCurrentAnnualPremium, setGiCurrentAnnualPremium] = useState('')
   const [giTargetPremium, setGiTargetPremium] = useState('')
   const [giTargetCommission, setGiTargetCommission] = useState('')
+
+  const money = {
+    locale: i18n.resolvedLanguage ?? 'pt',
+    currency: user?.organization.currency ?? 'BRL',
+  }
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
 
   const isCompany = clientKind === 'COMPANY'
   const showIndividualBlocks = !isCompany
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const docs = await apiFetch<
+          { id: string; document_type: string; original_filename: string; updated_at: string }[]
+        >('/v1/documents')
+        if (cancelled) return
+        const policies = docs
+          .filter((d) => d.document_type === 'POLICY')
+          .map((d) => ({
+            id: d.id,
+            label: `${d.original_filename} · ${new Date(d.updated_at).toLocaleDateString(i18n.resolvedLanguage ?? 'pt')}`,
+          }))
+        setGiPolicyDocOptions(policies)
+      } catch {
+        if (!cancelled) setGiPolicyDocOptions([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [i18n.resolvedLanguage])
 
   useEffect(() => {
       const per = profile.personal as Record<string, unknown> | null | undefined
@@ -408,6 +446,10 @@ export function InsuranceProfileTab({
         setGiHasInsurance('')
       }
       setGiPoliciesNote(profileStr(gi?.existing_policies_note))
+      {
+        const ids = gi?.existing_policies_document_ids
+        setGiPolicyDocIds(Array.isArray(ids) ? (ids.filter((x) => typeof x === 'string') as string[]) : [])
+      }
 
       const varisk = (gi?.values_at_risk as Record<string, unknown> | null | undefined) ?? null
       setGiValBuilding(typeof varisk?.building === 'number' ? String(varisk.building) : '')
@@ -433,6 +475,43 @@ export function InsuranceProfileTab({
       setGiTheftGuardsUnarmed(Boolean(theft?.unarmed_guards_24h ?? false))
 
       setGiClaimsNote(profileStr(gi?.claims_last_5y_note))
+      {
+        const rows = gi?.claims_last_5y
+        if (Array.isArray(rows)) {
+          setGiClaimsRows(
+            rows
+              .map((r) =>
+                r && typeof r === 'object'
+                  ? {
+                      occurred_at:
+                        typeof (r as { occurred_at?: unknown }).occurred_at === 'string'
+                          ? String((r as { occurred_at?: unknown }).occurred_at)
+                          : '',
+                      claimed_amount:
+                        typeof (r as { claimed_amount?: unknown }).claimed_amount === 'number'
+                          ? String((r as { claimed_amount?: unknown }).claimed_amount)
+                          : '',
+                      paid_amount:
+                        typeof (r as { paid_amount?: unknown }).paid_amount === 'number'
+                          ? String((r as { paid_amount?: unknown }).paid_amount)
+                          : '',
+                      status:
+                        typeof (r as { status?: unknown }).status === 'string'
+                          ? String((r as { status?: unknown }).status)
+                          : '',
+                      notes:
+                        typeof (r as { notes?: unknown }).notes === 'string'
+                          ? String((r as { notes?: unknown }).notes)
+                          : '',
+                    }
+                  : null,
+              )
+              .filter((x): x is NonNullable<typeof x> => x != null),
+          )
+        } else {
+          setGiClaimsRows([])
+        }
+      }
       setGiCurrentInsurer(profileStr(gi?.current_insurer))
       setGiCurrentAnnualPremium(typeof gi?.current_annual_premium === 'number' ? String(gi.current_annual_premium) : '')
       setGiTargetPremium(typeof gi?.target_premium === 'number' ? String(gi.target_premium) : '')
@@ -688,6 +767,9 @@ export function InsuranceProfileTab({
         if (giPoliciesNote.trim()) {
           generalInsuranceCompany.existing_policies_note = giPoliciesNote.trim()
         }
+        if (giPolicyDocIds.length > 0) {
+          generalInsuranceCompany.existing_policies_document_ids = giPolicyDocIds
+        }
 
         const valuesAtRisk: Record<string, unknown> = {}
         const parseNum = (s: string) => {
@@ -733,6 +815,32 @@ export function InsuranceProfileTab({
           generalInsuranceCompany.theft_protections = theft
         }
 
+        const claimsRows = giClaimsRows
+          .map((r) => ({
+            occurred_at: r.occurred_at.trim() || null,
+            claimed_amount: parseNum(r.claimed_amount),
+            paid_amount: parseNum(r.paid_amount),
+            status: r.status.trim() || null,
+            notes: r.notes.trim() || null,
+          }))
+          .filter(
+            (r) =>
+              r.occurred_at ||
+              r.claimed_amount != null ||
+              r.paid_amount != null ||
+              r.status ||
+              r.notes,
+          )
+          .map((r) => ({
+            ...(r.occurred_at ? { occurred_at: r.occurred_at } : {}),
+            ...(r.claimed_amount != null ? { claimed_amount: r.claimed_amount } : {}),
+            ...(r.paid_amount != null ? { paid_amount: r.paid_amount } : {}),
+            ...(r.status ? { status: r.status } : {}),
+            ...(r.notes ? { notes: r.notes } : {}),
+          }))
+        if (claimsRows.length > 0) {
+          generalInsuranceCompany.claims_last_5y = claimsRows
+        }
         if (giClaimsNote.trim()) {
           generalInsuranceCompany.claims_last_5y_note = giClaimsNote.trim()
         }
@@ -1541,47 +1649,83 @@ export function InsuranceProfileTab({
                         value={giPoliciesNote}
                         onChange={(ev) => setGiPoliciesNote(ev.target.value)}
                         placeholder={t('crm.profile.generalInsuranceCompany.policiesHint')}
+                        disabled={readOnly}
                       />
+                    </div>
+                    <div className="grid gap-2 col-span-2">
+                      <Label>{t('crm.profile.generalInsuranceCompany.policiesDocs')}</Label>
+                      <div className="grid gap-2 rounded-lg border border-border p-3">
+                        <p className="text-muted-foreground text-xs">
+                          {t('crm.profile.generalInsuranceCompany.policiesDocsHint')}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {giPolicyDocOptions.length === 0 ? (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          ) : (
+                            giPolicyDocOptions.map((d) => (
+                              <label key={d.id} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  className="border-input size-4 rounded border"
+                                  disabled={readOnly}
+                                  checked={giPolicyDocIds.includes(d.id)}
+                                  onChange={(ev) => {
+                                    const checked = ev.target.checked
+                                    setGiPolicyDocIds((prev) => {
+                                      if (checked) {
+                                        return prev.includes(d.id) ? prev : [...prev, d.id]
+                                      }
+                                      return prev.filter((x) => x !== d.id)
+                                    })
+                                  }}
+                                />
+                                <span className="text-muted-foreground">{d.label}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid gap-2">
                       <Label htmlFor="gi-bld">{t('crm.profile.generalInsuranceCompany.varBuilding')}</Label>
-                      <Input
+                      <CurrencyInput
                         id="gi-bld"
-                        type="number"
-                        min={0}
                         value={giValBuilding}
-                        onChange={(ev) => setGiValBuilding(ev.target.value)}
+                        onValueChange={setGiValBuilding}
                         placeholder="0"
+                        money={money}
+                        disabled={readOnly}
                       />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="gi-mmu">{t('crm.profile.generalInsuranceCompany.varMmu')}</Label>
-                      <Input
+                      <CurrencyInput
                         id="gi-mmu"
-                        type="number"
-                        min={0}
                         value={giValMmu}
-                        onChange={(ev) => setGiValMmu(ev.target.value)}
+                        onValueChange={setGiValMmu}
                         placeholder="0"
+                        money={money}
+                        disabled={readOnly}
                       />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="gi-mmp">{t('crm.profile.generalInsuranceCompany.varMmp')}</Label>
-                      <Input
+                      <CurrencyInput
                         id="gi-mmp"
-                        type="number"
-                        min={0}
                         value={giValMmp}
-                        onChange={(ev) => setGiValMmp(ev.target.value)}
+                        onValueChange={setGiValMmp}
                         placeholder="0"
+                        money={money}
+                        disabled={readOnly}
                       />
                     </div>
                     <div className="grid gap-2">
                       <Label>{t('crm.profile.generalInsuranceCompany.varTotal')}</Label>
                       <Input
-                        value={String(
+                        value={formatCurrency(
                           (Number(giValBuilding) || 0) + (Number(giValMmu) || 0) + (Number(giValMmp) || 0),
+                          money,
                         )}
                         readOnly
                       />
@@ -1659,7 +1803,123 @@ export function InsuranceProfileTab({
                         value={giClaimsNote}
                         onChange={(ev) => setGiClaimsNote(ev.target.value)}
                         placeholder={t('crm.profile.generalInsuranceCompany.claimsHint')}
+                        disabled={readOnly}
                       />
+                    </div>
+                    <div className="grid gap-2 col-span-2">
+                      <Label>{t('crm.profile.generalInsuranceCompany.claimsStructured')}</Label>
+                      <div className="space-y-3 rounded-lg border border-border p-3">
+                        <p className="text-muted-foreground text-xs">
+                          {t('crm.profile.generalInsuranceCompany.claimsStructuredHint')}
+                        </p>
+                        <div className="space-y-3">
+                          {giClaimsRows.length === 0 ? (
+                            <p className="text-muted-foreground text-xs">—</p>
+                          ) : null}
+                          {giClaimsRows.map((row, idx) => (
+                            <div key={idx} className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
+                              <div className="grid gap-2">
+                                <Label htmlFor={`gi-claim-date-${idx}`}>{t('crm.profile.claims.date')}</Label>
+                                <Input
+                                  id={`gi-claim-date-${idx}`}
+                                  type="date"
+                                  value={row.occurred_at}
+                                  disabled={readOnly}
+                                  onChange={(ev) =>
+                                    setGiClaimsRows((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, occurred_at: ev.target.value } : r)),
+                                    )
+                                  }
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor={`gi-claim-status-${idx}`}>{t('crm.profile.claims.status')}</Label>
+                                <Input
+                                  id={`gi-claim-status-${idx}`}
+                                  value={row.status}
+                                  disabled={readOnly}
+                                  onChange={(ev) =>
+                                    setGiClaimsRows((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, status: ev.target.value } : r)),
+                                    )
+                                  }
+                                  placeholder="PAID / DECLINED / CLAIMED"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label>{t('crm.profile.claims.claimed')}</Label>
+                                <CurrencyInput
+                                  value={row.claimed_amount}
+                                  disabled={readOnly}
+                                  onValueChange={(v) =>
+                                    setGiClaimsRows((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, claimed_amount: v } : r)),
+                                    )
+                                  }
+                                  placeholder="0"
+                                  money={money}
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label>{t('crm.profile.claims.paid')}</Label>
+                                <CurrencyInput
+                                  value={row.paid_amount}
+                                  disabled={readOnly}
+                                  onValueChange={(v) =>
+                                    setGiClaimsRows((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, paid_amount: v } : r)),
+                                    )
+                                  }
+                                  placeholder="0"
+                                  money={money}
+                                />
+                              </div>
+                              <div className="grid gap-2 sm:col-span-2">
+                                <Label htmlFor={`gi-claim-notes-${idx}`}>{t('crm.profile.claims.notes')}</Label>
+                                <Input
+                                  id={`gi-claim-notes-${idx}`}
+                                  value={row.notes}
+                                  disabled={readOnly}
+                                  onChange={(ev) =>
+                                    setGiClaimsRows((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, notes: ev.target.value } : r)),
+                                    )
+                                  }
+                                />
+                              </div>
+                              {!readOnly ? (
+                                <div className="flex justify-end sm:col-span-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setGiClaimsRows((prev) => prev.filter((_, i) => i !== idx))}
+                                  >
+                                    {t('crm.action.remove')}
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                        {!readOnly ? (
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() =>
+                                setGiClaimsRows((prev) => [
+                                  ...prev,
+                                  { occurred_at: '', claimed_amount: '', paid_amount: '', status: '', notes: '' },
+                                ])
+                              }
+                            >
+                              {t('crm.profile.claims.add')}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
 
                     <div className="grid gap-2">
@@ -1672,35 +1932,35 @@ export function InsuranceProfileTab({
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="gi-cur-prem">{t('crm.profile.generalInsuranceCompany.currentPremium')}</Label>
-                      <Input
+                      <CurrencyInput
                         id="gi-cur-prem"
-                        type="number"
-                        min={0}
                         value={giCurrentAnnualPremium}
-                        onChange={(ev) => setGiCurrentAnnualPremium(ev.target.value)}
+                        onValueChange={setGiCurrentAnnualPremium}
                         placeholder="0"
+                        money={money}
+                        disabled={readOnly}
                       />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="gi-tgt-prem">{t('crm.profile.generalInsuranceCompany.targetPremium')}</Label>
-                      <Input
+                      <CurrencyInput
                         id="gi-tgt-prem"
-                        type="number"
-                        min={0}
                         value={giTargetPremium}
-                        onChange={(ev) => setGiTargetPremium(ev.target.value)}
+                        onValueChange={setGiTargetPremium}
                         placeholder="0"
+                        money={money}
+                        disabled={readOnly}
                       />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="gi-tgt-com">{t('crm.profile.generalInsuranceCompany.targetCommission')}</Label>
-                      <Input
+                      <CurrencyInput
                         id="gi-tgt-com"
-                        type="number"
-                        min={0}
                         value={giTargetCommission}
-                        onChange={(ev) => setGiTargetCommission(ev.target.value)}
+                        onValueChange={setGiTargetCommission}
                         placeholder="0"
+                        money={money}
+                        disabled={readOnly}
                       />
                     </div>
                   </ProfileInsuranceBlock>

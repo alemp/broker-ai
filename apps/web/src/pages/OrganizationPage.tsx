@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import type { FormSelectOption } from '@/components/ui/select'
+import { FormSelect } from '@/components/ui/select'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
 
@@ -16,7 +18,12 @@ type OrganizationAdminOut = {
   id: string
   name: string
   slug: string
+  currency: string
   created_at: string
+}
+
+type CurrencyOptionsOut = {
+  options: { code: string; label: string }[]
 }
 
 export function OrganizationPage() {
@@ -29,6 +36,8 @@ export function OrganizationPage() {
 
   const [orgName, setOrgName] = useState('')
   const [orgSlug, setOrgSlug] = useState('')
+  const [orgCurrency, setOrgCurrency] = useState('BRL')
+  const [currencyOptions, setCurrencyOptions] = useState<FormSelectOption[]>([])
   const [touchedName, setTouchedName] = useState(false)
 
   const canManageOrg = user?.role === 'ADMIN'
@@ -43,16 +52,31 @@ export function OrganizationPage() {
     if (loading || saving) {
       return false
     }
-    return !!orgName.trim() && orgName.trim() !== (user?.organization.name ?? '')
-  }, [canManageOrg, loading, orgName, saving, user?.organization.name])
+    const nameChanged = orgName.trim() !== (user?.organization.name ?? '')
+    const currencyChanged = orgCurrency !== (user?.organization.currency ?? 'BRL')
+    return !!orgName.trim() && (nameChanged || currencyChanged)
+  }, [
+    canManageOrg,
+    loading,
+    orgCurrency,
+    orgName,
+    saving,
+    user?.organization.currency,
+    user?.organization.name,
+  ])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const org = await apiFetch<OrganizationAdminOut>('/v1/org/admin')
+      const [org, currencies] = await Promise.all([
+        apiFetch<OrganizationAdminOut>('/v1/org/admin'),
+        apiFetch<CurrencyOptionsOut>('/v1/org/currencies'),
+      ])
       setOrgName(org.name)
       setOrgSlug(org.slug)
+      setOrgCurrency(org.currency)
+      setCurrencyOptions(currencies.options.map((o) => ({ value: o.code, label: o.label })))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('crm.error.generic'))
     } finally {
@@ -77,7 +101,7 @@ export function OrganizationPage() {
     try {
       await apiFetch<OrganizationAdminOut>('/v1/org/admin', {
         method: 'PATCH',
-        json: { name: orgName.trim() },
+        json: { name: orgName.trim(), currency: orgCurrency },
       })
       await refreshUser()
       toast.success(t('org.toast.saved'))
@@ -123,6 +147,16 @@ export function OrganizationPage() {
               <div className="grid gap-2">
                 <Label htmlFor="org-slug">{t('org.field.slug')}</Label>
                 <Input id="org-slug" value={orgSlug} readOnly disabled />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="org-currency">{t('org.field.currency')}</Label>
+                <FormSelect
+                  id="org-currency"
+                  value={orgCurrency}
+                  onValueChange={setOrgCurrency}
+                  options={currencyOptions}
+                  disabled={loading || saving || !currencyOptions.length}
+                />
               </div>
               <div className="flex justify-end">
                 <Button type="submit" disabled={!canSubmit}>

@@ -26,6 +26,7 @@ class OrganizationBrief(BaseModel):
     id: UUID
     name: str
     slug: str
+    currency: str
 
 
 class UserMe(BaseModel):

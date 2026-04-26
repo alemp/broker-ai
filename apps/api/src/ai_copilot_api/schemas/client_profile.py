@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -54,6 +56,18 @@ class ClientProfileGeneralInsuranceValuesAtRisk(BaseModel):
     total: float | None = Field(default=None, ge=0)
 
 
+class ClientProfileGeneralInsuranceClaim(BaseModel):
+    """Sinistros (últimos 5 anos) para risco PJ."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    occurred_at: date | None = None
+    claimed_amount: float | None = Field(default=None, ge=0)
+    paid_amount: float | None = Field(default=None, ge=0)
+    status: str | None = Field(default=None, max_length=32)  # e.g. CLAIMED / PAID / DECLINED
+    notes: str | None = Field(default=None, max_length=512)
+
+
 class ClientProfileGeneralInsuranceCompany(BaseModel):
     """Dados PJ para Ramos Elementares / Multirrisco (questionário de risco)."""
 
@@ -62,12 +76,17 @@ class ClientProfileGeneralInsuranceCompany(BaseModel):
     activity: str | None = Field(default=None, max_length=512)
     has_existing_insurance: bool | None = None
     existing_policies_note: str | None = Field(default=None, max_length=2000)
+    existing_policies_document_ids: list[str] | None = None
 
     values_at_risk: ClientProfileGeneralInsuranceValuesAtRisk | None = None
     fire_protections: ClientProfileGeneralInsuranceFireProtections | None = None
     theft_protections: ClientProfileGeneralInsuranceTheftProtections | None = None
 
     claims_last_5y_note: str | None = Field(default=None, max_length=4000)
+
+    # Structured claims: preferred for reporting; note remains for free-form details.
+    # Each entry is optional; UI should allow partial capture while typing.
+    claims_last_5y: list[ClientProfileGeneralInsuranceClaim] | None = None
 
     current_insurer: str | None = Field(default=None, max_length=255)
     current_annual_premium: float | None = Field(default=None, ge=0)
