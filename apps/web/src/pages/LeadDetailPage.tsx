@@ -1126,6 +1126,7 @@ export function LeadDetailPage() {
                 profile={lead.profile as InsuranceProfileShape}
                 profileCompletenessScore={lead.profile_completeness_score}
                 profileAlerts={lead.profile_alerts}
+                clientKind={lead.client_kind}
                 reloadKey={lead.updated_at}
                 readOnly={!!lead.converted_client_id}
                 onAfterSave={load}

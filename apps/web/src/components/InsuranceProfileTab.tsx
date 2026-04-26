@@ -155,6 +155,7 @@ export type InsuranceProfileTabProps = {
   profile: InsuranceProfileShape
   profileCompletenessScore: number
   profileAlerts: string[]
+  clientKind?: string
   /** When this value changes, form fields reset from `profile` */
   reloadKey: string
   readOnly?: boolean
@@ -167,6 +168,7 @@ export function InsuranceProfileTab({
   profile,
   profileCompletenessScore,
   profileAlerts,
+  clientKind,
   reloadKey,
   readOnly = false,
   onAfterSave,
@@ -225,8 +227,34 @@ export function InsuranceProfileTab({
   const [behDates, setBehDates] = useState('')
   const [behComm, setBehComm] = useState('')
   const [behLifeEvents, setBehLifeEvents] = useState('')
+  const [giActivity, setGiActivity] = useState('')
+  const [giHasInsurance, setGiHasInsurance] = useState('')
+  const [giPoliciesNote, setGiPoliciesNote] = useState('')
+  const [giValBuilding, setGiValBuilding] = useState('')
+  const [giValMmu, setGiValMmu] = useState('')
+  const [giValMmp, setGiValMmp] = useState('')
+  const [giFireExtinguishers, setGiFireExtinguishers] = useState(false)
+  const [giFireHydrants, setGiFireHydrants] = useState(false)
+  const [giFireSprinklers, setGiFireSprinklers] = useState(false)
+  const [giFireBrigade, setGiFireBrigade] = useState(false)
+  const [giFireDetectors, setGiFireDetectors] = useState(false)
+  const [giFireReserveLiters, setGiFireReserveLiters] = useState('')
+  const [giTheftCctv, setGiTheftCctv] = useState(false)
+  const [giTheftAlarm, setGiTheftAlarm] = useState(false)
+  const [giTheftSensors, setGiTheftSensors] = useState(false)
+  const [giTheftPanicButton, setGiTheftPanicButton] = useState(false)
+  const [giTheftGuardsArmed, setGiTheftGuardsArmed] = useState(false)
+  const [giTheftGuardsUnarmed, setGiTheftGuardsUnarmed] = useState(false)
+  const [giClaimsNote, setGiClaimsNote] = useState('')
+  const [giCurrentInsurer, setGiCurrentInsurer] = useState('')
+  const [giCurrentAnnualPremium, setGiCurrentAnnualPremium] = useState('')
+  const [giTargetPremium, setGiTargetPremium] = useState('')
+  const [giTargetCommission, setGiTargetCommission] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
+
+  const isCompany = clientKind === 'COMPANY'
+  const showIndividualBlocks = !isCompany
 
   useEffect(() => {
       const per = profile.personal as Record<string, unknown> | null | undefined
@@ -368,6 +396,46 @@ export function InsuranceProfileTab({
       setBehDates(profileStr(beh?.relevant_dates_note))
       setBehComm(profileStr(beh?.communication_preferences))
       setBehLifeEvents(profileStr(beh?.life_events_note))
+
+      const gi = profile.general_insurance_company as Record<string, unknown> | null | undefined
+      setGiActivity(profileStr(gi?.activity))
+      if (gi?.has_existing_insurance === true) {
+        setGiHasInsurance('yes')
+      } else if (gi?.has_existing_insurance === false) {
+        setGiHasInsurance('no')
+      } else {
+        setGiHasInsurance('')
+      }
+      setGiPoliciesNote(profileStr(gi?.existing_policies_note))
+
+      const varisk = (gi?.values_at_risk as Record<string, unknown> | null | undefined) ?? null
+      setGiValBuilding(typeof varisk?.building === 'number' ? String(varisk.building) : '')
+      setGiValMmu(typeof varisk?.mmu === 'number' ? String(varisk.mmu) : '')
+      setGiValMmp(typeof varisk?.mmp === 'number' ? String(varisk.mmp) : '')
+
+      const fire = (gi?.fire_protections as Record<string, unknown> | null | undefined) ?? null
+      setGiFireExtinguishers(Boolean(fire?.extinguishers ?? false))
+      setGiFireHydrants(Boolean(fire?.hydrants ?? false))
+      setGiFireSprinklers(Boolean(fire?.sprinklers ?? false))
+      setGiFireBrigade(Boolean(fire?.trained_fire_brigade ?? false))
+      setGiFireDetectors(Boolean(fire?.detectors_alarms ?? false))
+      setGiFireReserveLiters(
+        typeof fire?.fire_technical_reserve_liters === 'number' ? String(fire.fire_technical_reserve_liters) : '',
+      )
+
+      const theft = (gi?.theft_protections as Record<string, unknown> | null | undefined) ?? null
+      setGiTheftCctv(Boolean(theft?.cctv ?? false))
+      setGiTheftAlarm(Boolean(theft?.alarm ?? false))
+      setGiTheftSensors(Boolean(theft?.sensors ?? false))
+      setGiTheftPanicButton(Boolean(theft?.panic_button ?? false))
+      setGiTheftGuardsArmed(Boolean(theft?.armed_guards_24h ?? false))
+      setGiTheftGuardsUnarmed(Boolean(theft?.unarmed_guards_24h ?? false))
+
+      setGiClaimsNote(profileStr(gi?.claims_last_5y_note))
+      setGiCurrentInsurer(profileStr(gi?.current_insurer))
+      setGiCurrentAnnualPremium(typeof gi?.current_annual_premium === 'number' ? String(gi.current_annual_premium) : '')
+      setGiTargetPremium(typeof gi?.target_premium === 'number' ? String(gi.target_premium) : '')
+      setGiTargetCommission(typeof gi?.target_commission === 'number' ? String(gi.target_commission) : '')
     // profile comes from parent; reloadKey bumps after refetch (e.g. updated_at)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey])
@@ -604,6 +672,85 @@ export function InsuranceProfileTab({
       if (behLifeEvents.trim()) {
         behavior.life_events_note = behLifeEvents.trim()
       }
+
+      const generalInsuranceCompany: Record<string, unknown> = {}
+      if (isCompany) {
+        if (giActivity.trim()) {
+          generalInsuranceCompany.activity = giActivity.trim()
+        }
+        if (giHasInsurance === 'yes') {
+          generalInsuranceCompany.has_existing_insurance = true
+        }
+        if (giHasInsurance === 'no') {
+          generalInsuranceCompany.has_existing_insurance = false
+        }
+        if (giPoliciesNote.trim()) {
+          generalInsuranceCompany.existing_policies_note = giPoliciesNote.trim()
+        }
+
+        const valuesAtRisk: Record<string, unknown> = {}
+        const parseNum = (s: string) => {
+          const n = Number(s)
+          return Number.isFinite(n) ? n : null
+        }
+        const b = parseNum(giValBuilding)
+        const mmu = parseNum(giValMmu)
+        const mmp = parseNum(giValMmp)
+        if (b != null) valuesAtRisk.building = b
+        if (mmu != null) valuesAtRisk.mmu = mmu
+        if (mmp != null) valuesAtRisk.mmp = mmp
+        const total = (b ?? 0) + (mmu ?? 0) + (mmp ?? 0)
+        if (Object.keys(valuesAtRisk).length > 0) {
+          valuesAtRisk.total = total
+          generalInsuranceCompany.values_at_risk = valuesAtRisk
+        }
+
+        const fire: Record<string, unknown> = {
+          extinguishers: giFireExtinguishers,
+          hydrants: giFireHydrants,
+          sprinklers: giFireSprinklers,
+          trained_fire_brigade: giFireBrigade,
+          detectors_alarms: giFireDetectors,
+        }
+        const rLit = parseInt(giFireReserveLiters, 10)
+        if (!Number.isNaN(rLit)) {
+          fire.fire_technical_reserve_liters = rLit
+        }
+        if (Object.values(fire).some((v) => v !== false && v !== undefined && v !== null)) {
+          generalInsuranceCompany.fire_protections = fire
+        }
+
+        const theft: Record<string, unknown> = {
+          cctv: giTheftCctv,
+          alarm: giTheftAlarm,
+          sensors: giTheftSensors,
+          panic_button: giTheftPanicButton,
+          armed_guards_24h: giTheftGuardsArmed,
+          unarmed_guards_24h: giTheftGuardsUnarmed,
+        }
+        if (Object.values(theft).some((v) => v !== false && v !== undefined && v !== null)) {
+          generalInsuranceCompany.theft_protections = theft
+        }
+
+        if (giClaimsNote.trim()) {
+          generalInsuranceCompany.claims_last_5y_note = giClaimsNote.trim()
+        }
+        if (giCurrentInsurer.trim()) {
+          generalInsuranceCompany.current_insurer = giCurrentInsurer.trim()
+        }
+        const curPrem = parseNum(giCurrentAnnualPremium)
+        if (curPrem != null) {
+          generalInsuranceCompany.current_annual_premium = curPrem
+        }
+        const tgtPrem = parseNum(giTargetPremium)
+        if (tgtPrem != null) {
+          generalInsuranceCompany.target_premium = tgtPrem
+        }
+        const tgtCom = parseNum(giTargetCommission)
+        if (tgtCom != null) {
+          generalInsuranceCompany.target_commission = tgtCom
+        }
+      }
       const json: Record<string, Record<string, unknown>> = {}
       if (Object.keys(personal).length > 0) {
         json.personal = personal
@@ -628,6 +775,9 @@ export function InsuranceProfileTab({
       }
       if (Object.keys(behavior).length > 0) {
         json.behavior = behavior
+      }
+      if (Object.keys(generalInsuranceCompany).length > 0) {
+        json.general_insurance_company = generalInsuranceCompany
       }
       await apiFetch(`${apiBasePath}/profile`, {
         method: 'PATCH',
@@ -708,111 +858,112 @@ export function InsuranceProfileTab({
                 </div>
               </div>
               <form className="space-y-6" onSubmit={onSaveProfile}>
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.family')}
-                  subtitle={t('crm.profile.insuranceSection.familyHint')}
-                  icon={Users}
-                >
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-life">{t('crm.profile.lifeStage')}</Label>
-                  <FormSelect
-                    id="pf-life"
-                    value={lifeStage}
-                    onValueChange={setLifeStage}
-                    allowEmpty
-                    emptyLabel={t('crm.profile.selectPlaceholder')}
-                    placeholder={t('crm.profile.selectPlaceholder')}
-                    extraOptions={
-                      lifeStage &&
-                      !LIFE_STAGE_OPTIONS.some((o) => o.value === lifeStage)
-                        ? [{ value: lifeStage, label: lifeStage }]
-                        : undefined
-                    }
-                    options={LIFE_STAGE_OPTIONS.map((o) => ({
-                      value: o.value,
-                      label: t(`crm.profile.lifeStageOption.${o.value}`),
-                    }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-children">{t('crm.profile.children')}</Label>
-                  <Input
-                    id="pf-children"
-                    type="number"
-                    min={0}
-                    value={numChildren}
-                    onChange={(ev) => setNumChildren(ev.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-marital">{t('crm.profile.maritalStatus')}</Label>
-                  <FormSelect
-                    id="pf-marital"
-                    value={maritalStatus}
-                    onValueChange={setMaritalStatus}
-                    allowEmpty
-                    emptyLabel={t('crm.profile.selectPlaceholder')}
-                    placeholder={t('crm.profile.selectPlaceholder')}
-                    extraOptions={
-                      maritalStatus &&
-                      !MARITAL_STATUS_OPTIONS.some((o) => o.value === maritalStatus)
-                        ? [{ value: maritalStatus, label: maritalStatus }]
-                        : undefined
-                    }
-                    options={MARITAL_STATUS_OPTIONS.map((o) => ({
-                      value: o.value,
-                      label: t(`crm.profile.maritalStatusOption.${o.value}`),
-                    }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-children-ages">{t('crm.profile.childrenAgesSummary')}</Label>
-                  <Input
-                    id="pf-children-ages"
-                    value={childrenAgesSummary}
-                    onChange={(ev) => setChildrenAgesSummary(ev.target.value)}
-                    placeholder={t('crm.profile.childrenAgesHint')}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-fin-dep">{t('crm.profile.financialDependents')}</Label>
-                  <Input
-                    id="pf-fin-dep"
-                    type="number"
-                    min={0}
-                    value={financialDependents}
-                    onChange={(ev) => setFinancialDependents(ev.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-main-income">{t('crm.profile.mainIncomeProvider')}</Label>
-                  <Input
-                    id="pf-main-income"
-                    value={mainIncomeProvider}
-                    onChange={(ev) => setMainIncomeProvider(ev.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pf-partner">{t('crm.profile.hasPartner')}</Label>
-                  <FormSelect
-                    id="pf-partner"
-                    value={hasPartner}
-                    onValueChange={setHasPartner}
-                    allowEmpty
-                    emptyLabel="—"
-                    options={[
-                      { value: 'yes', label: t('crm.profile.yes') },
-                      { value: 'no', label: t('crm.profile.no') },
-                    ]}
-                  />
-                </div>
-                </ProfileInsuranceBlock>
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.family')}
+                    subtitle={t('crm.profile.insuranceSection.familyHint')}
+                    icon={Users}
+                  >
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-life">{t('crm.profile.lifeStage')}</Label>
+                      <FormSelect
+                        id="pf-life"
+                        value={lifeStage}
+                        onValueChange={setLifeStage}
+                        allowEmpty
+                        emptyLabel={t('crm.profile.selectPlaceholder')}
+                        placeholder={t('crm.profile.selectPlaceholder')}
+                        extraOptions={
+                          lifeStage && !LIFE_STAGE_OPTIONS.some((o) => o.value === lifeStage)
+                            ? [{ value: lifeStage, label: lifeStage }]
+                            : undefined
+                        }
+                        options={LIFE_STAGE_OPTIONS.map((o) => ({
+                          value: o.value,
+                          label: t(`crm.profile.lifeStageOption.${o.value}`),
+                        }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-children">{t('crm.profile.children')}</Label>
+                      <Input
+                        id="pf-children"
+                        type="number"
+                        min={0}
+                        value={numChildren}
+                        onChange={(ev) => setNumChildren(ev.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-marital">{t('crm.profile.maritalStatus')}</Label>
+                      <FormSelect
+                        id="pf-marital"
+                        value={maritalStatus}
+                        onValueChange={setMaritalStatus}
+                        allowEmpty
+                        emptyLabel={t('crm.profile.selectPlaceholder')}
+                        placeholder={t('crm.profile.selectPlaceholder')}
+                        extraOptions={
+                          maritalStatus && !MARITAL_STATUS_OPTIONS.some((o) => o.value === maritalStatus)
+                            ? [{ value: maritalStatus, label: maritalStatus }]
+                            : undefined
+                        }
+                        options={MARITAL_STATUS_OPTIONS.map((o) => ({
+                          value: o.value,
+                          label: t(`crm.profile.maritalStatusOption.${o.value}`),
+                        }))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-children-ages">{t('crm.profile.childrenAgesSummary')}</Label>
+                      <Input
+                        id="pf-children-ages"
+                        value={childrenAgesSummary}
+                        onChange={(ev) => setChildrenAgesSummary(ev.target.value)}
+                        placeholder={t('crm.profile.childrenAgesHint')}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-fin-dep">{t('crm.profile.financialDependents')}</Label>
+                      <Input
+                        id="pf-fin-dep"
+                        type="number"
+                        min={0}
+                        value={financialDependents}
+                        onChange={(ev) => setFinancialDependents(ev.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-main-income">{t('crm.profile.mainIncomeProvider')}</Label>
+                      <Input
+                        id="pf-main-income"
+                        value={mainIncomeProvider}
+                        onChange={(ev) => setMainIncomeProvider(ev.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pf-partner">{t('crm.profile.hasPartner')}</Label>
+                      <FormSelect
+                        id="pf-partner"
+                        value={hasPartner}
+                        onValueChange={setHasPartner}
+                        allowEmpty
+                        emptyLabel="—"
+                        options={[
+                          { value: 'yes', label: t('crm.profile.yes') },
+                          { value: 'no', label: t('crm.profile.no') },
+                        ]}
+                      />
+                    </div>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.property')}
-                  subtitle={t('crm.profile.insuranceSection.propertyHint')}
-                  icon={Building2}
-                >
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.property')}
+                    subtitle={t('crm.profile.insuranceSection.propertyHint')}
+                    icon={Building2}
+                  >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-owns-prop">{t('crm.profile.ownsProperty')}</Label>
                   <FormSelect
@@ -921,13 +1072,15 @@ export function InsuranceProfileTab({
                     ]}
                   />
                 </div>
-                </ProfileInsuranceBlock>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.vehicle')}
-                  subtitle={t('crm.profile.insuranceSection.vehicleHint')}
-                  icon={Car}
-                >
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.vehicle')}
+                    subtitle={t('crm.profile.insuranceSection.vehicleHint')}
+                    icon={Car}
+                  >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-owns-veh">{t('crm.profile.ownsVehicle')}</Label>
                   <FormSelect
@@ -1023,13 +1176,15 @@ export function InsuranceProfileTab({
                     onChange={(ev) => setCirculationCity(ev.target.value)}
                   />
                 </div>
-                </ProfileInsuranceBlock>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.professional')}
-                  subtitle={t('crm.profile.insuranceSection.professionalHint')}
-                  icon={Briefcase}
-                >
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.professional')}
+                    subtitle={t('crm.profile.insuranceSection.professionalHint')}
+                    icon={Briefcase}
+                  >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-prof">{t('crm.profile.profession')}</Label>
                   <Input
@@ -1098,13 +1253,15 @@ export function InsuranceProfileTab({
                     ]}
                   />
                 </div>
-                </ProfileInsuranceBlock>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.health')}
-                  subtitle={t('crm.profile.insuranceSection.healthHint')}
-                  icon={HeartPulse}
-                >
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.health')}
+                    subtitle={t('crm.profile.insuranceSection.healthHint')}
+                    icon={HeartPulse}
+                  >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-hlth-plan">{t('crm.profile.hasHealthPlan')}</Label>
                   <FormSelect
@@ -1174,13 +1331,15 @@ export function InsuranceProfileTab({
                     onChange={(ev) => setHlthInterest(ev.target.value)}
                   />
                 </div>
-                </ProfileInsuranceBlock>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.business')}
-                  subtitle={t('crm.profile.insuranceSection.businessHint')}
-                  icon={Building2}
-                >
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.business')}
+                    subtitle={t('crm.profile.insuranceSection.businessHint')}
+                    icon={Building2}
+                  >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-bus-own">{t('crm.profile.ownsBusiness')}</Label>
                   <FormSelect
@@ -1263,13 +1422,15 @@ export function InsuranceProfileTab({
                     ]}
                   />
                 </div>
-                </ProfileInsuranceBlock>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
-                <ProfileInsuranceBlock
-                  title={t('crm.profile.insuranceSection.pet')}
-                  subtitle={t('crm.profile.insuranceSection.petHint')}
-                  icon={PawPrint}
-                >
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.insuranceSection.pet')}
+                    subtitle={t('crm.profile.insuranceSection.petHint')}
+                    icon={PawPrint}
+                  >
                 <div className="grid gap-2">
                   <Label htmlFor="pf-pet-has">{t('crm.profile.hasPet')}</Label>
                   <FormSelect
@@ -1338,7 +1499,211 @@ export function InsuranceProfileTab({
                     }))}
                   />
                 </div>
-                </ProfileInsuranceBlock>
+                  </ProfileInsuranceBlock>
+                ) : null}
+
+                {isCompany ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.generalInsuranceCompany.title')}
+                    subtitle={t('crm.profile.generalInsuranceCompany.subtitle')}
+                    icon={Building2}
+                    className="border-primary/15"
+                  >
+                    <div className="grid gap-2 col-span-2">
+                      <Label htmlFor="gi-activity">{t('crm.profile.generalInsuranceCompany.activity')}</Label>
+                      <Input
+                        id="gi-activity"
+                        value={giActivity}
+                        onChange={(ev) => setGiActivity(ev.target.value)}
+                        placeholder={t('crm.profile.generalInsuranceCompany.activityHint')}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-has-ins">{t('crm.profile.generalInsuranceCompany.hasInsurance')}</Label>
+                      <FormSelect
+                        id="gi-has-ins"
+                        value={giHasInsurance}
+                        onValueChange={setGiHasInsurance}
+                        allowEmpty
+                        emptyLabel="—"
+                        options={[
+                          { value: 'yes', label: t('crm.profile.yes') },
+                          { value: 'no', label: t('crm.profile.no') },
+                        ]}
+                      />
+                    </div>
+                    <div className="grid gap-2 col-span-2">
+                      <Label htmlFor="gi-pol">{t('crm.profile.generalInsuranceCompany.policies')}</Label>
+                      <textarea
+                        id="gi-pol"
+                        className="border-input bg-background min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+                        value={giPoliciesNote}
+                        onChange={(ev) => setGiPoliciesNote(ev.target.value)}
+                        placeholder={t('crm.profile.generalInsuranceCompany.policiesHint')}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-bld">{t('crm.profile.generalInsuranceCompany.varBuilding')}</Label>
+                      <Input
+                        id="gi-bld"
+                        type="number"
+                        min={0}
+                        value={giValBuilding}
+                        onChange={(ev) => setGiValBuilding(ev.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-mmu">{t('crm.profile.generalInsuranceCompany.varMmu')}</Label>
+                      <Input
+                        id="gi-mmu"
+                        type="number"
+                        min={0}
+                        value={giValMmu}
+                        onChange={(ev) => setGiValMmu(ev.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-mmp">{t('crm.profile.generalInsuranceCompany.varMmp')}</Label>
+                      <Input
+                        id="gi-mmp"
+                        type="number"
+                        min={0}
+                        value={giValMmp}
+                        onChange={(ev) => setGiValMmp(ev.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>{t('crm.profile.generalInsuranceCompany.varTotal')}</Label>
+                      <Input
+                        value={String(
+                          (Number(giValBuilding) || 0) + (Number(giValMmu) || 0) + (Number(giValMmp) || 0),
+                        )}
+                        readOnly
+                      />
+                    </div>
+
+                    <div className="grid gap-2 col-span-2">
+                      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                        {t('crm.profile.generalInsuranceCompany.fireProtections')}
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {[
+                          ['gi-fire-ext', giFireExtinguishers, setGiFireExtinguishers, t('crm.profile.generalInsuranceCompany.fire.extinguishers')],
+                          ['gi-fire-hyd', giFireHydrants, setGiFireHydrants, t('crm.profile.generalInsuranceCompany.fire.hydrants')],
+                          ['gi-fire-spr', giFireSprinklers, setGiFireSprinklers, t('crm.profile.generalInsuranceCompany.fire.sprinklers')],
+                          ['gi-fire-brig', giFireBrigade, setGiFireBrigade, t('crm.profile.generalInsuranceCompany.fire.brigade')],
+                          ['gi-fire-det', giFireDetectors, setGiFireDetectors, t('crm.profile.generalInsuranceCompany.fire.detectors')],
+                        ].map(([id, checked, setChecked, label]) => (
+                          <label key={String(id)} className="flex items-center gap-2 text-sm">
+                            <input
+                              id={String(id)}
+                              type="checkbox"
+                              className="border-input size-4 rounded border"
+                              checked={Boolean(checked)}
+                              onChange={(ev) => (setChecked as (v: boolean) => void)(ev.target.checked)}
+                            />
+                            <span>{String(label)}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-2 grid gap-2 sm:max-w-sm">
+                        <Label htmlFor="gi-fire-lit">{t('crm.profile.generalInsuranceCompany.fire.reserveLiters')}</Label>
+                        <Input
+                          id="gi-fire-lit"
+                          type="number"
+                          min={0}
+                          value={giFireReserveLiters}
+                          onChange={(ev) => setGiFireReserveLiters(ev.target.value)}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 col-span-2">
+                      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                        {t('crm.profile.generalInsuranceCompany.theftProtections')}
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {[
+                          ['gi-theft-cctv', giTheftCctv, setGiTheftCctv, t('crm.profile.generalInsuranceCompany.theft.cctv')],
+                          ['gi-theft-alarm', giTheftAlarm, setGiTheftAlarm, t('crm.profile.generalInsuranceCompany.theft.alarm')],
+                          ['gi-theft-sensors', giTheftSensors, setGiTheftSensors, t('crm.profile.generalInsuranceCompany.theft.sensors')],
+                          ['gi-theft-panic', giTheftPanicButton, setGiTheftPanicButton, t('crm.profile.generalInsuranceCompany.theft.panicButton')],
+                          ['gi-theft-armed', giTheftGuardsArmed, setGiTheftGuardsArmed, t('crm.profile.generalInsuranceCompany.theft.armed24h')],
+                          ['gi-theft-unarmed', giTheftGuardsUnarmed, setGiTheftGuardsUnarmed, t('crm.profile.generalInsuranceCompany.theft.unarmed24h')],
+                        ].map(([id, checked, setChecked, label]) => (
+                          <label key={String(id)} className="flex items-center gap-2 text-sm">
+                            <input
+                              id={String(id)}
+                              type="checkbox"
+                              className="border-input size-4 rounded border"
+                              checked={Boolean(checked)}
+                              onChange={(ev) => (setChecked as (v: boolean) => void)(ev.target.checked)}
+                            />
+                            <span>{String(label)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2 col-span-2">
+                      <Label htmlFor="gi-claims">{t('crm.profile.generalInsuranceCompany.claims')}</Label>
+                      <textarea
+                        id="gi-claims"
+                        className="border-input bg-background min-h-[84px] w-full rounded-md border px-3 py-2 text-sm"
+                        value={giClaimsNote}
+                        onChange={(ev) => setGiClaimsNote(ev.target.value)}
+                        placeholder={t('crm.profile.generalInsuranceCompany.claimsHint')}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-cur-ins">{t('crm.profile.generalInsuranceCompany.currentInsurer')}</Label>
+                      <Input
+                        id="gi-cur-ins"
+                        value={giCurrentInsurer}
+                        onChange={(ev) => setGiCurrentInsurer(ev.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-cur-prem">{t('crm.profile.generalInsuranceCompany.currentPremium')}</Label>
+                      <Input
+                        id="gi-cur-prem"
+                        type="number"
+                        min={0}
+                        value={giCurrentAnnualPremium}
+                        onChange={(ev) => setGiCurrentAnnualPremium(ev.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-tgt-prem">{t('crm.profile.generalInsuranceCompany.targetPremium')}</Label>
+                      <Input
+                        id="gi-tgt-prem"
+                        type="number"
+                        min={0}
+                        value={giTargetPremium}
+                        onChange={(ev) => setGiTargetPremium(ev.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-tgt-com">{t('crm.profile.generalInsuranceCompany.targetCommission')}</Label>
+                      <Input
+                        id="gi-tgt-com"
+                        type="number"
+                        min={0}
+                        value={giTargetCommission}
+                        onChange={(ev) => setGiTargetCommission(ev.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </ProfileInsuranceBlock>
+                ) : null}
 
                 <ProfileInsuranceBlock
                   title={t('crm.profile.insuranceSection.behavior')}

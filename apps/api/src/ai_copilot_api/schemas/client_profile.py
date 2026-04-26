@@ -5,6 +5,76 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ClientProfileGeneralInsuranceFireProtections(BaseModel):
+    """Protecionais (incêndio e demais danos) para risco PJ."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    extinguishers: bool | None = None
+    hydrants: bool | None = None
+    sprinklers: bool | None = None
+    trained_fire_brigade: bool | None = None
+    detectors_alarms: bool | None = None
+    fire_technical_reserve_liters: int | None = Field(default=None, ge=0)
+    elevated_water_tank: bool | None = None
+    ground_or_underground_water_tank: bool | None = None
+    trained_personnel: bool | None = None
+    mobile_pump_hose_reels_pam: bool | None = None
+
+
+class ClientProfileGeneralInsuranceTheftProtections(BaseModel):
+    """Protecionais (roubo) para risco PJ."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    vehicle_access_control: bool | None = None
+    tire_killer: bool | None = None
+    gates_barriers: bool | None = None
+    armored_guardhouses: bool | None = None
+    armed_guards_24h: bool | None = None
+    unarmed_guards_24h: bool | None = None
+    alarm: bool | None = None
+    cctv: bool | None = None
+    sensors: bool | None = None
+    panic_button: bool | None = None
+    alarm_connected_to_security_center: bool | None = None
+    nearby_police_station: bool | None = None
+    people_access_control: bool | None = None
+    thermometry_aeration: bool | None = None
+
+
+class ClientProfileGeneralInsuranceValuesAtRisk(BaseModel):
+    """Valores em risco (PREDIO + MMU + MMP)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    building: float | None = Field(default=None, ge=0)
+    mmu: float | None = Field(default=None, ge=0)
+    mmp: float | None = Field(default=None, ge=0)
+    total: float | None = Field(default=None, ge=0)
+
+
+class ClientProfileGeneralInsuranceCompany(BaseModel):
+    """Dados PJ para Ramos Elementares / Multirrisco (questionário de risco)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    activity: str | None = Field(default=None, max_length=512)
+    has_existing_insurance: bool | None = None
+    existing_policies_note: str | None = Field(default=None, max_length=2000)
+
+    values_at_risk: ClientProfileGeneralInsuranceValuesAtRisk | None = None
+    fire_protections: ClientProfileGeneralInsuranceFireProtections | None = None
+    theft_protections: ClientProfileGeneralInsuranceTheftProtections | None = None
+
+    claims_last_5y_note: str | None = Field(default=None, max_length=4000)
+
+    current_insurer: str | None = Field(default=None, max_length=255)
+    current_annual_premium: float | None = Field(default=None, ge=0)
+    target_premium: float | None = Field(default=None, ge=0)
+    target_commission: float | None = Field(default=None, ge=0)
+
+
 class ClientProfilePersonal(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -111,6 +181,7 @@ class ClientInsuranceProfile(BaseModel):
     business: ClientProfileBusiness | None = None
     pet: ClientProfilePet | None = None
     behavior: ClientProfileBehavior | None = None
+    general_insurance_company: ClientProfileGeneralInsuranceCompany | None = None
 
 
 class ClientProfileOut(BaseModel):

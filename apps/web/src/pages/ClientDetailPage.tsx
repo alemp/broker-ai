@@ -1295,6 +1295,7 @@ export function ClientDetailPage() {
                 profile={detail.profile as InsuranceProfileShape}
                 profileCompletenessScore={detail.profile_completeness_score}
                 profileAlerts={detail.profile_alerts}
+                clientKind={detail.client_kind}
                 reloadKey={detail.updated_at}
                 onAfterSave={loadAll}
               />

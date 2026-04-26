@@ -10,6 +10,7 @@ from ai_copilot_api.schemas.client_profile import (
     ClientInsuranceProfile,
     ClientProfileBehavior,
     ClientProfileBusiness,
+    ClientProfileGeneralInsuranceCompany,
     ClientProfileHealth,
     ClientProfileMobility,
     ClientProfilePersonal,
@@ -27,7 +28,13 @@ _BLOCK_MODELS: list[tuple[str, type[BaseModel]]] = [
     ("business", ClientProfileBusiness),
     ("pet", ClientProfilePet),
     ("behavior", ClientProfileBehavior),
+    ("general_insurance_company", ClientProfileGeneralInsuranceCompany),
 ]
+
+_OPTIONAL_COMPLETENESS_BLOCKS: set[str] = {
+    # New block; keep PF scores stable when absent.
+    "general_insurance_company",
+}
 
 
 def parse_profile(raw: dict[str, Any] | None) -> ClientInsuranceProfile:
@@ -82,6 +89,8 @@ def completeness_score(profile: ClientInsuranceProfile) -> int:
         block = getattr(profile, attr)
         n_fields = len(cls.model_fields)
         if n_fields == 0:
+            continue
+        if block is None and attr in _OPTIONAL_COMPLETENESS_BLOCKS:
             continue
         if block is None:
             ratios.append(0.0)

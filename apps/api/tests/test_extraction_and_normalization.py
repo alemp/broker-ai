@@ -35,10 +35,11 @@ def test_extract_creates_run_and_normalizes(client: TestClient) -> None:
     token = reg.json()["access_token"]
 
     # Create one taxonomy entry to normalize against.
+    code = f"AUTO_THEFT_{uuid.uuid4().hex[:8].upper()}"
     tax = client.post(
         "/v1/coverage-taxonomy",
         headers={"Authorization": f"Bearer {token}"},
-        json={"code": "AUTO_THEFT", "label": "Roubo e furto", "synonyms": ["furto", "roubo"]},
+        json={"code": code, "label": "Roubo e furto", "synonyms": ["furto", "roubo"]},
     )
     assert tax.status_code in (200, 201), tax.text
 
@@ -55,8 +56,10 @@ def test_extract_creates_run_and_normalizes(client: TestClient) -> None:
         f"/v1/documents/{doc_id}/extract",
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert ex.status_code == 201, ex.text
+    # Extraction is async (background job) — API returns 202 with job meta.
+    assert ex.status_code == 202, ex.text
     body = ex.json()
-    assert body["document_id"] == doc_id
-    assert "coverages" in body["normalized_data"]
+    assert body["job_type"] == "document_extraction"
+    assert body["status"] == "RUNNING"
+    assert (body.get("job_meta") or {}).get("document_id") == doc_id
 
