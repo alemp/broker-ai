@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -384,6 +385,7 @@ export function OpportunityDetailPage() {
               </div>
               <div className="sm:col-span-2">
                 <Button type="submit" disabled={savingDeal}>
+                  {savingDeal ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                   {savingDeal ? t('crm.opportunities.savingDeal') : t('crm.opportunities.saveDeal')}
                 </Button>
               </div>

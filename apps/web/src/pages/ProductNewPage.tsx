@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -101,6 +102,7 @@ export function ProductNewPage() {
           <form className="space-y-6" onSubmit={onCreate}>
             <ProductCatalogEditorBody draft={draft} setDraft={setDraft} insurers={insurers} />
             <Button type="submit" disabled={saving || !draft.name.trim()}>
+              {saving ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
               {saving ? t('crm.catalog.saving') : t('crm.catalog.create')}
             </Button>
           </form>

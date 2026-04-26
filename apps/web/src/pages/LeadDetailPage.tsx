@@ -9,6 +9,7 @@ import {
   ClipboardList,
   FolderTree,
   IdCard,
+  Loader2,
   Megaphone,
   MessageSquare,
   Package,
@@ -1017,6 +1018,7 @@ export function LeadDetailPage() {
                       </section>
                       <div>
                         <Button type="submit" disabled={savingCrm}>
+                          {savingCrm ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                           {savingCrm ? t('crm.core.saving') : t('crm.core.save')}
                         </Button>
                       </div>

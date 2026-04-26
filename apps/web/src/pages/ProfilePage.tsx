@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -130,6 +131,7 @@ export function ProfilePage() {
             </div>
             <div className="flex justify-end">
               <Button type="submit" disabled={!canSubmit || saving}>
+                {saving ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                 {saving ? t('profile.save.saving') : t('profile.save.submit')}
               </Button>
             </div>

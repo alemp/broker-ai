@@ -7,6 +7,7 @@ import {
   Car,
   Contact,
   HeartPulse,
+  Loader2,
   PawPrint,
   UserCircle,
   Users,
@@ -1778,6 +1779,7 @@ export function InsuranceProfileTab({
 
                 <div className="border-border flex justify-start border-t pt-2">
                   <Button type="submit" disabled={savingProfile || readOnly}>
+                    {savingProfile ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                     {savingProfile ? t('crm.profile.saving') : t('crm.profile.save')}
                   </Button>
                 </div>

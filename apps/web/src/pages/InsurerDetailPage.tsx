@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -39,6 +40,9 @@ export function InsurerDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [touchedName, setTouchedName] = useState(false)
+
+  const nameError = (touchedName || name !== '') && !name.trim() ? t('crm.validation.required') : null
 
   const load = useCallback(async () => {
     if (!insurerId) {
@@ -70,6 +74,7 @@ export function InsurerDetailPage() {
   const onSave = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!insurerId || !name.trim()) {
+      setTouchedName(true)
       return
     }
     setSaving(true)
@@ -125,7 +130,15 @@ export function InsurerDetailPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2 sm:col-span-2">
                   <Label htmlFor="id-name">{t('crm.insurers.name')}</Label>
-                  <Input id="id-name" value={name} onChange={(ev) => setName(ev.target.value)} required />
+                  <Input
+                    id="id-name"
+                    value={name}
+                    onChange={(ev) => setName(ev.target.value)}
+                    onBlur={() => setTouchedName(true)}
+                    aria-invalid={nameError ? true : undefined}
+                    required
+                  />
+                  {nameError ? <p className="text-destructive text-xs">{nameError}</p> : null}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="id-code">{t('crm.insurers.code')}</Label>
@@ -154,6 +167,7 @@ export function InsurerDetailPage() {
                 </div>
               </div>
               <Button type="submit" disabled={saving || !name.trim()}>
+                {saving ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                 {saving ? t('crm.insurers.saving') : t('crm.insurers.save')}
               </Button>
             </form>

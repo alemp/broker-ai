@@ -35,6 +35,14 @@ export function ClientCreatePage() {
   const [orgUsers, setOrgUsers] = useState<UserBrief[]>([])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [touchedFullName, setTouchedFullName] = useState(false)
+  const [touchedCompanyLegal, setTouchedCompanyLegal] = useState(false)
+
+  const fullNameError = (touchedFullName || fullName !== '') && !fullName.trim() ? t('crm.core.fullNameRequired') : null
+  const companyLegalError =
+    clientKind === 'COMPANY' && (touchedCompanyLegal || companyLegal !== '') && !companyLegal.trim()
+      ? t('crm.core.companyLegalRequired')
+      : null
 
   useEffect(() => {
     let cancelled = false
@@ -56,9 +64,11 @@ export function ClientCreatePage() {
   const onCreate = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!fullName.trim()) {
+      setTouchedFullName(true)
       return
     }
     if (clientKind === 'COMPANY' && !companyLegal.trim()) {
+      setTouchedCompanyLegal(true)
       setError(t('crm.core.companyLegalRequired'))
       return
     }
@@ -126,7 +136,10 @@ export function ClientCreatePage() {
                     onChange={(ev) => setFullName(ev.target.value)}
                     autoComplete="name"
                     required
+                    onBlur={() => setTouchedFullName(true)}
+                    aria-invalid={fullNameError ? true : undefined}
                   />
+                  {fullNameError ? <p className="text-destructive text-xs">{fullNameError}</p> : null}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="client-email">{t('crm.clients.field.emailOptional')}</Label>
@@ -177,7 +190,12 @@ export function ClientCreatePage() {
                         id="client-legal"
                         value={companyLegal}
                         onChange={(ev) => setCompanyLegal(ev.target.value)}
+                        onBlur={() => setTouchedCompanyLegal(true)}
+                        aria-invalid={companyLegalError ? true : undefined}
                       />
+                      {companyLegalError ? (
+                        <p className="text-destructive text-xs">{companyLegalError}</p>
+                      ) : null}
                     </div>
                     <div className="grid gap-2 sm:col-span-2">
                       <Label htmlFor="client-tax">{t('crm.core.companyTax')}</Label>

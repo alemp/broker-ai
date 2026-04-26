@@ -10,9 +10,11 @@ from sqlalchemy.orm import Session
 from ai_copilot_api.api.deps import get_current_user, require_admin
 from ai_copilot_api.auth import hash_password
 from ai_copilot_api.db.enums import UserRole
-from ai_copilot_api.db.models import User
+from ai_copilot_api.db.models import Organization, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.schemas.crm import (
+    OrganizationAdminOut,
+    OrganizationAdminUpdate,
     OrgUserAdminCreate,
     OrgUserAdminCreatedOut,
     OrgUserAdminOut,
@@ -56,6 +58,30 @@ def list_organization_users(
         .order_by(User.email),
     ).all()
     return [UserBrief.model_validate(r) for r in rows]
+
+
+@router.get("/admin", response_model=OrganizationAdminOut)
+def admin_get_organization(
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+) -> OrganizationAdminOut:
+    org = db.scalar(select(Organization).where(Organization.id == admin_user.organization_id))
+    assert org is not None  # org is enforced by foreign key
+    return OrganizationAdminOut.model_validate(org)
+
+
+@router.patch("/admin", response_model=OrganizationAdminOut)
+def admin_update_organization(
+    body: OrganizationAdminUpdate,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+) -> OrganizationAdminOut:
+    org = db.scalar(select(Organization).where(Organization.id == admin_user.organization_id))
+    assert org is not None  # org is enforced by foreign key
+    org.name = body.name.strip()
+    db.commit()
+    db.refresh(org)
+    return OrganizationAdminOut.model_validate(org)
 
 
 @router.get("/admin/users", response_model=list[OrgUserAdminOut])

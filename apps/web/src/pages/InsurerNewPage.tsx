@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -18,10 +19,14 @@ export function InsurerNewPage() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [touchedName, setTouchedName] = useState(false)
+
+  const nameError = (touchedName || name !== '') && !name.trim() ? t('crm.validation.required') : null
 
   const onCreate = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!name.trim()) {
+      setTouchedName(true)
       return
     }
     setSaving(true)
@@ -64,13 +69,22 @@ export function InsurerNewPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div className="grid min-w-[200px] flex-1 gap-2">
                 <Label htmlFor="ins-name">{t('crm.insurers.name')}</Label>
-                <Input id="ins-name" value={name} onChange={(ev) => setName(ev.target.value)} />
+                <Input
+                  id="ins-name"
+                  value={name}
+                  onChange={(ev) => setName(ev.target.value)}
+                  onBlur={() => setTouchedName(true)}
+                  aria-invalid={nameError ? true : undefined}
+                  required
+                />
+                {nameError ? <p className="text-destructive text-xs">{nameError}</p> : null}
               </div>
               <div className="grid w-32 gap-2">
                 <Label htmlFor="ins-code">{t('crm.insurers.code')}</Label>
                 <Input id="ins-code" value={code} onChange={(ev) => setCode(ev.target.value)} />
               </div>
               <Button type="submit" disabled={saving || !name.trim()}>
+                {saving ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                 {saving ? t('crm.insurers.saving') : t('crm.insurers.create')}
               </Button>
             </div>

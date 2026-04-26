@@ -29,6 +29,7 @@ import { RegisterPage } from '@/pages/RegisterPage'
 import { ReleaseNotesPage } from '@/pages/ReleaseNotesPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { UsersPage } from '@/pages/UsersPage'
+import { OrganizationPage } from '@/pages/OrganizationPage'
 
 export default function App() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/campaigns/new" element={<CampaignNewPage />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/organization" element={<OrganizationPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/release-notes" element={<ReleaseNotesPage />} />
       </Route>

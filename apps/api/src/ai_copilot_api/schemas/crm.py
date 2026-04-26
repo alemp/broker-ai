@@ -70,6 +70,19 @@ class OrgUserAdminCreatedOut(BaseModel):
     temporary_password: str | None = None
 
 
+class OrganizationAdminOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    created_at: datetime
+
+
+class OrganizationAdminUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+
 class ClientBrief(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

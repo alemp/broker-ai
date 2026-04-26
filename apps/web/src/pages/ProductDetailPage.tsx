@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -119,6 +120,7 @@ export function ProductDetailPage() {
               <ProductCatalogEditorBody draft={draft} setDraft={setDraft} insurers={insurers} />
               <div className="flex flex-wrap gap-3">
                 <Button type="submit" disabled={saving || !draft.name.trim()}>
+                  {saving ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                   {saving ? t('crm.catalog.saving') : t('crm.catalog.save')}
                 </Button>
                 <Button

@@ -17,6 +17,7 @@ const mainNavItems = [
 ] satisfies readonly { to: string; labelKey: string; end?: boolean }[]
 
 const adminNavItems = [
+  { to: '/organization', labelKey: 'nav.organization' as const, adminOnly: true as const },
   { to: '/users', labelKey: 'nav.users' as const, adminOnly: true as const },
   { to: '/insurers', labelKey: 'nav.insurers' as const },
   { to: '/products', labelKey: 'nav.products' as const },
@@ -47,6 +48,7 @@ function navLinkClassName(isActive: boolean) {
 
 function isAdminPath(pathname: string) {
   return (
+    pathname === '/organization' ||
     pathname === '/users' ||
     pathname === '/insurers' ||
     pathname.startsWith('/insurers/') ||

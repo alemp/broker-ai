@@ -12,6 +12,7 @@ import {
   HeartPulse,
   Home,
   IdCard,
+  Loader2,
   Megaphone,
   MessageSquare,
   Package,
@@ -1192,6 +1193,7 @@ export function ClientDetailPage() {
                     </section>
                     <div>
                       <Button type="submit" disabled={savingCrm}>
+                        {savingCrm ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden /> : null}
                         {savingCrm ? t('crm.core.saving') : t('crm.core.save')}
                       </Button>
                     </div>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -58,6 +59,10 @@ type Props = {
 
 export function ProductCatalogEditorBody({ draft, setDraft, insurers }: Props) {
   const { t } = useTranslation('common')
+  const [touchedName, setTouchedName] = useState(false)
+
+  const nameError =
+    (touchedName || draft.name !== '') && !draft.name.trim() ? t('crm.validation.required') : null
 
   const categoryOptions = [
     { value: 'AUTO_INSURANCE', label: t('crm.catalog.category.AUTO_INSURANCE') },
@@ -112,7 +117,10 @@ export function ProductCatalogEditorBody({ draft, setDraft, insurers }: Props) {
             value={draft.name}
             onChange={(ev) => setDraft((d) => ({ ...d, name: ev.target.value }))}
             required
+              onBlur={() => setTouchedName(true)}
+              aria-invalid={nameError ? true : undefined}
           />
+            {nameError ? <p className="text-destructive text-xs">{nameError}</p> : null}
         </div>
         <div className="grid gap-2">
           <Label htmlFor="pc-line">{t('crm.catalog.fields.productLine')}</Label>
