@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
 import { useAuth } from '@/contexts/AuthContext'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, getApiBaseUrl, getStoredAccessToken } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/lib/money'
 
@@ -70,6 +70,29 @@ function profileStr(v: unknown): string {
 
 function profileIntStr(v: unknown): string {
   return typeof v === 'number' && Number.isFinite(v) ? String(v) : ''
+}
+
+async function downloadWithAuth(path: string, filename: string): Promise<void> {
+  const token = getStoredAccessToken()
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || `Download failed (${res.status})`)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
 const LIFE_STAGE_OPTIONS = [
@@ -179,6 +202,7 @@ export function InsuranceProfileTab({
 }: InsuranceProfileTabProps) {
   const { t, i18n } = useTranslation('common')
   const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
   const [lifeStage, setLifeStage] = useState('')
   const [numChildren, setNumChildren] = useState('')
   const [ownsProperty, setOwnsProperty] = useState('')
@@ -236,7 +260,17 @@ export function InsuranceProfileTab({
   const [giHasInsurance, setGiHasInsurance] = useState('')
   const [giPoliciesNote, setGiPoliciesNote] = useState('')
   const [giPolicyDocIds, setGiPolicyDocIds] = useState<string[]>([])
-  const [giPolicyDocOptions, setGiPolicyDocOptions] = useState<{ id: string; label: string }[]>([])
+  const [giPolicyDocOptions, setGiPolicyDocOptions] = useState<
+    { id: string; label: string; original_filename: string }[]
+  >([])
+  const [giPolicyUploadFile, setGiPolicyUploadFile] = useState<File | null>(null)
+  const [giPolicyUploading, setGiPolicyUploading] = useState(false)
+
+  const [giIndHasInsurance, setGiIndHasInsurance] = useState('')
+  const [giIndPoliciesNote, setGiIndPoliciesNote] = useState('')
+  const [giIndPolicyDocIds, setGiIndPolicyDocIds] = useState<string[]>([])
+  const [giIndPolicyUploadFile, setGiIndPolicyUploadFile] = useState<File | null>(null)
+  const [giIndPolicyUploading, setGiIndPolicyUploading] = useState(false)
   const [giValBuilding, setGiValBuilding] = useState('')
   const [giValMmu, setGiValMmu] = useState('')
   const [giValMmp, setGiValMmp] = useState('')
@@ -271,29 +305,88 @@ export function InsuranceProfileTab({
   const isCompany = clientKind === 'COMPANY'
   const showIndividualBlocks = !isCompany
 
+  const loadPolicyDocs = async (cancelledRef: { cancelled: boolean }) => {
+    try {
+      const docs = await apiFetch<
+        { id: string; document_type: string; original_filename: string; updated_at: string }[]
+      >('/v1/documents')
+      if (cancelledRef.cancelled) return
+      const policies = docs
+        .filter((d) => d.document_type === 'POLICY')
+        .map((d) => ({
+          id: d.id,
+          original_filename: d.original_filename,
+          label: `${d.original_filename} · ${new Date(d.updated_at).toLocaleDateString(
+            i18n.resolvedLanguage ?? 'pt',
+          )}`,
+        }))
+      setGiPolicyDocOptions(policies)
+    } catch {
+      if (!cancelledRef.cancelled) setGiPolicyDocOptions([])
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const docs = await apiFetch<
-          { id: string; document_type: string; original_filename: string; updated_at: string }[]
-        >('/v1/documents')
-        if (cancelled) return
-        const policies = docs
-          .filter((d) => d.document_type === 'POLICY')
-          .map((d) => ({
-            id: d.id,
-            label: `${d.original_filename} · ${new Date(d.updated_at).toLocaleDateString(i18n.resolvedLanguage ?? 'pt')}`,
-          }))
-        setGiPolicyDocOptions(policies)
-      } catch {
-        if (!cancelled) setGiPolicyDocOptions([])
-      }
-    })()
+    const ref = { cancelled: false }
+    void loadPolicyDocs(ref)
     return () => {
-      cancelled = true
+      ref.cancelled = true
     }
   }, [i18n.resolvedLanguage])
+
+  const uploadPolicyDoc = async (file: File) => {
+    const token = getStoredAccessToken()
+    const headers = new Headers()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    const body = new FormData()
+    body.append('document_type', 'POLICY')
+    body.append('file', file)
+    const res = await fetch(`${getApiBaseUrl()}/v1/documents`, {
+      method: 'POST',
+      headers,
+      body,
+    })
+    const text = await res.text()
+    if (!res.ok) {
+      throw new Error(text || `Upload failed (${res.status})`)
+    }
+    const data = JSON.parse(text) as { id: string; original_filename: string }
+    return data
+  }
+
+  const onUploadCompanyPolicy = async () => {
+    if (!isAdmin || !giPolicyUploadFile) return
+    setGiPolicyUploading(true)
+    try {
+      const up = await uploadPolicyDoc(giPolicyUploadFile)
+      toast.success('Documento enviado.')
+      setGiPolicyUploadFile(null)
+      const ref = { cancelled: false }
+      await loadPolicyDocs(ref)
+      setGiPolicyDocIds((prev) => (prev.includes(up.id) ? prev : [...prev, up.id]))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setGiPolicyUploading(false)
+    }
+  }
+
+  const onUploadIndividualPolicy = async () => {
+    if (!isAdmin || !giIndPolicyUploadFile) return
+    setGiIndPolicyUploading(true)
+    try {
+      const up = await uploadPolicyDoc(giIndPolicyUploadFile)
+      toast.success('Documento enviado.')
+      setGiIndPolicyUploadFile(null)
+      const ref = { cancelled: false }
+      await loadPolicyDocs(ref)
+      setGiIndPolicyDocIds((prev) => (prev.includes(up.id) ? prev : [...prev, up.id]))
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('crm.error.generic'))
+    } finally {
+      setGiIndPolicyUploading(false)
+    }
+  }
 
   useEffect(() => {
       const per = profile.personal as Record<string, unknown> | null | undefined
@@ -449,6 +542,22 @@ export function InsuranceProfileTab({
       {
         const ids = gi?.existing_policies_document_ids
         setGiPolicyDocIds(Array.isArray(ids) ? (ids.filter((x) => typeof x === 'string') as string[]) : [])
+      }
+
+      const giInd = profile.general_insurance_individual as Record<string, unknown> | null | undefined
+      if (giInd?.has_existing_insurance === true) {
+        setGiIndHasInsurance('yes')
+      } else if (giInd?.has_existing_insurance === false) {
+        setGiIndHasInsurance('no')
+      } else {
+        setGiIndHasInsurance('')
+      }
+      setGiIndPoliciesNote(profileStr(giInd?.existing_policies_note))
+      {
+        const ids = giInd?.existing_policies_document_ids
+        setGiIndPolicyDocIds(
+          Array.isArray(ids) ? (ids.filter((x) => typeof x === 'string') as string[]) : [],
+        )
       }
 
       const varisk = (gi?.values_at_risk as Record<string, unknown> | null | undefined) ?? null
@@ -887,6 +996,25 @@ export function InsuranceProfileTab({
       }
       if (Object.keys(generalInsuranceCompany).length > 0) {
         json.general_insurance_company = generalInsuranceCompany
+      }
+
+      const generalInsuranceIndividual: Record<string, unknown> = {}
+      if (showIndividualBlocks) {
+        if (giIndHasInsurance === 'yes') {
+          generalInsuranceIndividual.has_existing_insurance = true
+        }
+        if (giIndHasInsurance === 'no') {
+          generalInsuranceIndividual.has_existing_insurance = false
+        }
+        if (giIndPoliciesNote.trim()) {
+          generalInsuranceIndividual.existing_policies_note = giIndPoliciesNote.trim()
+        }
+        if (giIndPolicyDocIds.length > 0) {
+          generalInsuranceIndividual.existing_policies_document_ids = giIndPolicyDocIds
+        }
+      }
+      if (Object.keys(generalInsuranceIndividual).length > 0) {
+        json.general_insurance_individual = generalInsuranceIndividual
       }
       await apiFetch(`${apiBasePath}/profile`, {
         method: 'PATCH',
@@ -1658,6 +1786,21 @@ export function InsuranceProfileTab({
                         <p className="text-muted-foreground text-xs">
                           {t('crm.profile.generalInsuranceCompany.policiesDocsHint')}
                         </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="file"
+                            disabled={!isAdmin || readOnly || giPolicyUploading}
+                            onChange={(ev) => setGiPolicyUploadFile(ev.target.files?.[0] ?? null)}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={!isAdmin || readOnly || !giPolicyUploadFile || giPolicyUploading}
+                            onClick={() => void onUploadCompanyPolicy()}
+                          >
+                            {giPolicyUploading ? 'Enviando…' : 'Enviar'}
+                          </Button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           {giPolicyDocOptions.length === 0 ? (
                             <span className="text-muted-foreground text-xs">—</span>
@@ -1680,6 +1823,15 @@ export function InsuranceProfileTab({
                                   }}
                                 />
                                 <span className="text-muted-foreground">{d.label}</span>
+                                <button
+                                  type="button"
+                                  className="text-primary text-xs underline underline-offset-2"
+                                  onClick={() =>
+                                    void downloadWithAuth(`/v1/documents/${d.id}/download`, d.original_filename)
+                                  }
+                                >
+                                  Baixar
+                                </button>
                               </label>
                             ))
                           )}
@@ -1962,6 +2114,99 @@ export function InsuranceProfileTab({
                         money={money}
                         disabled={readOnly}
                       />
+                    </div>
+                  </ProfileInsuranceBlock>
+                ) : null}
+
+                {showIndividualBlocks ? (
+                  <ProfileInsuranceBlock
+                    title={t('crm.profile.generalInsuranceIndividual.title')}
+                    subtitle={t('crm.profile.generalInsuranceIndividual.subtitle')}
+                    icon={Briefcase}
+                    className="border-primary/15"
+                  >
+                    <div className="grid gap-2">
+                      <Label htmlFor="gi-ind-has-ins">{t('crm.profile.generalInsuranceIndividual.hasInsurance')}</Label>
+                      <FormSelect
+                        id="gi-ind-has-ins"
+                        value={giIndHasInsurance}
+                        onValueChange={setGiIndHasInsurance}
+                        allowEmpty
+                        emptyLabel="—"
+                        options={[
+                          { value: 'yes', label: t('crm.profile.yes') },
+                          { value: 'no', label: t('crm.profile.no') },
+                        ]}
+                      />
+                    </div>
+                    <div className="grid gap-2 col-span-2">
+                      <Label htmlFor="gi-ind-pol">{t('crm.profile.generalInsuranceIndividual.policies')}</Label>
+                      <textarea
+                        id="gi-ind-pol"
+                        className="border-input bg-background min-h-[72px] w-full rounded-md border px-3 py-2 text-sm"
+                        value={giIndPoliciesNote}
+                        onChange={(ev) => setGiIndPoliciesNote(ev.target.value)}
+                        placeholder={t('crm.profile.generalInsuranceIndividual.policiesHint')}
+                        disabled={readOnly}
+                      />
+                    </div>
+                    <div className="grid gap-2 col-span-2">
+                      <Label>{t('crm.profile.generalInsuranceIndividual.policiesDocs')}</Label>
+                      <div className="grid gap-2 rounded-lg border border-border p-3">
+                        <p className="text-muted-foreground text-xs">
+                          {t('crm.profile.generalInsuranceIndividual.policiesDocsHint')}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Input
+                            type="file"
+                            disabled={!isAdmin || readOnly || giIndPolicyUploading}
+                            onChange={(ev) => setGiIndPolicyUploadFile(ev.target.files?.[0] ?? null)}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={!isAdmin || readOnly || !giIndPolicyUploadFile || giIndPolicyUploading}
+                            onClick={() => void onUploadIndividualPolicy()}
+                          >
+                            {giIndPolicyUploading ? 'Enviando…' : 'Enviar'}
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {giPolicyDocOptions.length === 0 ? (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          ) : (
+                            giPolicyDocOptions.map((d) => (
+                              <label key={d.id} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  className="border-input size-4 rounded border"
+                                  disabled={readOnly}
+                                  checked={giIndPolicyDocIds.includes(d.id)}
+                                  onChange={(ev) => {
+                                    const checked = ev.target.checked
+                                    setGiIndPolicyDocIds((prev) => {
+                                      if (checked) {
+                                        return prev.includes(d.id) ? prev : [...prev, d.id]
+                                      }
+                                      return prev.filter((x) => x !== d.id)
+                                    })
+                                  }}
+                                />
+                                <span className="text-muted-foreground">{d.label}</span>
+                                <button
+                                  type="button"
+                                  className="text-primary text-xs underline underline-offset-2"
+                                  onClick={() =>
+                                    void downloadWithAuth(`/v1/documents/${d.id}/download`, d.original_filename)
+                                  }
+                                >
+                                  Baixar
+                                </button>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </ProfileInsuranceBlock>
                 ) : null}

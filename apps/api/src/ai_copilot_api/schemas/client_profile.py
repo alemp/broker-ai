@@ -94,6 +94,16 @@ class ClientProfileGeneralInsuranceCompany(BaseModel):
     target_commission: float | None = Field(default=None, ge=0)
 
 
+class ClientProfileGeneralInsuranceIndividual(BaseModel):
+    """Dados PF para Ramos Elementares (apólices atuais, anexos e observações)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    has_existing_insurance: bool | None = None
+    existing_policies_note: str | None = Field(default=None, max_length=2000)
+    existing_policies_document_ids: list[str] | None = None
+
+
 class ClientProfilePersonal(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -201,6 +211,7 @@ class ClientInsuranceProfile(BaseModel):
     pet: ClientProfilePet | None = None
     behavior: ClientProfileBehavior | None = None
     general_insurance_company: ClientProfileGeneralInsuranceCompany | None = None
+    general_insurance_individual: ClientProfileGeneralInsuranceIndividual | None = None
 
 
 class ClientProfileOut(BaseModel):

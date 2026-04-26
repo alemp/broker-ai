@@ -131,7 +131,9 @@ class ClientCreate(BaseModel):
             self.company_legal_name and self.company_legal_name.strip()
         ):
             raise ValueError("company_legal_name is required when client_kind is COMPANY")
-        if self.client_kind == ClientKind.COMPANY and not (self.company_tax_id and self.company_tax_id.strip()):
+        if self.client_kind == ClientKind.COMPANY and not (
+            self.company_tax_id and self.company_tax_id.strip()
+        ):
             raise ValueError("company_tax_id is required when client_kind is COMPANY")
         return self
 
@@ -154,7 +156,9 @@ class ClientUpdate(BaseModel):
     @model_validator(mode="after")
     def require_company_tax_id_when_company(self) -> Self:
         # For updates, we can only validate when client_kind is explicitly being set to COMPANY.
-        if self.client_kind == ClientKind.COMPANY and not (self.company_tax_id and self.company_tax_id.strip()):
+        if self.client_kind == ClientKind.COMPANY and not (
+            self.company_tax_id and self.company_tax_id.strip()
+        ):
             raise ValueError("company_tax_id is required when client_kind is COMPANY")
         return self
 

@@ -20,6 +20,17 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 _MAX_PDF_BYTES = 100 * 1024 * 1024  # 100MB
 _PDF_MAGIC = b"%PDF-"
+_MAX_GENERIC_BYTES = 25 * 1024 * 1024  # 25MB (images/spreadsheets/etc.)
+
+_ALLOWED_CONTENT_TYPES: set[str] = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "text/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
 
 
 def _validate_product_in_org(db: Session, org_id: uuid.UUID, product_id: uuid.UUID) -> None:
@@ -30,34 +41,48 @@ def _validate_product_in_org(db: Session, org_id: uuid.UUID, product_id: uuid.UU
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
 
+def _is_pdf_upload(file: UploadFile) -> bool:
+    ct = (file.content_type or "").lower().strip()
+    if ct == "application/pdf":
+        return True
+    name = (file.filename or "").lower()
+    return name.endswith(".pdf")
+
+
 def _read_upload_with_limits(file: UploadFile) -> tuple[bytes, str, int]:
-    """
-    Read the uploaded file into memory with:
-    - magic-bytes validation (PDF)
-    - size limit enforcement
-    Returns (payload, sha256hex, size_bytes).
-    """
+    """Read upload into memory, enforcing per-type limits and PDF magic validation."""
+    content_type = (file.content_type or "").lower().strip()
+    if content_type and content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type",
+        )
+
+    is_pdf = _is_pdf_upload(file)
+    max_bytes = _MAX_PDF_BYTES if is_pdf else _MAX_GENERIC_BYTES
+    too_large_detail = "PDF too large" if is_pdf else "File too large"
+
     hasher = hashlib.sha256()
     buf = bytearray()
 
-    # Read first chunk to validate magic bytes.
-    first = file.file.read(8)
-    if not first.startswith(_PDF_MAGIC):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file: only PDF is supported",
-        )
-    hasher.update(first)
-    buf.extend(first)
+    if is_pdf:
+        first = file.file.read(8)
+        if not first.startswith(_PDF_MAGIC):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid PDF file",
+            )
+        hasher.update(first)
+        buf.extend(first)
 
     while True:
         chunk = file.file.read(1024 * 1024)  # 1MB
         if not chunk:
             break
-        if len(buf) + len(chunk) > _MAX_PDF_BYTES:
+        if len(buf) + len(chunk) > max_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="PDF too large",
+                detail=too_large_detail,
             )
         hasher.update(chunk)
         buf.extend(chunk)
@@ -99,6 +124,11 @@ def upload_document(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename")
 
     payload, sha256hex, size_bytes = _read_upload_with_limits(file)
+    content_type = (file.content_type or "application/octet-stream").strip().lower()
+    if content_type not in _ALLOWED_CONTENT_TYPES and not _is_pdf_upload(file):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+    if _is_pdf_upload(file):
+        content_type = "application/pdf"
 
     # "Documento lógico": org + tipo + produto + nome do arquivo.
     existing_doc = db.scalar(
@@ -123,10 +153,11 @@ def upload_document(
         storage_key = existing_blob
         if not storage.exists_object(storage_key):
             # Heal missing blobs (e.g. local path changed / volume was recreated).
-            storage.put_object(storage_key, payload, content_type="application/pdf")
+            storage.put_object(storage_key, payload, content_type=content_type)
     else:
-        storage_key = f"orgs/{org_id}/documents/{uuid.uuid4()}.pdf"
-        storage.put_object(storage_key, payload, content_type="application/pdf")
+        suffix = ".pdf" if content_type == "application/pdf" else ""
+        storage_key = f"orgs/{org_id}/documents/{uuid.uuid4()}{suffix}"
+        storage.put_object(storage_key, payload, content_type=content_type)
 
     if existing_doc is None:
         doc_id = uuid.uuid4()
@@ -137,7 +168,7 @@ def upload_document(
             product_id=product_id,
             document_type=document_type,
             original_filename=file.filename,
-            content_type="application/pdf",
+            content_type=content_type,
             size_bytes=size_bytes,
             sha256=sha256hex,
             storage_key=storage_key,
@@ -152,7 +183,7 @@ def upload_document(
                 organization_id=org_id,
                 uploaded_by_id=current_user.id,
                 version=1,
-                content_type="application/pdf",
+                content_type=content_type,
                 size_bytes=size_bytes,
                 sha256=sha256hex,
                 storage_key=storage_key,
@@ -172,7 +203,7 @@ def upload_document(
 
         next_version = existing_doc.current_version + 1
         existing_doc.uploaded_by_id = current_user.id
-        existing_doc.content_type = "application/pdf"
+        existing_doc.content_type = content_type
         existing_doc.size_bytes = size_bytes
         existing_doc.sha256 = sha256hex
         existing_doc.storage_key = storage_key
@@ -184,7 +215,7 @@ def upload_document(
                 organization_id=org_id,
                 uploaded_by_id=current_user.id,
                 version=next_version,
-                content_type="application/pdf",
+                content_type=content_type,
                 size_bytes=size_bytes,
                 sha256=sha256hex,
                 storage_key=storage_key,

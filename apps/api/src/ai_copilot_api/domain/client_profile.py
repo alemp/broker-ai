@@ -11,6 +11,7 @@ from ai_copilot_api.schemas.client_profile import (
     ClientProfileBehavior,
     ClientProfileBusiness,
     ClientProfileGeneralInsuranceCompany,
+    ClientProfileGeneralInsuranceIndividual,
     ClientProfileHealth,
     ClientProfileMobility,
     ClientProfilePersonal,
@@ -29,11 +30,13 @@ _BLOCK_MODELS: list[tuple[str, type[BaseModel]]] = [
     ("pet", ClientProfilePet),
     ("behavior", ClientProfileBehavior),
     ("general_insurance_company", ClientProfileGeneralInsuranceCompany),
+    ("general_insurance_individual", ClientProfileGeneralInsuranceIndividual),
 ]
 
 _OPTIONAL_COMPLETENESS_BLOCKS: set[str] = {
     # New block; keep PF scores stable when absent.
     "general_insurance_company",
+    "general_insurance_individual",
 }
 
 
