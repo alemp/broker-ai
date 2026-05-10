@@ -124,9 +124,10 @@ def profile_alerts(profile: ClientInsuranceProfile) -> list[str]:
             codes.append("property_use_missing_when_owns_property")
     mob = profile.mobility
     if mob is not None:
-        if mob.owns_vehicle is True and not mob.vehicle_primary_use:
+        owns_vehicle_signal = mob.owns_vehicle is True or bool(mob.vehicles)
+        if owns_vehicle_signal and not mob.vehicle_primary_use:
             codes.append("vehicle_use_missing_when_owns_vehicle")
-        if mob.owns_vehicle is True and not (mob.vehicle_type and str(mob.vehicle_type).strip()):
+        if owns_vehicle_signal and not (mob.vehicle_type and str(mob.vehicle_type).strip()):
             codes.append("vehicle_type_missing_when_owns_vehicle")
     pro = profile.professional
     if pro is not None:

@@ -182,6 +182,7 @@ class Document(Base):
     __table_args__ = (
         Index("ix_documents_org_created_at", "organization_id", "created_at"),
         Index("ix_documents_org_sha256", "organization_id", "sha256"),
+        Index("ix_documents_org_opportunity_id", "organization_id", "opportunity_id"),
         UniqueConstraint(
             "organization_id",
             "document_type",
@@ -213,6 +214,11 @@ class Document(Base):
         ForeignKey("products.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    opportunity_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("opportunities.id", ondelete="CASCADE"),
+        nullable=True,
     )
     document_type: Mapped[DocumentType] = mapped_column(
         _varchar_enum(DocumentType),
@@ -253,6 +259,11 @@ class Document(Base):
         foreign_keys=[uploaded_by_id],
     )
     product: Mapped["Product | None"] = relationship("Product", back_populates="documents")
+    opportunity: Mapped["Opportunity | None"] = relationship(
+        "Opportunity",
+        back_populates="documents",
+        foreign_keys=[opportunity_id],
+    )
     extraction_runs: Mapped[list["DocumentExtractionRun"]] = relationship(
         "DocumentExtractionRun",
         back_populates="document",
@@ -809,6 +820,29 @@ class ClientHeldProduct(Base):
 
 class Opportunity(Base):
     __tablename__ = "opportunities"
+    __table_args__ = (
+        Index(
+            "ix_opportunities_org_insurance_line",
+            "organization_id",
+            "insurance_line",
+        ),
+        Index("ix_opportunities_quote_number", "quote_number"),
+        Index(
+            "ix_opportunities_org_quote_unique",
+            "organization_id",
+            "preferred_insurer_name",
+            "quote_number",
+            "quote_item",
+            unique=True,
+            postgresql_where=text("quote_number IS NOT NULL"),
+        ),
+        CheckConstraint(
+            "quote_number IS NULL "
+            "OR (preferred_insurer_name IS NOT NULL AND quote_item IS NOT NULL "
+            "AND proposal_source IS NOT NULL)",
+            name="ck_opportunities_quote_required_fields",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -845,6 +879,10 @@ class Opportunity(Base):
         nullable=True,
         index=True,
     )
+    insurance_line: Mapped[ProductCategory] = mapped_column(
+        _varchar_enum(ProductCategory),
+        nullable=False,
+    )
     estimated_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     closing_probability: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     stage: Mapped[OpportunityStage] = mapped_column(
@@ -875,6 +913,11 @@ class Opportunity(Base):
         index=True,
     )
     loss_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proposal_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    quote_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    quote_item: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    quote_valid_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    proposal_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -910,6 +953,12 @@ class Opportunity(Base):
         "Interaction",
         back_populates="opportunity",
         cascade="all, delete-orphan",
+    )
+    documents: Mapped[list["Document"]] = relationship(
+        "Document",
+        back_populates="opportunity",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 

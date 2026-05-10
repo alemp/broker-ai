@@ -139,6 +139,32 @@ class ClientProfileResidence(BaseModel):
     high_value_items: bool | None = None
 
 
+class ClientProfileVehicle(BaseModel):
+    """Per-vehicle entry stored under `mobility.vehicles[]` (JSONB).
+
+    Populated/upserted by the proposal ingest flow (ADR §D6 / Phase 3) and by
+    manual profile edits. Identity for upsert is `chassis` (preferred) or
+    `plate`; both should be normalized (uppercase, no separators) by the
+    writer before storage.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    make: str | None = Field(default=None, max_length=64)
+    model: str | None = Field(default=None, max_length=128)
+    version: str | None = Field(default=None, max_length=128)
+    fabrication_year: int | None = Field(default=None, ge=1900, le=2100)
+    model_year: int | None = Field(default=None, ge=1900, le=2100)
+    plate: str | None = Field(default=None, max_length=16)
+    chassis: str | None = Field(default=None, max_length=32)
+    fipe_code: str | None = Field(default=None, max_length=16)
+    usage: str | None = Field(default=None, max_length=64)
+    fuel_type: str | None = Field(default=None, max_length=32)
+    body_type: str | None = Field(default=None, max_length=64)
+    last_quote_number: str | None = Field(default=None, max_length=128)
+    last_quoted_at: date | None = None
+
+
 class ClientProfileMobility(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -150,6 +176,7 @@ class ClientProfileMobility(BaseModel):
     primary_driver: str | None = Field(default=None, max_length=255)
     has_garage: bool | None = None
     circulation_city: str | None = Field(default=None, max_length=128)
+    vehicles: list[ClientProfileVehicle] | None = None
 
 
 class ClientProfileHealth(BaseModel):

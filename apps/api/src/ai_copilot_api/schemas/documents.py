@@ -20,6 +20,7 @@ class DocumentOut(BaseModel):
     sha256: str
     storage_key: str
     product_id: uuid.UUID | None
+    opportunity_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
     current_version: int

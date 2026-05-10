@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
+import { translateProductCategory } from '@/lib/crmEnumLabels'
+import { INSURANCE_LINE_VALUES, type InsuranceLineValue } from '@/lib/proposalIngest'
 
 type ClientRow = {
   id: string
@@ -45,6 +47,7 @@ export function OpportunityCreatePage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadingParties, setLoadingParties] = useState(true)
+  const [insuranceLine, setInsuranceLine] = useState<InsuranceLineValue>('GENERAL_INSURANCE')
 
   useEffect(() => {
     let cancelled = false
@@ -119,6 +122,7 @@ export function OpportunityCreatePage() {
         json: {
           ...partyPayload,
           owner_id: user.id,
+          insurance_line: insuranceLine,
           stage: 'LEAD',
           status: 'OPEN',
           closing_probability: 10,
@@ -195,6 +199,19 @@ export function OpportunityCreatePage() {
                 />
               </div>
             )}
+            <div className="grid gap-2 sm:max-w-md">
+              <Label htmlFor="opp-line">{t('crm.opportunities.insuranceLine')}</Label>
+              <FormSelect
+                id="opp-line"
+                value={insuranceLine}
+                onValueChange={(v) => setInsuranceLine(v as InsuranceLineValue)}
+                disabled={loadingParties || !user}
+                options={INSURANCE_LINE_VALUES.map((v) => ({
+                  value: v,
+                  label: translateProductCategory(v, t),
+                }))}
+              />
+            </div>
             <Button
               type="submit"
               disabled={

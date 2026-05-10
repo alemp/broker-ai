@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from ai_copilot_api.api.deps import get_current_user, require_admin
 from ai_copilot_api.config import Settings, get_settings
-from ai_copilot_api.db.enums import BatchJobStatus
+from ai_copilot_api.db.enums import BatchJobStatus, DocumentType
 from ai_copilot_api.db.models import (
     BatchJobRun,
     CoverageTaxonomy,
     Document,
     DocumentExtractionRun,
+    Opportunity,
     User,
 )
 from ai_copilot_api.db.session import get_db, new_session
@@ -23,9 +26,21 @@ from ai_copilot_api.domain.document_extraction import (
     extract_pdf_text_with_ocr,
     extract_structured_with_text,
 )
+from ai_copilot_api.domain.proposal_adapters import select_adapter_for_pdf
+from ai_copilot_api.domain.proposal_ingest import (
+    apply_auto_proposal_to_opportunity,
+    resolve_party,
+)
 from ai_copilot_api.schemas.crm import BatchJobRunOut
 from ai_copilot_api.schemas.extraction import DocumentExtractionConfirmIn, DocumentExtractionRunOut
+from ai_copilot_api.schemas.proposal_ingest import AutoProposalPayload
 from ai_copilot_api.storage.factory import get_object_storage
+
+# Phase 6: when a PROPOSAL document is linked to an opportunity and the canonical
+# payload validates, we auto-apply only when extractor confidence is at least
+# this threshold. Lower scores are persisted with `requires_review=True` so a
+# human can confirm via `PATCH /v1/documents/extractions/{run_id}/confirm`.
+PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE = 70
 
 router = APIRouter(prefix="/documents", tags=["document-extraction"])
 
@@ -40,6 +55,113 @@ def _load_taxonomy(db: Session, org_id: uuid.UUID) -> list[dict[str, object]]:
         ),
     ).all()
     return [{"code": r.code, "label": r.label, "synonyms": r.synonyms} for r in rows]
+
+
+def _validation_errors_payload(exc: ValidationError) -> list[dict[str, Any]]:
+    return [
+        {"loc": list(err.get("loc", ())), "msg": err.get("msg"), "type": err.get("type")}
+        for err in exc.errors()
+    ]
+
+
+def _run_proposal_extraction_for_opportunity(
+    db: Session,
+    *,
+    doc: Document,
+    opp: Opportunity,
+    requested_by_id: uuid.UUID,
+    raw_text: str,
+    extraction_meta: dict[str, Any],
+) -> None:
+    """Phase 6 — proposal-aware extraction for documents linked to an opportunity.
+
+    Reads `insurance_line` from the **opportunity** (not from the request),
+    runs the matching adapter, persists a `DocumentExtractionRun`, and
+    auto-applies via :func:`apply_auto_proposal_to_opportunity` when the
+    canonical payload validates with ``confidence >= PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE``.
+    Otherwise the run is flagged ``requires_review=True`` and the existing
+    ``PATCH .../extractions/{run_id}/confirm`` flow can take over.
+    """
+    org_id = opp.organization_id
+    compact_text = " ".join(raw_text.split())
+
+    validation_errors: list[dict[str, Any]] = []
+    payload: AutoProposalPayload | None = None
+    canonical_dict: dict[str, Any] | None = None
+    proposal_source: str | None = None
+    confidence = 0
+    requires_review = True
+
+    try:
+        adapter = select_adapter_for_pdf(opp.insurance_line)
+    except NotImplementedError as exc:
+        validation_errors.append({"msg": str(exc), "type": "adapter_unsupported"})
+        run = DocumentExtractionRun(
+            organization_id=org_id,
+            document_id=doc.id,
+            created_by_id=requested_by_id,
+            confidence=0,
+            requires_review=True,
+            extracted_data={
+                "insurance_line": opp.insurance_line.value,
+                "extraction_meta": extraction_meta,
+                "validation_errors": validation_errors,
+                "applied": False,
+            },
+            normalized_data={"payload": None},
+        )
+        db.add(run)
+        return
+
+    proposal_source = adapter.source
+    canonical_dict = adapter.to_canonical_dict(
+        {"compact_text": compact_text, "raw_text": raw_text},
+    )
+    try:
+        payload = AutoProposalPayload.model_validate(canonical_dict)
+        confidence = 80
+        requires_review = False
+    except ValidationError as exc:
+        validation_errors = _validation_errors_payload(exc)
+
+    applied = False
+    if payload is not None and confidence >= PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE:
+        try:
+            party = resolve_party(db, org_id, payload.applicant, opportunity=opp)
+        except LookupError as exc:
+            requires_review = True
+            confidence = min(confidence, PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE - 1)
+            validation_errors.append(
+                {"msg": str(exc), "type": "party_resolution_error"},
+            )
+        else:
+            apply_auto_proposal_to_opportunity(
+                db,
+                opportunity=opp,
+                payload=payload,
+                proposal_source=adapter.source,
+                actor_user_id=requested_by_id,
+                party=party,
+            )
+            applied = True
+
+    run = DocumentExtractionRun(
+        organization_id=org_id,
+        document_id=doc.id,
+        created_by_id=requested_by_id,
+        confidence=confidence,
+        requires_review=requires_review,
+        extracted_data={
+            "insurance_line": opp.insurance_line.value,
+            "canonical_dict": canonical_dict,
+            "extraction_meta": extraction_meta,
+            "validation_errors": validation_errors,
+            "proposal_source": proposal_source,
+            "applied": applied,
+        },
+        normalized_data={"payload": payload.model_dump(mode="json") if payload else None},
+    )
+    db.add(run)
 
 
 def _run_document_extraction_job(job_id: uuid.UUID, *, settings: Settings) -> None:
@@ -69,6 +191,11 @@ def _run_document_extraction_job(job_id: uuid.UUID, *, settings: Settings) -> No
             db.commit()
             return
 
+        requested_by = job.job_meta.get("requested_by_id")
+        requested_by_id = uuid.UUID(requested_by) if isinstance(requested_by, str) else None
+        if requested_by_id is None:
+            raise ValueError("requested_by_id missing from job_meta")
+
         storage = get_object_storage(settings)
         pdf_bytes = storage.get_object(doc.storage_key)
         raw_text, extraction_meta = extract_pdf_text_with_ocr(
@@ -81,6 +208,36 @@ def _run_document_extraction_job(job_id: uuid.UUID, *, settings: Settings) -> No
             provider_max_pages=settings.ocr_provider_max_pages,
             provider_dpi=settings.ocr_provider_dpi,
         )
+
+        # Phase 6: proposal-aware path runs when a PROPOSAL document is linked
+        # to an opportunity. We read `insurance_line` from the opportunity and
+        # auto-apply the canonical payload when extractor confidence is high.
+        if (
+            doc.opportunity_id is not None
+            and doc.document_type == DocumentType.PROPOSAL
+        ):
+            opp = db.scalar(
+                select(Opportunity).where(
+                    Opportunity.id == doc.opportunity_id,
+                    Opportunity.organization_id == org_id,
+                ),
+            )
+            if opp is not None:
+                _run_proposal_extraction_for_opportunity(
+                    db,
+                    doc=doc,
+                    opp=opp,
+                    requested_by_id=requested_by_id,
+                    raw_text=raw_text,
+                    extraction_meta=extraction_meta,
+                )
+                job.status = BatchJobStatus.SUCCESS
+                job.clients_processed = 1
+                job.finished_at = datetime.now(UTC)
+                db.commit()
+                return
+
+        # Legacy free-form structured extraction (no opportunity linkage).
         compact = " ".join(raw_text.split())
         result = extract_structured_with_text(
             doc.document_type,
@@ -106,11 +263,6 @@ def _run_document_extraction_job(job_id: uuid.UUID, *, settings: Settings) -> No
             }
             for n in normalized
         ]
-
-        requested_by = job.job_meta.get("requested_by_id")
-        requested_by_id = uuid.UUID(requested_by) if isinstance(requested_by, str) else None
-        if requested_by_id is None:
-            raise ValueError("requested_by_id missing from job_meta")
 
         run = DocumentExtractionRun(
             organization_id=org_id,

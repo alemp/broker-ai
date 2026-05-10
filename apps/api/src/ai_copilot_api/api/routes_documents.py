@@ -3,15 +3,19 @@ from __future__ import annotations
 import hashlib
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from ai_copilot_api.api.deps import get_current_user, require_admin
+from ai_copilot_api.api.deps import (
+    assert_can_extract_for_opportunity,
+    get_current_user,
+    require_admin,
+)
 from ai_copilot_api.config import Settings, get_settings
-from ai_copilot_api.db.enums import DocumentType
-from ai_copilot_api.db.models import Document, DocumentVersion, Product, User
+from ai_copilot_api.db.enums import DocumentType, UserRole
+from ai_copilot_api.db.models import Document, DocumentVersion, Opportunity, Product, User
 from ai_copilot_api.db.session import get_db
 from ai_copilot_api.schemas.documents import DocumentOut, DocumentVersionOut
 from ai_copilot_api.storage.factory import get_object_storage
@@ -39,6 +43,22 @@ def _validate_product_in_org(db: Session, org_id: uuid.UUID, product_id: uuid.UU
     )
     if exists is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+
+def _validate_opportunity_in_org(
+    db: Session,
+    org_id: uuid.UUID,
+    opportunity_id: uuid.UUID,
+) -> None:
+    """Tenant guard for `Document.opportunity_id` (ADR-PROPOSAL-INGEST §D3)."""
+    exists = db.scalar(
+        select(Opportunity.id).where(
+            Opportunity.id == opportunity_id,
+            Opportunity.organization_id == org_id,
+        ),
+    )
+    if exists is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Opportunity not found")
 
 
 def _is_pdf_upload(file: UploadFile) -> bool:
@@ -95,13 +115,25 @@ def _read_upload_with_limits(file: UploadFile) -> tuple[bytes, str, int]:
 def list_documents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    opportunity_id: uuid.UUID | None = Query(default=None),
 ) -> list[DocumentOut]:
+    """List documents for the caller's organization.
+
+    Phase 6: when ``opportunity_id`` is provided we restrict the listing to
+    documents linked to that opportunity (tenant-guarded — a 404 is raised
+    when the opportunity does not exist for the caller's organization).
+    """
+    org_id = current_user.organization_id
+    if opportunity_id is not None:
+        _validate_opportunity_in_org(db, org_id, opportunity_id)
     stmt = (
         select(Document)
         .options(joinedload(Document.uploaded_by_user))
-        .where(Document.organization_id == current_user.organization_id)
+        .where(Document.organization_id == org_id)
         .order_by(Document.updated_at.desc())
     )
+    if opportunity_id is not None:
+        stmt = stmt.where(Document.opportunity_id == opportunity_id)
     rows = db.scalars(stmt).unique().all()
     return [DocumentOut.model_validate(r) for r in rows]
 
@@ -110,15 +142,47 @@ def list_documents(
 def upload_document(
     document_type: DocumentType = Form(...),
     product_id: uuid.UUID | None = Form(default=None),
+    opportunity_id: uuid.UUID | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ) -> DocumentOut:
     org_id = current_user.organization_id
 
-    if product_id is not None:
-        _validate_product_in_org(db, org_id, product_id)
+    if current_user.role == UserRole.ADMIN:
+        if product_id is not None:
+            _validate_product_in_org(db, org_id, product_id)
+        if opportunity_id is not None:
+            _validate_opportunity_in_org(db, org_id, opportunity_id)
+    elif current_user.role in (UserRole.BROKER, UserRole.SALES_MANAGER):
+        if product_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators may attach documents to catalog products",
+            )
+        if opportunity_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Opportunity-scoped document upload is required for your role",
+            )
+        opp = db.scalar(
+            select(Opportunity).where(
+                Opportunity.id == opportunity_id,
+                Opportunity.organization_id == org_id,
+            ),
+        )
+        if opp is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Opportunity not found",
+            )
+        assert_can_extract_for_opportunity(current_user, opp)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
 
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename")
@@ -130,15 +194,22 @@ def upload_document(
     if _is_pdf_upload(file):
         content_type = "application/pdf"
 
-    # "Documento lógico": org + tipo + produto + nome do arquivo.
-    existing_doc = db.scalar(
-        select(Document).where(
-            Document.organization_id == org_id,
-            Document.document_type == document_type,
-            Document.product_id == product_id,
-            Document.original_filename == file.filename,
-        ),
+    # "Documento lógico": org + tipo + (opportunity_id ou product_id) + nome do arquivo.
+    # Quando opportunity_id é informado, ele isola o bucket do documento por oportunidade
+    # para que o mesmo nome possa coexistir entre deals (Phase 2 / ADR-PROPOSAL-INGEST §D3).
+    existing_doc_stmt = select(Document).where(
+        Document.organization_id == org_id,
+        Document.document_type == document_type,
+        Document.original_filename == file.filename,
     )
+    if opportunity_id is not None:
+        existing_doc_stmt = existing_doc_stmt.where(Document.opportunity_id == opportunity_id)
+    else:
+        existing_doc_stmt = existing_doc_stmt.where(
+            Document.opportunity_id.is_(None),
+            Document.product_id == product_id,
+        )
+    existing_doc = db.scalar(existing_doc_stmt)
 
     # Reuse the same stored blob if we already have it anywhere for this org.
     existing_blob = db.scalar(
@@ -166,6 +237,7 @@ def upload_document(
             organization_id=org_id,
             uploaded_by_id=current_user.id,
             product_id=product_id,
+            opportunity_id=opportunity_id,
             document_type=document_type,
             original_filename=file.filename,
             content_type=content_type,
@@ -223,16 +295,23 @@ def upload_document(
         )
         db.commit()
 
-    row = db.scalar(
+    row_stmt = (
         select(Document)
         .options(joinedload(Document.uploaded_by_user))
         .where(
             Document.organization_id == org_id,
             Document.document_type == document_type,
-            Document.product_id == product_id,
             Document.original_filename == file.filename,
-        ),
+        )
     )
+    if opportunity_id is not None:
+        row_stmt = row_stmt.where(Document.opportunity_id == opportunity_id)
+    else:
+        row_stmt = row_stmt.where(
+            Document.opportunity_id.is_(None),
+            Document.product_id == product_id,
+        )
+    row = db.scalar(row_stmt)
     assert row is not None
     return DocumentOut.model_validate(row)
 

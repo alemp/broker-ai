@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { FormSelect } from '@/components/ui/select'
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch } from '@/lib/api'
 import {
@@ -46,6 +47,7 @@ type OpportunityDetail = {
   id: string
   stage: string
   status: string
+  insurance_line: string
   closing_probability: number
   estimated_value: string | null
   preferred_insurer_name: string | null
@@ -57,6 +59,10 @@ type OpportunityDetail = {
   next_action_due_at: string | null
   last_interaction_at: string | null
   product: { id: string; name: string } | null
+  proposal_source: string | null
+  quote_number: string | null
+  quote_item: number | null
+  proposal_data: Record<string, unknown> | null
 }
 
 type InteractionDto = {
@@ -65,6 +71,14 @@ type InteractionDto = {
   summary: string
   occurred_at: string
   created_by: { email: string; full_name: string | null }
+}
+
+type DocumentBrief = {
+  id: string
+  document_type: string
+  original_filename: string
+  opportunity_id: string | null
+  updated_at: string
 }
 
 type OppRecItem = {
@@ -116,6 +130,9 @@ export function OpportunityDetailPage() {
   const [savingDeal, setSavingDeal] = useState(false)
   const [recPreview, setRecPreview] = useState<OppRecPreview | null>(null)
   const [recLoading, setRecLoading] = useState(false)
+  const [mainTab, setMainTab] = useState('summary')
+  const [linkedDocs, setLinkedDocs] = useState<DocumentBrief[]>([])
+  const [documentsLoading, setDocumentsLoading] = useState(false)
 
   const load = useCallback(async () => {
     if (!opportunityId) {
@@ -146,6 +163,33 @@ export function OpportunityDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (mainTab !== 'documents' || !opportunityId) {
+      return
+    }
+    let cancelled = false
+    setDocumentsLoading(true)
+    void (async () => {
+      try {
+        const all = await apiFetch<DocumentBrief[]>('/v1/documents')
+        if (!cancelled) {
+          setLinkedDocs(all.filter((d) => d.opportunity_id === opportunityId))
+        }
+      } catch {
+        if (!cancelled) {
+          setLinkedDocs([])
+        }
+      } finally {
+        if (!cancelled) {
+          setDocumentsLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mainTab, opportunityId])
 
   const loadRecommendationsPreview = useCallback(async () => {
     if (!opportunityId || !detail?.client) {
@@ -282,6 +326,7 @@ export function OpportunityDetailPage() {
 
   const oppDescription = detail
     ? [
+        `${t('crm.opportunities.insuranceLine')}: ${translateProductCategory(detail.insurance_line, t)}`,
         `${t('crm.opportunities.pipeline')}: ${translateOpportunityStage(detail.stage, t)} · ${translateOpportunityStatus(detail.status, t)}`,
         `${t('crm.opportunities.probability')}: ${detail.closing_probability}%${
           detail.estimated_value ? ` · ${formatCurrency(detail.estimated_value, money)}` : ''
@@ -312,41 +357,60 @@ export function OpportunityDetailPage() {
         <p className="text-destructive text-sm">{error ?? t('crm.error.notFound')}</p>
       ) : null}
       {detail && !loading ? (
-        <div className="space-y-1">
-          {detail.next_action ? <p className="mt-2 text-sm">{detail.next_action}</p> : null}
-          {detail.next_action_due_at ? (
-            <p className="text-muted-foreground text-sm">
-              {t('crm.opportunities.due')}: {new Date(detail.next_action_due_at).toLocaleString()}
-            </p>
-          ) : null}
-          {detail.last_interaction_at ? (
-            <p className="text-muted-foreground text-sm">
-              {t('crm.opportunities.lastInteraction')}:{' '}
-              {new Date(detail.last_interaction_at).toLocaleString()}
-            </p>
-          ) : null}
-          {detail.loss_reason ? (
-            <p className="text-destructive mt-2 text-sm">
-              {t('crm.opportunities.lossReason')}: {detail.loss_reason}
-            </p>
-          ) : null}
-          <p className="mt-2 text-sm">
-            {detail.client ? (
-              <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
-                {t('crm.opportunities.openClient')}
-              </Link>
-            ) : detail.lead ? (
-              <Link to={`/leads/${detail.lead.id}`} className="text-primary hover:underline">
-                {t('crm.opportunities.openLead')}
-              </Link>
-            ) : null}
-          </p>
-        </div>
-      ) : null}
-
-      {error && detail ? <p className="text-destructive text-sm">{error}</p> : null}
+        <TabsRoot value={mainTab} onValueChange={setMainTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="summary">{t('crm.opportunityDetail.tab.summary')}</TabsTrigger>
+            <TabsTrigger value="documents">{t('crm.opportunityDetail.tab.documents')}</TabsTrigger>
+            <TabsTrigger value="proposal">{t('crm.opportunityDetail.tab.proposal')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="summary" className="mt-4 space-y-8">
+            <div className="space-y-1">
+              {detail.next_action ? <p className="mt-2 text-sm">{detail.next_action}</p> : null}
+              {detail.next_action_due_at ? (
+                <p className="text-muted-foreground text-sm">
+                  {t('crm.opportunities.due')}: {new Date(detail.next_action_due_at).toLocaleString()}
+                </p>
+              ) : null}
+              {detail.last_interaction_at ? (
+                <p className="text-muted-foreground text-sm">
+                  {t('crm.opportunities.lastInteraction')}:{' '}
+                  {new Date(detail.last_interaction_at).toLocaleString()}
+                </p>
+              ) : null}
+              {detail.loss_reason ? (
+                <p className="text-destructive mt-2 text-sm">
+                  {t('crm.opportunities.lossReason')}: {detail.loss_reason}
+                </p>
+              ) : null}
+              <p className="mt-2 text-sm">
+                {detail.client ? (
+                  <Link to={`/clients/${detail.client.id}`} className="text-primary hover:underline">
+                    {t('crm.opportunities.openClient')}
+                  </Link>
+                ) : detail.lead ? (
+                  <Link to={`/leads/${detail.lead.id}`} className="text-primary hover:underline">
+                    {t('crm.opportunities.openLead')}
+                  </Link>
+                ) : null}
+              </p>
+              {detail.proposal_source ? (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs font-medium">
+                    {t('crm.opportunityDetail.fromProposal')}
+                  </span>
+                  {detail.quote_number ? (
+                    <span className="text-muted-foreground font-mono text-xs">
+                      {t('crm.opportunities.quoteNumberShort')}: {detail.quote_number}
+                      {detail.quote_item != null ? ` · #${detail.quote_item}` : ''}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
+            {error && detail ? <p className="text-destructive text-sm">{error}</p> : null}
 
       {detail ? (
+        <>
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('crm.opportunities.dealFields')}</CardTitle>
@@ -400,9 +464,7 @@ export function OpportunityDetailPage() {
             </form>
           </CardContent>
         </Card>
-      ) : null}
 
-      {detail ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('crm.opportunities.recommendationsTitle')}</CardTitle>
@@ -485,9 +547,7 @@ export function OpportunityDetailPage() {
             ) : null}
           </CardContent>
         </Card>
-      ) : null}
 
-      {detail ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('crm.interactions.title')}</CardTitle>
@@ -542,9 +602,7 @@ export function OpportunityDetailPage() {
             </form>
           </CardContent>
         </Card>
-      ) : null}
 
-      {detail ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('crm.opportunities.stageActions')}</CardTitle>
@@ -584,6 +642,43 @@ export function OpportunityDetailPage() {
             </div>
           </CardContent>
         </Card>
+        </>
+      ) : null}
+          </TabsContent>
+          <TabsContent value="documents" className="mt-4 space-y-4">
+            {documentsLoading ? (
+              <p className="text-muted-foreground text-sm">{t('auth.loading')}</p>
+            ) : linkedDocs.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t('crm.opportunityDetail.noDocuments')}</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {linkedDocs.map((d) => (
+                  <li
+                    key={d.id}
+                    className="border-border/60 flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-0"
+                  >
+                    <div>
+                      <span className="font-medium">{d.original_filename}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">({d.document_type})</span>
+                    </div>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link to={`/documents/${d.id}`}>{t('crm.action.view')}</Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </TabsContent>
+          <TabsContent value="proposal" className="mt-4 space-y-4">
+            {detail.proposal_data && Object.keys(detail.proposal_data).length > 0 ? (
+              <pre className="bg-muted max-h-[32rem] overflow-auto rounded-md border p-3 text-xs">
+                {JSON.stringify(detail.proposal_data, null, 2)}
+              </pre>
+            ) : (
+              <p className="text-muted-foreground text-sm">{t('crm.opportunityDetail.noProposalData')}</p>
+            )}
+          </TabsContent>
+        </TabsRoot>
       ) : null}
     </div>
   )

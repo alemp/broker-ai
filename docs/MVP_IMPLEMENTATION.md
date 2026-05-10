@@ -8,6 +8,14 @@ This document is the **single technical source of truth for the MVP scope**, rep
 - `PRODUCT.md` (stakeholder brief, pt-BR)
 - `PRODUCT_ADDITIONAL_INFO.md` (extended product vision for policy/coverage adequacy)
 
+### Related ADRs
+
+- [`ADR-PROPOSAL-INGEST.md`](./ADR-PROPOSAL-INGEST.md) — Proposal ingest: `Opportunity` as proposal container, `insurance_line`, JSON and PDF channels, `documents.opportunity_id`, idempotency, party resolution.
+
+### Related implementation plans
+
+- [`PROPOSAL-INGEST-IMPLEMENTATION.md`](./PROPOSAL-INGEST-IMPLEMENTATION.md) — Phase-by-phase plan for the proposal-ingest feature (data model, PDF/JSON channels, web UI, tests, rollout).
+
 ---
 
 ## 0. Implementation status (current)

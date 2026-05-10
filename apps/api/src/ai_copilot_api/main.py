@@ -21,6 +21,7 @@ from ai_copilot_api.api.routes_me import router as me_router
 from ai_copilot_api.api.routes_opportunities import router as opportunities_router
 from ai_copilot_api.api.routes_org import router as org_router
 from ai_copilot_api.api.routes_products import router as products_router
+from ai_copilot_api.api.routes_proposal_ingest import router as proposal_ingest_router
 from ai_copilot_api.api.routes_recommendation_rules import router as recommendation_rules_router
 from ai_copilot_api.config import get_settings
 
@@ -83,6 +84,7 @@ app.include_router(leads_router, prefix="/v1")
 app.include_router(products_router, prefix="/v1")
 app.include_router(campaigns_router, prefix="/v1")
 app.include_router(opportunities_router, prefix="/v1")
+app.include_router(proposal_ingest_router, prefix="/v1")
 app.include_router(interactions_router, prefix="/v1")
 app.include_router(jobs_router, prefix="/v1")
 app.include_router(dashboard_router, prefix="/v1")

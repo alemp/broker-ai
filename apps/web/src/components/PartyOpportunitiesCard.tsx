@@ -14,6 +14,7 @@ import { apiFetch } from '@/lib/api'
 import {
   translateOpportunityStage,
   translateOpportunityStatus,
+  translateProductCategory,
 } from '@/lib/crmEnumLabels'
 import { formatCurrency } from '@/lib/money'
 import { useAuth } from '@/contexts/AuthContext'
@@ -21,6 +22,9 @@ export type PartyOppRow = {
   id: string
   stage: string
   status: string
+  insurance_line: string
+  proposal_source: string | null
+  quote_number: string | null
   estimated_value: string | null
   product: { id: string; name: string } | null
   next_action: string | null
@@ -49,6 +53,10 @@ function rowMatchesQuery(row: PartyOppRow, q: string, t: TFunction<'common'>): b
     translateOpportunityStage(row.stage, t),
     row.status,
     translateOpportunityStatus(row.status, t),
+    row.insurance_line,
+    translateProductCategory(row.insurance_line, t),
+    row.proposal_source,
+    row.quote_number,
     row.product?.name,
     row.estimated_value,
     row.next_action,
@@ -142,17 +150,21 @@ export function PartyOpportunitiesCard({
           viewMode === 'table' ? (
             <div className="space-y-2" aria-busy="true" aria-label={t('auth.loading')}>
               <div className="flex gap-2 border-b px-3 py-2">
+                <Skeleton className="h-3 w-16" />
                 <Skeleton className="h-3 w-28" />
                 <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-20" />
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="h-3 w-20" />
                 <Skeleton className="ml-auto h-3 w-14" />
               </div>
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="flex gap-2 border-b px-3 py-3 last:border-0">
+                  <Skeleton className="h-4 w-14" />
                   <Skeleton className="h-4 w-36" />
                   <Skeleton className="h-4 w-28" />
                   <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-16" />
                   <Skeleton className="h-4 w-16" />
                   <Skeleton className="ml-auto h-4 w-14" />
                 </div>
@@ -181,6 +193,7 @@ export function PartyOpportunitiesCard({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>{t('crm.opportunities.insuranceLine')}</TableHead>
                 <TableHead>{t('crm.opportunities.productInterest')}</TableHead>
                 <TableHead>{t('crm.opportunities.filterStage')}</TableHead>
                 <TableHead>{t('crm.opportunities.tableOppStatus')}</TableHead>
@@ -194,10 +207,21 @@ export function PartyOpportunitiesCard({
             <TableBody>
               {items.map((o) => (
                 <TableRow key={o.id}>
+                  <TableCell className="text-muted-foreground text-xs">
+                    {translateProductCategory(o.insurance_line, t)}
+                  </TableCell>
                   <TableCell className="max-w-[12rem] font-medium">
-                    <span className="line-clamp-2" title={o.product?.name ?? undefined}>
-                      {o.product?.name ?? '—'}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="line-clamp-2" title={o.product?.name ?? undefined}>
+                        {o.product?.name ?? '—'}
+                      </span>
+                      {o.proposal_source ? (
+                        <span className="bg-muted text-foreground w-fit rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                          {t('crm.opportunities.fromQuoteBadge')}
+                          {o.quote_number ? ` · ${o.quote_number}` : ''}
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {translateOpportunityStage(o.stage, t)}
@@ -227,15 +251,36 @@ export function PartyOpportunitiesCard({
                 <Card className="border-border/80 h-full shadow-sm transition-shadow hover:shadow-md">
                   <CardContent className="flex h-full flex-col gap-3 p-4">
                     <div className="min-w-0 flex-1 space-y-2">
-                      <Link
-                        to={`/opportunities/${o.id}`}
-                        className="text-foreground line-clamp-2 text-base font-semibold hover:underline"
-                      >
-                        {o.product?.name?.trim()
-                          ? o.product.name
-                          : t('crm.opportunities.cardTitleFallback')}
-                      </Link>
+                      <div className="flex flex-wrap items-start gap-2">
+                        <Link
+                          to={`/opportunities/${o.id}`}
+                          className="text-foreground line-clamp-2 min-w-0 flex-1 text-base font-semibold hover:underline"
+                        >
+                          {o.product?.name?.trim()
+                            ? o.product.name
+                            : t('crm.opportunities.cardTitleFallback')}
+                        </Link>
+                        {o.proposal_source ? (
+                          <span className="bg-muted text-foreground shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                            {t('crm.opportunities.fromQuoteBadge')}
+                          </span>
+                        ) : null}
+                      </div>
                       <dl className="text-muted-foreground space-y-1 text-sm">
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                          <dt className="text-foreground/80 font-medium">
+                            {t('crm.opportunities.insuranceLine')}
+                          </dt>
+                          <dd>{translateProductCategory(o.insurance_line, t)}</dd>
+                        </div>
+                        {o.quote_number ? (
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                            <dt className="text-foreground/80 font-medium">
+                              {t('crm.opportunities.quoteNumberShort')}
+                            </dt>
+                            <dd className="font-mono text-xs">{o.quote_number}</dd>
+                          </div>
+                        ) : null}
                         <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                           <dt className="text-foreground/80 font-medium">
                             {t('crm.opportunities.productInterest')}

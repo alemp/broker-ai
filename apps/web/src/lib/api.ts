@@ -63,6 +63,26 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
   return data as T
 }
 
+/** POST `multipart/form-data` (caller builds `FormData`; do not set `Content-Type`). */
+export async function apiPostFormData<T>(path: string, form: FormData): Promise<T> {
+  const token = getStoredAccessToken()
+  const headers = new Headers()
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: 'POST',
+    headers,
+    body: form,
+  })
+  const text = await response.text()
+  const data = parseJsonSafe(text)
+  if (!response.ok) {
+    throw new Error(formatErrorDetail(data) || `Request failed (${response.status})`)
+  }
+  return data as T
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit & { json?: unknown; skipAuth?: boolean } = {},

@@ -14,9 +14,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { usePersistedListViewMode } from '@/hooks/usePersistedListViewMode'
 import { apiFetch } from '@/lib/api'
+import { INSURANCE_LINE_VALUES } from '@/lib/proposalIngest'
 import {
   translateOpportunityStage,
   translateOpportunityStatus,
+  translateProductCategory,
 } from '@/lib/crmEnumLabels'
 import { formatCurrency } from '@/lib/money'
 import { cn } from '@/lib/utils'
@@ -27,6 +29,7 @@ type OpportunityRow = {
   id: string
   stage: string
   status: string
+  insurance_line: string
   estimated_value: string | null
   client: { id: string; full_name: string } | null
   lead: { id: string; full_name: string; email: string | null } | null
@@ -58,6 +61,7 @@ export function OpportunitiesPage() {
   const [viewMode, setViewMode] = usePersistedListViewMode(LIST_VIEW_STORAGE_KEY)
   const [filterStage, setFilterStage] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterInsuranceLine, setFilterInsuranceLine] = useState('')
   const [filterOwner, setFilterOwner] = useState<'all' | 'mine'>('all')
   const [listSearch, setListSearch] = useState('')
   const debouncedListSearch = useDebouncedValue(listSearch, 350)
@@ -73,13 +77,16 @@ export function OpportunitiesPage() {
     if (filterOwner === 'mine' && user?.id) {
       p.set('owner_id', user.id)
     }
+    if (filterInsuranceLine) {
+      p.set('insurance_line', filterInsuranceLine)
+    }
     const q = debouncedListSearch.trim()
     if (q) {
       p.set('q', q)
     }
     const s = p.toString()
     return s ? `?${s}` : ''
-  }, [filterStage, filterStatus, filterOwner, user?.id, debouncedListSearch])
+  }, [filterStage, filterStatus, filterInsuranceLine, filterOwner, user?.id, debouncedListSearch])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -112,7 +119,7 @@ export function OpportunitiesPage() {
   )
 
   const filterRow = (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <div className="grid gap-2">
         <Label htmlFor="opp-filter-stage">{t('crm.opportunities.filterStage')}</Label>
         <FormSelect
@@ -156,6 +163,21 @@ export function OpportunitiesPage() {
           ]}
         />
       </div>
+      <div className="grid gap-2">
+        <Label htmlFor="opp-filter-line">{t('crm.opportunities.insuranceLine')}</Label>
+        <FormSelect
+          id="opp-filter-line"
+          value={filterInsuranceLine}
+          onValueChange={setFilterInsuranceLine}
+          allowEmpty
+          emptyLabel={t('crm.opportunities.filterAll')}
+          placeholder={t('crm.opportunities.filterAll')}
+          options={INSURANCE_LINE_VALUES.map((v) => ({
+            value: v,
+            label: translateProductCategory(v, t),
+          }))}
+        />
+      </div>
     </div>
   )
 
@@ -165,6 +187,9 @@ export function OpportunitiesPage() {
         title={t('crm.opportunities.title')}
         description={t('crm.opportunities.subtitle')}
       >
+        <Button asChild variant="outline">
+          <Link to="/opportunities/proposal-import">{t('proposalIngest.navShort')}</Link>
+        </Button>
         <Button asChild>
           <Link to="/opportunities/new">{t('action.newRecord')}</Link>
         </Button>
@@ -230,6 +255,7 @@ export function OpportunitiesPage() {
                   <Skeleton className="h-3 w-24" />
                   <Skeleton className="h-3 w-20" />
                   <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-3 w-24" />
                   <Skeleton className="ml-auto h-3 w-14" />
                 </div>
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -237,6 +263,8 @@ export function OpportunitiesPage() {
                     <Skeleton className="h-4 w-40" />
                     <Skeleton className="h-4 w-28" />
                     <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
                     <Skeleton className="h-4 w-16" />
                     <Skeleton className="ml-auto h-4 w-14" />
                   </div>
@@ -266,6 +294,7 @@ export function OpportunitiesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('crm.opportunities.tableParty')}</TableHead>
+                  <TableHead>{t('crm.opportunities.insuranceLine')}</TableHead>
                   <TableHead>{t('crm.opportunities.filterStage')}</TableHead>
                   <TableHead>{t('crm.opportunities.tableOppStatus')}</TableHead>
                   <TableHead>{t('crm.opportunities.tableValue')}</TableHead>
@@ -281,6 +310,9 @@ export function OpportunitiesPage() {
                       <Link to={`/opportunities/${o.id}`} className="hover:underline">
                         {partyLabel(o)}
                       </Link>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {translateProductCategory(o.insurance_line, t)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {translateOpportunityStage(o.stage, t)}
@@ -314,6 +346,12 @@ export function OpportunitiesPage() {
                           {partyLabel(o)}
                         </Link>
                         <dl className="text-muted-foreground space-y-1 text-sm">
+                          <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                            <dt className="text-foreground/80 font-medium">
+                              {t('crm.opportunities.insuranceLine')}
+                            </dt>
+                            <dd>{translateProductCategory(o.insurance_line, t)}</dd>
+                          </div>
                           <div className="flex flex-wrap gap-x-2 gap-y-0.5">
                             <dt className="text-foreground/80 font-medium">
                               {t('crm.opportunities.filterStage')}

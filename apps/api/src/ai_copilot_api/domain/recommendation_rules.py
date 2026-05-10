@@ -76,6 +76,29 @@ def _has_active_category(party: IntelParty, category: ProductCategory) -> bool:
     return False
 
 
+def _has_in_flight_proposal(party: IntelParty, category: ProductCategory) -> bool:
+    """An opportunity already carries a canonical proposal for this line.
+
+    Used as an "in-flight coverage" signal so that protection-gap rules
+    (e.g. RULE_AUTO_GAP) do not re-recommend a category we are actively
+    quoting. A proposal is considered active while the opportunity is not
+    in a terminal lost state; CLOSED_WON and POST_SALE are kept as covered
+    because the portfolio entry (ClientHeldProduct) is created in a
+    separate flow (ADR §D8).
+    """
+    from ai_copilot_api.db.enums import OpportunityStage
+
+    for o in party.opportunities:
+        if o.insurance_line != category:
+            continue
+        if not o.proposal_data:
+            continue
+        if o.stage == OpportunityStage.CLOSED_LOST:
+            continue
+        return True
+    return False
+
+
 @dataclass(frozen=True)
 class RuleResult:
     rule_id: str
@@ -145,7 +168,11 @@ def assess_protection_gaps(party: IntelParty) -> tuple[ProtectionGaps, list[Rule
     children = (personal.number_of_children if personal else None) or 0
     dependents = (personal.financial_dependents if personal else None) or 0
     owns_property = bool(res.owns_property) if res and res.owns_property is not None else False
-    owns_vehicle = bool(mob.owns_vehicle) if mob and mob.owns_vehicle is not None else False
+    legacy_owns_vehicle = (
+        bool(mob.owns_vehicle) if mob and mob.owns_vehicle is not None else False
+    )
+    has_vehicle_in_profile = bool(mob and mob.vehicles)
+    owns_vehicle = legacy_owns_vehicle or has_vehicle_in_profile
     has_health = (
         bool(health.has_health_plan) if health and health.has_health_plan is not None else False
     )
@@ -182,12 +209,16 @@ def assess_protection_gaps(party: IntelParty) -> tuple[ProtectionGaps, list[Rule
         ),
     )
     auto_held = _has_active_category(party, ProductCategory.AUTO_INSURANCE)
-    want_auto = owns_vehicle and not auto_held
+    auto_in_flight = _has_in_flight_proposal(party, ProductCategory.AUTO_INSURANCE)
+    want_auto = owns_vehicle and not auto_held and not auto_in_flight
     trace.append(
         RuleResult(
             "RULE_AUTO_GAP",
             want_auto,
-            f"owns_vehicle={owns_vehicle}, auto_held={auto_held}",
+            (
+                f"owns_vehicle={owns_vehicle}, auto_held={auto_held}, "
+                f"auto_in_flight={auto_in_flight}"
+            ),
         ),
     )
     want_health = (not has_health) and (

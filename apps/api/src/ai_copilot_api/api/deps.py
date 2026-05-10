@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from ai_copilot_api.auth.jwt_tokens import decode_access_token
 from ai_copilot_api.config import Settings, get_settings
 from ai_copilot_api.db.enums import UserRole
-from ai_copilot_api.db.models import User
+from ai_copilot_api.db.models import Opportunity, User
 from ai_copilot_api.db.session import get_db
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -79,3 +79,35 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin access required",
         )
     return current_user
+
+
+def require_broker_or_above(current_user: User = Depends(get_current_user)) -> User:
+    """Broker, sales manager, or admin (Phase 4 JSON ingest and similar CRM writes)."""
+    if current_user.role not in (
+        UserRole.ADMIN,
+        UserRole.SALES_MANAGER,
+        UserRole.BROKER,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Broker or elevated role required",
+        )
+    return current_user
+
+
+def assert_can_extract_for_opportunity(user: User, opp: Opportunity) -> None:
+    """ADR-PROPOSAL-INGEST §D7 — extraction permission matrix.
+
+    Admins and sales managers may extract for any opportunity in their org;
+    brokers may only do so for opportunities they own (`owner_id == user.id`).
+    """
+    if user.organization_id != opp.organization_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Opportunity not found")
+    if user.role in (UserRole.ADMIN, UserRole.SALES_MANAGER):
+        return
+    if user.role == UserRole.BROKER and opp.owner_id == user.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Insufficient permissions to extract this proposal",
+    )

@@ -20,6 +20,7 @@ from ai_copilot_api.db.enums import (
     CrmEntityType,
     LeadStatus,
     OpportunityStage,
+    ProductCategory,
 )
 from ai_copilot_api.db.models import (
     Client,
@@ -92,6 +93,30 @@ def _product_in_org(db: Session, org_id: uuid.UUID, product_id: uuid.UUID | None
     )
     if p is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+
+def _assert_product_line_match(
+    db: Session,
+    org_id: uuid.UUID,
+    product_id: uuid.UUID | None,
+    insurance_line: ProductCategory | None,
+) -> None:
+    """Enforce ADR D1: when product_id is set, product.category must match insurance_line."""
+    if product_id is None or insurance_line is None:
+        return
+    p = db.scalar(
+        select(Product).where(Product.id == product_id, Product.organization_id == org_id),
+    )
+    if p is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if p.category != insurance_line:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"insurance_line ({insurance_line.value}) does not match "
+                f"product.category ({p.category.value})"
+            ),
+        )
 
 
 def _lead_or_404(db: Session, org_id: uuid.UUID, lead_id: uuid.UUID) -> Lead:
@@ -732,13 +757,14 @@ def convert_lead(
     if body.opportunity is not None:
         op = body.opportunity
         _user_in_org(db, org_id, op.owner_id)
-        _product_in_org(db, org_id, op.product_id)
+        _assert_product_line_match(db, org_id, op.product_id, op.insurance_line)
         derived_status = status_for_stage(op.stage, op.status)
         opp_row = Opportunity(
             organization_id=org_id,
             client_id=client_row.id,
             owner_id=op.owner_id,
             product_id=op.product_id,
+            insurance_line=op.insurance_line,
             estimated_value=op.estimated_value,
             closing_probability=op.closing_probability,
             stage=op.stage,

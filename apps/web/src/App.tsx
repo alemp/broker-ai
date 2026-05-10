@@ -1,4 +1,7 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+
+import { Loader2 } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
@@ -25,6 +28,11 @@ import { LeadsPage } from '@/pages/LeadsPage'
 import { OpportunityCreatePage } from '@/pages/OpportunityCreatePage'
 import { OpportunityDetailPage } from '@/pages/OpportunityDetailPage'
 import { OpportunitiesPage } from '@/pages/OpportunitiesPage'
+
+const ProposalIngestPage = lazy(async () => {
+  const m = await import('@/pages/ProposalIngestPage')
+  return { default: m.ProposalIngestPage }
+})
 import { RegisterPage } from '@/pages/RegisterPage'
 import { ReleaseNotesPage } from '@/pages/ReleaseNotesPage'
 import { ProfilePage } from '@/pages/ProfilePage'
@@ -52,6 +60,21 @@ export default function App() {
         <Route path="/leads/new" element={<LeadCreatePage />} />
         <Route path="/leads/:leadId" element={<LeadDetailPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
+        <Route
+          path="/opportunities/proposal-import"
+          element={
+            <Suspense
+              fallback={
+                <div className="text-muted-foreground flex items-center justify-center gap-2 px-4 py-16 text-sm">
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  <span>…</span>
+                </div>
+              }
+            >
+              <ProposalIngestPage />
+            </Suspense>
+          }
+        />
         <Route path="/opportunities/new" element={<OpportunityCreatePage />} />
         <Route path="/opportunities/:opportunityId" element={<OpportunityDetailPage />} />
         <Route path="/insurers" element={<InsurersPage />} />

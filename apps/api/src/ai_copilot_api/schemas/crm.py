@@ -15,6 +15,7 @@ from ai_copilot_api.db.enums import (
     ClientKind,
     CrmAuditAction,
     CrmEntityType,
+    DocumentType,
     IngestionSource,
     InsuredRelation,
     InteractionType,
@@ -425,6 +426,7 @@ class LeadDetailOut(LeadOut):
 class LeadOpportunityPayload(BaseModel):
     owner_id: uuid.UUID
     product_id: uuid.UUID | None = None
+    insurance_line: ProductCategory
     estimated_value: Decimal | None = None
     closing_probability: int = Field(default=0, ge=0, le=100)
     stage: OpportunityStage = OpportunityStage.LEAD
@@ -519,6 +521,7 @@ class OpportunityCreate(BaseModel):
     lead_id: uuid.UUID | None = None
     owner_id: uuid.UUID
     product_id: uuid.UUID | None = None
+    insurance_line: ProductCategory
     estimated_value: Decimal | None = None
     closing_probability: int = Field(default=0, ge=0, le=100)
     stage: OpportunityStage = OpportunityStage.LEAD
@@ -530,12 +533,32 @@ class OpportunityCreate(BaseModel):
     preferred_insurer_name: str | None = Field(default=None, max_length=255)
     expected_close_at: datetime | None = None
     loss_reason: str | None = None
+    proposal_source: str | None = Field(default=None, max_length=64)
+    quote_number: str | None = Field(default=None, max_length=128)
+    quote_item: int | None = Field(default=None, ge=1)
+    quote_valid_until: date | None = None
+    proposal_data: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def exactly_one_party(self) -> Self:
         cid, lid = self.client_id, self.lead_id
         if (cid is None) == (lid is None):
             raise ValueError("Exactly one of client_id or lead_id is required")
+        return self
+
+    @model_validator(mode="after")
+    def quote_fields_consistency(self) -> Self:
+        has_quote = self.quote_number is not None
+        has_source = self.proposal_source is not None
+        if has_quote != has_source:
+            raise ValueError("quote_number and proposal_source must be provided together")
+        if has_quote:
+            if self.quote_item is None:
+                raise ValueError("quote_item is required when quote_number is provided")
+            if not (self.preferred_insurer_name and self.preferred_insurer_name.strip()):
+                raise ValueError(
+                    "preferred_insurer_name is required when quote_number is provided",
+                )
         return self
 
     @model_validator(mode="after")
@@ -549,6 +572,7 @@ class OpportunityCreate(BaseModel):
 class OpportunityUpdate(BaseModel):
     owner_id: uuid.UUID | None = None
     product_id: uuid.UUID | None = None
+    insurance_line: ProductCategory | None = None
     estimated_value: Decimal | None = None
     closing_probability: int | None = Field(default=None, ge=0, le=100)
     stage: OpportunityStage | None = None
@@ -560,6 +584,11 @@ class OpportunityUpdate(BaseModel):
     preferred_insurer_name: str | None = Field(default=None, max_length=255)
     expected_close_at: datetime | None = None
     loss_reason: str | None = None
+    proposal_source: str | None = Field(default=None, max_length=64)
+    quote_number: str | None = Field(default=None, max_length=128)
+    quote_item: int | None = Field(default=None, ge=1)
+    quote_valid_until: date | None = None
+    proposal_data: dict[str, Any] | None = None
 
 
 class OpportunityStagePatch(BaseModel):
@@ -583,6 +612,7 @@ class OpportunityOut(BaseModel):
     lead_id: uuid.UUID | None
     owner_id: uuid.UUID
     product_id: uuid.UUID | None
+    insurance_line: ProductCategory
     estimated_value: Decimal | None
     closing_probability: int
     stage: OpportunityStage
@@ -594,12 +624,82 @@ class OpportunityOut(BaseModel):
     preferred_insurer_name: str | None
     expected_close_at: datetime | None
     loss_reason: str | None
+    proposal_source: str | None
+    quote_number: str | None
+    quote_item: int | None
+    quote_valid_until: date | None
+    proposal_data: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime
     client: ClientBrief | None = None
     lead: LeadBrief | None = None
     owner: UserBrief
     product: ProductBrief | None
+
+
+class DocumentExtractionRunBrief(BaseModel):
+    """Latest extraction summary embedded in `DocumentBrief` (Phase 6)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    confidence: int
+    requires_review: bool
+    confirmed_at: datetime | None = None
+    created_at: datetime
+
+
+class DocumentBrief(BaseModel):
+    """Compact view of a `Document` for embedding in `OpportunityDetailOut`.
+
+    Phase 6 — exposes the latest `DocumentExtractionRun` summary so the UI can
+    show "extraction status" badges next to each PDF without an extra call.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    document_type: DocumentType
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    current_version: int
+    created_at: datetime
+    updated_at: datetime
+    latest_extraction_run: DocumentExtractionRunBrief | None = None
+
+
+class CoverageAdequacyOut(BaseModel):
+    """Per-coverage adequacy item embedded in :class:`OpportunityDetailOut` (Phase 9).
+
+    Maps the product's expected coverage codes against the proposal's
+    actual ``proposal_data.clauses[]`` and assigns a traffic light per code.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    label: str
+    status: AdequacyTrafficLight
+    matched_clause_code: str | None = None
+    matched_clause_description: str | None = None
+    match_confidence: int = Field(ge=0, le=100)
+    reason: str
+
+
+class OpportunityDetailOut(OpportunityOut):
+    """Single-opportunity payload that embeds linked documents (Phase 6).
+
+    The list reflects `Document.opportunity_id == opp.id` for the same tenant
+    and includes a compact extraction summary (latest `DocumentExtractionRun`)
+    so the UI can render the documents tab without a second round-trip.
+
+    Phase 9 — also surfaces per-coverage adequacy when a linked product
+    declares an expected coverage set; empty when no comparison can be made.
+    """
+
+    documents: list[DocumentBrief] = Field(default_factory=list)
+    coverage_adequacy: list[CoverageAdequacyOut] = Field(default_factory=list)
 
 
 class OpportunityMetricsSummary(BaseModel):

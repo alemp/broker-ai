@@ -167,6 +167,7 @@ def test_insurer_product_intel_campaign_flow(client: TestClient) -> None:
             "client_id": client_id,
             "owner_id": user_id,
             "product_id": product_id,
+            "insurance_line": "LIFE_INSURANCE",
             "estimated_value": "5000",
             "closing_probability": 50,
             "stage": "LEAD",

@@ -7,9 +7,23 @@ vi.mock('react-i18next', () => {
   return {
     useTranslation: () => ({
       t: (k: string) => k,
+      i18n: { resolvedLanguage: 'pt' },
     }),
   }
 })
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: {
+      id: 'u1',
+      email: 't@example.com',
+      full_name: 'Tester',
+      role: 'ADMIN',
+      active: true,
+      organization: { id: 'o1', name: 'Org', slug: 'org', currency: 'BRL' },
+    },
+  }),
+}))
 
 describe('InsuranceProfileTab', () => {
   it('shows company profile block and hides individual blocks for COMPANY', () => {

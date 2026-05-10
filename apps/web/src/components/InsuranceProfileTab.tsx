@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -203,6 +203,17 @@ export function InsuranceProfileTab({
   const { t, i18n } = useTranslation('common')
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
+  const mobilityVehiclesPreview = useMemo(() => {
+    const mob = profile.mobility as Record<string, unknown> | undefined
+    if (!mob) {
+      return [] as Record<string, unknown>[]
+    }
+    const raw = mob.vehicles
+    if (!Array.isArray(raw)) {
+      return [] as Record<string, unknown>[]
+    }
+    return raw.filter((v): v is Record<string, unknown> => typeof v === 'object' && v !== null)
+  }, [profile.mobility])
   const [lifeStage, setLifeStage] = useState('')
   const [numChildren, setNumChildren] = useState('')
   const [ownsProperty, setOwnsProperty] = useState('')
@@ -1413,6 +1424,41 @@ export function InsuranceProfileTab({
                     onChange={(ev) => setCirculationCity(ev.target.value)}
                   />
                 </div>
+                {mobilityVehiclesPreview.length > 0 ? (
+                  <div className="col-span-2 space-y-2 border-t border-border/40 pt-3">
+                    <p className="text-foreground text-xs font-semibold">{t('crm.profile.vehiclesFromProfileTitle')}</p>
+                    <div className="overflow-x-auto rounded-md border border-border/60">
+                      <table className="w-full min-w-[320px] text-left text-xs">
+                        <thead className="bg-muted/50 text-muted-foreground">
+                          <tr>
+                            <th className="px-2 py-1.5 font-medium">{t('crm.profile.vehiclesTable.model')}</th>
+                            <th className="px-2 py-1.5 font-medium">{t('crm.profile.vehiclesTable.year')}</th>
+                            <th className="px-2 py-1.5 font-medium">{t('crm.profile.vehiclesTable.plate')}</th>
+                            <th className="px-2 py-1.5 font-medium">{t('crm.profile.vehiclesTable.chassis')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mobilityVehiclesPreview.map((v, idx) => (
+                            <tr key={idx} className="border-t border-border/50">
+                              <td className="text-foreground px-2 py-1.5">
+                                {String(v.make_model ?? v.model ?? '—')}
+                              </td>
+                              <td className="text-muted-foreground px-2 py-1.5 tabular-nums">
+                                {v.model_year != null ? String(v.model_year) : v.year != null ? String(v.year) : '—'}
+                              </td>
+                              <td className="text-muted-foreground px-2 py-1.5 font-mono">
+                                {String(v.plate ?? '—')}
+                              </td>
+                              <td className="text-muted-foreground px-2 py-1.5 font-mono text-[11px]">
+                                {String(v.vin ?? v.chassis ?? '—')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
                   </ProfileInsuranceBlock>
                 ) : null}
 

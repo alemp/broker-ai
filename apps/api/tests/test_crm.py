@@ -37,6 +37,7 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
     product_list = products.json()
     assert len(product_list) >= 1
     product_id = product_list[0]["id"]
+    product_category = product_list[0]["category"]
 
     create_client = client.post(
         "/v1/clients",
@@ -103,6 +104,7 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
             "client_id": client_id,
             "owner_id": user_id,
             "product_id": product_id,
+            "insurance_line": product_category,
             "estimated_value": "1234.50",
             "closing_probability": 40,
             "stage": "LEAD",
@@ -113,6 +115,7 @@ def test_client_portfolio_and_opportunity_flow(client: TestClient) -> None:
     assert opp.status_code == 201, opp.text
     opp_id = opp.json()["id"]
     assert opp.json()["stage"] == "LEAD"
+    assert opp.json()["insurance_line"] == product_category
 
     stage = client.post(
         f"/v1/opportunities/{opp_id}/stage",
@@ -135,6 +138,7 @@ def test_interactions_sync_opportunity_and_overdue_filter(client: TestClient) ->
     products = client.get("/v1/products", headers=headers)
     assert products.status_code == 200
     product_id = products.json()[0]["id"]
+    product_category = products.json()[0]["category"]
 
     create_client = client.post(
         "/v1/clients",
@@ -151,6 +155,7 @@ def test_interactions_sync_opportunity_and_overdue_filter(client: TestClient) ->
             "client_id": client_id,
             "owner_id": user_id,
             "product_id": product_id,
+            "insurance_line": product_category,
             "stage": "LEAD",
             "status": "OPEN",
         },
@@ -229,6 +234,7 @@ def test_module52_org_users_leads_convert_insured_audit(client: TestClient) -> N
     products = client.get("/v1/products", headers=headers)
     assert products.status_code == 200
     product_id = products.json()[0]["id"]
+    product_category = products.json()[0]["category"]
 
     conv = client.post(
         f"/v1/leads/{lead_id}/convert",
@@ -238,6 +244,7 @@ def test_module52_org_users_leads_convert_insured_audit(client: TestClient) -> N
             "opportunity": {
                 "owner_id": my_id,
                 "product_id": product_id,
+                "insurance_line": product_category,
                 "stage": "LEAD",
                 "status": "OPEN",
                 "estimated_value": "500.00",
@@ -315,6 +322,7 @@ def test_opportunity_product_54_rules_and_metrics(client: TestClient) -> None:
     products = client.get("/v1/products", headers=headers)
     assert products.status_code == 200
     product_id = products.json()[0]["id"]
+    product_category = products.json()[0]["category"]
 
     create_client = client.post(
         "/v1/clients",
@@ -331,6 +339,7 @@ def test_opportunity_product_54_rules_and_metrics(client: TestClient) -> None:
             "client_id": client_id,
             "owner_id": user_id,
             "product_id": product_id,
+            "insurance_line": product_category,
             "stage": "LEAD",
             "status": "OPEN",
         },
@@ -380,6 +389,7 @@ def test_opportunity_product_54_rules_and_metrics(client: TestClient) -> None:
             "client_id": client_id,
             "owner_id": user_id,
             "product_id": product_id,
+            "insurance_line": product_category,
             "stage": "LEAD",
             "status": "OPEN",
         },
@@ -460,6 +470,7 @@ def test_lead_opportunity_convert_repoints_and_intel_blocked_until_client(
         json={
             "lead_id": lead_id,
             "owner_id": my_id,
+            "insurance_line": "AUTO_INSURANCE",
             "stage": "LEAD",
             "status": "OPEN",
             "closing_probability": 10,
@@ -707,6 +718,7 @@ def test_lead_intel_adequacy_and_recommendations(client: TestClient) -> None:
     products = client.get("/v1/products", headers=headers)
     assert products.status_code == 200
     product_id = products.json()[0]["id"]
+    product_category = products.json()[0]["category"]
 
     lead = client.post(
         "/v1/leads",
@@ -743,6 +755,7 @@ def test_lead_intel_adequacy_and_recommendations(client: TestClient) -> None:
             "lead_id": lead_id,
             "owner_id": my_id,
             "product_id": product_id,
+            "insurance_line": product_category,
             "stage": "LEAD",
             "status": "OPEN",
             "closing_probability": 30,
