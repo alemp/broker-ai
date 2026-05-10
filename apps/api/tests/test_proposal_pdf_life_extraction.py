@@ -66,6 +66,32 @@ def test_tokio_life_pdf_adapter_validates_as_life_payload() -> None:
     assert adapter.last_pdf_extraction.confidence >= 70
 
 
+def test_extract_coverage_pulls_amounts_from_following_lines() -> None:
+    """Columnar PDFs may place code/description on one line and values on the next."""
+    raw = """
+TOKIO MARINE SEGURADORA S.A.
+PME Vida Empresa
+Cotação Nº 99001
+02/02/2026
+
+Razão Social
+ACME SERVICOS LTDA
+CNPJ 12.345.678/0001-90
+
+Quantidade de vidas 1
+BASICA_MORTE Morte
+R$ 20.000,00 20.000,00 25,50
+"""
+    compact = " ".join(raw.split())
+    ext = extract_tokio_life_pme_proposal(raw, compact)
+    codes = [c.get("codigo") for c in ext.tokio_inner.get("coberturas", [])]
+    assert "BASICA_MORTE" in codes
+    row = next(c for c in ext.tokio_inner["coberturas"] if c["codigo"] == "BASICA_MORTE")
+    assert row["capital_segurado_minimo"] == 20000.0
+    assert row["capital_segurado_maximo"] == 20000.0
+    assert row["premio"] == 25.5
+
+
 def test_non_tokio_text_yields_empty_extraction() -> None:
     raw = "Bradesco Seguro Auto\nCotação 12345"
     compact = " ".join(raw.split())

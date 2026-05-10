@@ -27,7 +27,11 @@ _DATA_BR_RE = re.compile(
     r"(?:\b|\s)([0-3]?\d)[/.]([01]?\d)[/.](\d{4})\b",
 )
 _HORA_RE = re.compile(r"\b([01]?\d:[0-5]\d(?::[0-5]\d)?)\b")
-_MONEY_BR_RE = re.compile(r"([\d]{1,3}(?:\.[\d]{3})*,\d{2}|\d+,\d{2})")
+# Optional R$; Brazilian thousands + cents, or smaller amounts with cents only.
+_MONEY_BR_RE = re.compile(
+    r"(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})",
+    re.IGNORECASE,
+)
 _VALIDADE_DIAS_RE = re.compile(
     r"(?:validade|v[aá]lida)\s*(?:da\s*cota[cç][aã]o)?\s*[:\-]?\s*(\d+)\s*(?:dias?|d\.)",
     re.IGNORECASE,
@@ -185,14 +189,13 @@ def _extract_razao_social(raw: str) -> str | None:
 
 
 def _extract_coverage_rows(raw: str) -> list[dict[str, Any]]:
+    lines = [ln.strip() for ln in raw.splitlines()]
     rows: list[dict[str, Any]] = []
     seen_codes: set[str] = set()
-    for line in raw.splitlines():
-        stripped = line.strip()
-        if len(stripped) < 6:
+    for i, stripped in enumerate(lines):
+        if len(stripped) < 4:
             continue
         lower = stripped.lower()
-        # Inline carrier code
         cm = _CODE_INLINE_RE.search(stripped)
         code = cm.group(1).upper() if cm else None
         desc = None
@@ -200,24 +203,51 @@ def _extract_coverage_rows(raw: str) -> list[dict[str, Any]]:
             for needle, c in _DESC_TO_CODE:
                 if re.search(needle, lower):
                     code = c
-                    # Human description slice
                     desc = stripped[:200]
                     break
         if code is None or code in seen_codes:
             continue
         seen_codes.add(code)
-        amounts = _all_money_in_line(stripped)
+        amounts = list(_all_money_in_line(stripped))
+        # PDFs often put capitais/prêmio on the following lines (column layout).
+        if len(amounts) < 3:
+            stop_kw = ("fatura mensal", "precifica", "prêmio total", "total a pagar")
+            j = i + 1
+            while j < len(lines) and j < i + 10:
+                nxt = lines[j]
+                j += 1
+                if not nxt:
+                    continue
+                nxt_lower = nxt.lower()
+                if any(k in nxt_lower for k in stop_kw):
+                    break
+                next_code = _CODE_INLINE_RE.search(nxt)
+                if next_code and next_code.group(1).upper() != code:
+                    break
+                extra = _all_money_in_line(nxt)
+                if extra:
+                    amounts.extend(extra)
+                if len(amounts) >= 3:
+                    break
+                if len(amounts) >= 2 and j < len(lines):
+                    peek = lines[j] if j < len(lines) else ""
+                    if peek and not _all_money_in_line(peek) and _CODE_INLINE_RE.search(peek):
+                        break
+
         cap: Decimal | None = None
+        cap_max: Decimal | None = None
         prem: Decimal | None = None
         if len(amounts) >= 3:
             cap = amounts[0]
+            cap_max = amounts[1]
             prem = amounts[-1]
         elif len(amounts) == 2:
             cap, prem = amounts[0], amounts[1]
+            cap_max = cap
         elif len(amounts) == 1:
             cap = amounts[0]
+            cap_max = cap
         if desc is None:
-            # Drop leading code token for description
             desc = _CODE_INLINE_RE.sub("", stripped).strip() or code.replace("_", " ").title()
         rows.append(
             {
@@ -225,7 +255,7 @@ def _extract_coverage_rows(raw: str) -> list[dict[str, Any]]:
                 "descricao": desc[:255],
                 "percentual_indenizacao": 100.0 if cap is not None else None,
                 "capital_segurado_minimo": float(cap) if cap is not None else None,
-                "capital_segurado_maximo": float(cap) if cap is not None else None,
+                "capital_segurado_maximo": float(cap_max) if cap_max is not None else None,
                 "premio": float(prem) if prem is not None else None,
             },
         )

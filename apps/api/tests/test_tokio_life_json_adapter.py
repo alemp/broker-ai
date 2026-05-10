@@ -205,15 +205,15 @@ def test_adapter_returns_canonical_dict_for_tokio_pme() -> None:
     assert [i["code"] for i in items] == ["BASICA_MORTE", "IEA", "IPA"]
     death_item = items[0]
     assert death_item["description"] == "Morte"
-    assert death_item["insured_capital_min"] == 15000.00
-    assert death_item["premium"] == 19.28
+    assert death_item["insured_capital_min"] == Decimal("15000.00")
+    assert death_item["premium"] == Decimal("19.28")
 
     # flat coverages rolled up from items
     flat = canonical["coverages"]
     assert flat == {
-        "death": 15000.00,
-        "accidental_death": 15000.00,
-        "total_disability": 15000.00,
+        "death": Decimal("15000.00"),
+        "accidental_death": Decimal("15000.00"),
+        "total_disability": Decimal("15000.00"),
     }
 
     # acceptance conditions
@@ -311,6 +311,38 @@ def test_adapter_handles_missing_optional_blocks() -> None:
     assert payload.acceptance_conditions is None
     assert payload.premium.total_payable is None
     assert payload.coverages.death == Decimal("10000.00")
+
+
+def test_adapter_coerces_pt_br_string_money_in_coberturas() -> None:
+    """Carrier may send capitais as formatted strings (e.g. ``"15.000,00"``)."""
+    payload: dict = {
+        "proposta_seguro_vida": {
+            "tipo_produto": "PME Vida Empresa",
+            "tipo_seguro": "Novo",
+            "seguradora": {"nome": "Tokio Marine Seguradora S.A."},
+            "cotacao": {"numero": "STR-MONEY", "data_referencia": "2026-02-02"},
+            "estipulante": {
+                "razao_social": "ACME LTDA",
+                "cnpj": "11.222.333/0001-44",
+            },
+            "perfil_grupo": {"quantidade_vidas": 3},
+            "coberturas": [
+                {
+                    "codigo": "BASICA_MORTE",
+                    "descricao": "Morte",
+                    "capital_segurado_minimo": "15.000,00",
+                    "capital_segurado_maximo": "R$ 15.000,00",
+                    "premio": "19,28",
+                },
+            ],
+        },
+    }
+    canonical = TokioLifeJsonAdapterV1().to_canonical_dict(payload)
+    item = canonical["coverage_items"][0]
+    assert item["insured_capital_min"] == Decimal("15000.00")
+    assert item["insured_capital_max"] == Decimal("15000.00")
+    assert item["premium"] == Decimal("19.28")
+    assert canonical["coverages"]["death"] == Decimal("15000.00")
 
 
 def test_adapter_skips_unknown_coverage_codes_for_flat_block() -> None:

@@ -16,6 +16,8 @@ This document is the **single technical source of truth for the MVP scope**, rep
 
 - [`PROPOSAL-INGEST-IMPLEMENTATION.md`](./PROPOSAL-INGEST-IMPLEMENTATION.md) — Phase-by-phase plan for the proposal-ingest feature (data model, PDF/JSON channels, web UI, tests, rollout).
 
+Section **§10** below is the **canonical plan** for adapting the current auth/tenancy model to the **self-service product flow**: marketing entry → onboarding (login/register) → **create organization at signup** → optional **email invitations**.
+
 ---
 
 ## 0. Implementation status (current)
@@ -32,7 +34,8 @@ Legend:
 | Area                                                                          | Status             | Notes                                                                                                                                                                                             |
 | ----------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tenancy (single partner, `organization_id` everywhere)                        | **Done**           | Tenant scoping is present across major tables (`organization_id`).                                                                                                                                |
-| Users / Organization (membership, auth)                                       | **Partially done** | Auth is implemented (`/register`, `/login`, `/me`) and org users can be listed (`GET /org/users`), but there is **no user admin CRUD** (create/update/deactivate roles) in API/UI.                |
+| Users / Organization (membership, auth)                                       | **Partially done** | Auth (`/register`, `/login`, `/me`); org settings (`PATCH /org/admin`); **admin user CRUD** in API + UI (`/org/admin/users`, `/users`). **Missing for self-service SaaS flow:** landing + onboarding hub; **register creates a new org** (today signup joins `DEFAULT_ORGANIZATION_SLUG`); **email invitations** (today: temp password shown in UI only). |
+| Self-service onboarding (landing → onboarding → new org at signup → invites) | **Not started**    | See **§10** for the implementation plan.                                                                                                                                                          |
 | Core CRM entities (Clients, Leads, Opportunities, Interactions)               | **Done**           | CRUD + UI pages exist for these entities.                                                                                                                                                         |
 | Portfolio (held products + provenance)                                        | **Done**           | `ClientHeldProduct` with `ingestion_source` is implemented; import supports held products.                                                                                                        |
 | Portfolio (LOB as first-class entity)                                         | **Not started**    | No `LineOfBusiness` / `ClientLineOfBusiness` tables or UI surfaced yet.                                                                                                                           |
@@ -54,11 +57,9 @@ This checklist is split into:
 #### Stage 1 — MVP “done” checklist
 
 - **Users / Organization**
-  - Add **user admin CRUD** (at least: create user in org, update name/password, deactivate/reactivate, reset password)
-  - Add **roles/permissions** (even minimal: admin vs broker) if required for the design-partner workflow
-  - Add UI screens for user management (or explicitly define as out-of-scope for MVP)
-  - Admin-only access: only **Administrator** can manage users (per `PRODUCT.md` minimal profiles)
-  - Minimal roles to implement now (from `PRODUCT.md`): **Administrator**, **Sales manager**, **Broker** (Support/ops is optional next phase)
+  - **User admin CRUD** (create in org, update, deactivate/reactivate, reset password) — **done** in API + `/users` UI for ADMIN
+  - **Roles/permissions** — minimal roles exist (**Administrator**, **Sales manager**, **Broker**); keep enforcing admin-only user management
+  - **Self-service onboarding & tenancy (product flow)** — **not done**; tracked in **§10** (register-with-organization, invitations by email, landing/onboarding UX). Treat as a **parallel workstream** to Stage 1 CRM items if the go-to-market requires it before design-partner-only access
 - **Portfolio: Lines of business (LOB)**
   - Add DB models + migrations for `LineOfBusiness` and `ClientLineOfBusiness` (tenant-scoped)
   - Add API endpoints to manage LOBs and client LOB links (create/list/update/delete)
@@ -292,7 +293,7 @@ Sending via email/WhatsApp providers is **post-MVP** (Stage 2+).
 
 ### Stage 3 — Platform scale
 
-- Multi-tenant product onboarding
+- **Multi-tenant product onboarding** (self-service org creation, invitations, optional multi-org-per-user) — detailed phased plan in **§10**
 - Event-driven patterns where needed
 - Warehouse/BI foundations
 
@@ -301,4 +302,97 @@ Sending via email/WhatsApp providers is **post-MVP** (Stage 2+).
 - Copilot / gen-AI (grounded on portfolio + opportunities + documents)
 - Experimentation (A/B tests)
 - Learning loops from won/lost outcomes
+
+---
+
+## 10. Self-service onboarding, tenancy & invitations (implementation plan)
+
+This section adapts the **current** model (global self-register joins `DEFAULT_ORGANIZATION_SLUG`; one `organization_id` per user; admin-created users with optional **temporary password** returned in the API/UI) to the **desired flow**:
+
+1. User visits the **main product marketing** surface.
+2. User clicks **“Comece agora”** (or equivalent CTA).
+3. User lands on an **onboarding** experience with **login** or **sign up**.
+4. On sign up, the user provides **basics to create a new organization** (not the shared default tenant).
+5. Optionally, the user **invites teammates by email**.
+6. The platform remains **multi-organization** at the data level (`organization_id` on tenant tables); **multi-org per single user account** is optional later (§10.7).
+
+### 10.1 Product and data-model decisions (before implementation)
+
+**MVP tenant model (recommended first slice)**
+
+- Each new self-service signup **creates** an `Organization` row and a **single** `User` row with `role = ADMIN` for that org.
+- Keep **`users.email` globally unique** for MVP unless **§10.7** (membership table) is implemented; then define policy for “invite existing platform user into another org.”
+
+**Marketing vs app**
+
+- Prefer implementing the **landing + CTA** inside `apps/web` (public routes) unless marketing lives on another domain; then only the **target URL** of “Comece agora” changes.
+
+**Invitations**
+
+- Use **opaque token** (store **hash** only), **expiry**, and **accept** endpoint; avoid relying on “first login with this email” without a secret.
+
+### 10.2 Phase 0 — Register with new organization (API + DB)
+
+- Add a dedicated transaction, e.g. `POST /v1/auth/register-with-organization`, body including at least:
+  - User: `email`, `password`, optional `full_name`
+  - Organization: `name`, optional `currency`; `slug` either **client-supplied with validation** or **server-derived** from name (unique, normalized, reserved slugs rejected)
+- On success: return the same **`TokenResponse`** shape as today so the web `AuthContext` stays aligned.
+- **Deprecate or gate** the current `POST /v1/auth/register` that attaches to `DEFAULT_ORGANIZATION_SLUG` (keep for dev/seeds behind env or remove after migration story is clear).
+- **Tests:** integration tests with `DATABASE_URL` (happy path, duplicate slug, duplicate email).
+
+### 10.3 Phase 1 — Email invitations
+
+- **Table** `organization_invitations` (name aligned with project conventions): `id`, `organization_id`, `email` (normalized), `role`, `token_hash`, `expires_at`, `invited_by_user_id`, `accepted_at`, `created_at`; unique constraint for **pending** invites per org+email as appropriate.
+- **API (ADMIN)**  
+  - `POST /v1/org/invitations` — create invite, enqueue email  
+  - `GET /v1/org/invitations` — list pending (optional)  
+  - `DELETE /v1/org/invitations/{id}` — revoke (optional)
+- **API (public)**  
+  - `GET /v1/invitations/validate?token=…` — safe metadata (org display name, invited email mask, expired flag)  
+  - `POST /v1/invitations/accept` — `token`, `password` (and optional `full_name` for new users); creates `User` in the inviting org with the given role or returns a clear error if email already exists (per MVP policy).
+- **Email delivery:** introduce a small `EmailBackend` (log-only in dev; provider in prod); template with link `https://<app>/invite?token=…`.
+- **Security:** rate limits on validate/accept; never log raw tokens.
+
+### 10.4 Phase 2 — Frontend (`apps/web`)
+
+- **Public landing** route with **“Comece agora”** → `/onboarding` (or `/start`).
+- **Onboarding hub** `/onboarding`: primary actions **Entrar** (`/login`) and **Criar conta** (`/register` or single-step wizard).
+- **Register page:** collect organization fields + call `register-with-organization`.
+- **Invite accept** `/invite`: read `token` from query; loading / invalid / expired / set-password / success; then session same as login.
+- **Optional post-login prompt** “Convide sua equipe” linking to admin invite UI.
+- **i18n:** pt-BR keys for all new copy.
+
+### 10.5 Phase 3 — Admin UI alignment
+
+- Extend **`/users`** (or adjacent screen): besides “create user with temp password”, add **“Send invitation”** using `POST /v1/org/invitations`; list pending invites; optional resend/revoke.
+- Document operational difference: **invite** (email + self-serve accept) vs **direct create** (temp password in UI) — product may keep both during transition.
+
+### 10.6 Phase 4 — Hardening
+
+- Rate limiting on registration and invitation endpoints.
+- Observability: invitation sent / accepted / expired (metrics or structured logs).
+- Production email: verified domain, secrets, environment-specific base URL for links.
+
+### 10.7 Phase 5 (optional) — Multiple organizations per user
+
+- Add **`organization_members`** (or equivalent): `(user_id, organization_id, role, …)` and migration from current `users.organization_id`.
+- **Switch org:** e.g. `POST /v1/me/switch-organization` issuing a new JWT with selected `organization_id`.
+- **UI:** org switcher in shell; invitation accept flow updated if the same email can join a second org.
+
+### 10.8 Implementation order (suggested)
+
+| Order | Deliverable | Verification |
+| ----- | ----------- | ------------ |
+| 1 | API `register-with-organization` + tests | New signup does not depend on default org row |
+| 2 | Landing + onboarding + extended register form | Manual E2E from CTA to dashboard |
+| 3 | Invitations schema + API + dev email | Accept invite locally end-to-end |
+| 4 | `/invite` page + UsersPage invitation actions | Admin invites; invitee sets password |
+| 5 | Policy for duplicate email + docs | Product rules explicit for support |
+| 6 | (Optional) §10.7 membership + org switcher | Same login, multiple orgs |
+
+### 10.9 Risks and dependencies
+
+- **Default org** (`DEFAULT_ORGANIZATION_SLUG`): plan for existing environments and any legacy users (rename, migrate, or keep for internal tenants only).
+- **Transactional email** is a hard dependency for production quality of invitations.
+- **CORS and absolute URLs** for invite links must match deployed web origin(s).
 

@@ -25,9 +25,38 @@ from __future__ import annotations
 
 import re
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Any
 
 from ai_copilot_api.db.enums import ProductCategory
+
+
+def _coerce_decimal(value: Any) -> Decimal | None:
+    """Parse carrier money fields (number, pt-BR string, Decimal) for Pydantic."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and value != value:  # NaN
+            return None
+        return Decimal(str(value))
+    if isinstance(value, str):
+        s = re.sub(r"^\s*R\$\s*", "", value.strip(), flags=re.IGNORECASE).replace(" ", "")
+        if not s:
+            return None
+        # pt-BR: 1.234,56 or 15.000,00
+        if re.fullmatch(r"-?(\d{1,3}\.)+\d{3},\d{2}", s) or re.fullmatch(r"-?\d+,\d{2}", s):
+            s = s.replace(".", "").replace(",", ".")
+        elif "," in s and "." not in s:
+            s = s.replace(",", ".")
+        try:
+            return Decimal(s)
+        except Exception:
+            return None
+    return None
 
 
 def _normalize_tax_id(value: Any) -> str | None:
@@ -175,14 +204,21 @@ def _adapt_coverage_items(coberturas: list[dict[str, Any]] | None) -> list[dict[
         description = c.get("descricao")
         if not code or not description:
             continue
+        raw_min = _coerce_decimal(c.get("capital_segurado_minimo"))
+        raw_max = _coerce_decimal(c.get("capital_segurado_maximo"))
+        if raw_min is None and raw_max is not None:
+            raw_min = raw_max
+        if raw_max is None and raw_min is not None:
+            raw_max = raw_min
+        pct = _coerce_decimal(c.get("percentual_indenizacao"))
         out.append(
             {
                 "code": str(code).strip(),
                 "description": str(description).strip(),
-                "indemnity_percentage": c.get("percentual_indenizacao"),
-                "insured_capital_min": c.get("capital_segurado_minimo"),
-                "insured_capital_max": c.get("capital_segurado_maximo"),
-                "premium": c.get("premio"),
+                "indemnity_percentage": pct,
+                "insured_capital_min": raw_min,
+                "insured_capital_max": raw_max,
+                "premium": _coerce_decimal(c.get("premio")),
                 "accumulable_with_death": c.get("acumulavel_morte_acidental"),
                 "note": c.get("observacao"),
             },
@@ -203,7 +239,12 @@ def _flat_coverages_from_items(items: list[dict[str, Any]]) -> dict[str, Any]:
         slot = _LIFE_CODE_TO_SLOT.get(code)
         if slot is None or slot in out:
             continue
-        out[slot] = item.get("insured_capital_min") or item.get("insured_capital_max")
+        cap = item.get("insured_capital_min")
+        if cap is None:
+            cap = item.get("insured_capital_max")
+        if cap is None:
+            continue
+        out[slot] = cap
     return out
 
 
