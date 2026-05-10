@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { apiFetch, apiPostFormData } from '@/lib/api'
 import {
   INSURANCE_LINE_VALUES,
+  insuranceLineSupportsProposalPdfExtract,
   type InsuranceLineValue,
   type ProposalDocumentUploadResponse,
   type ProposalExtractResponse,
@@ -68,13 +69,11 @@ export function ProposalIngestPage() {
     }
   }, [t])
 
+  const pdfExtractSupported = insuranceLineSupportsProposalPdfExtract(insuranceLine)
+
   const onCreateOpportunity = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!user) {
-      return
-    }
-    if (insuranceLine !== 'AUTO_INSURANCE') {
-      setError(t('proposalIngest.autoLineOnly'))
       return
     }
     if (partyKind === 'client' && !clientId) {
@@ -222,7 +221,7 @@ export function ProposalIngestPage() {
               />
               <p className="text-muted-foreground text-xs">{t('proposalIngest.lineHint')}</p>
             </div>
-            <Button type="submit" disabled={creating || !user || !!opportunityId || insuranceLine !== 'AUTO_INSURANCE'}>
+            <Button type="submit" disabled={creating || !user || !!opportunityId}>
               {creating ? t('proposalIngest.creating') : t('proposalIngest.createOpp')}
             </Button>
             {opportunityId ? (
@@ -242,6 +241,9 @@ export function ProposalIngestPage() {
           <CardTitle className="text-base">{t('proposalIngest.step2Title')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {opportunityId && !pdfExtractSupported ? (
+            <p className="text-muted-foreground text-sm">{t('proposalIngest.pdfArchiveHint')}</p>
+          ) : null}
           <div className="grid gap-2 sm:max-w-md">
             <Label htmlFor="pi-file">{t('proposalIngest.pdfLabel')}</Label>
             <input
@@ -267,7 +269,14 @@ export function ProposalIngestPage() {
           <CardTitle className="text-base">{t('proposalIngest.step3Title')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button type="button" disabled={!opportunityId || extracting} onClick={() => void onExtract()}>
+          {!pdfExtractSupported ? (
+            <p className="text-muted-foreground text-sm">{t('proposalIngest.pdfExtractUnavailable')}</p>
+          ) : null}
+          <Button
+            type="button"
+            disabled={!opportunityId || extracting || !pdfExtractSupported}
+            onClick={() => void onExtract()}
+          >
             {extracting ? t('proposalIngest.extracting') : t('proposalIngest.extract')}
           </Button>
           {extractResult ? (

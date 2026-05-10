@@ -40,7 +40,7 @@ from ai_copilot_api.domain.opportunity_rules import (
 from ai_copilot_api.domain.opportunity_status import status_for_stage
 from ai_copilot_api.domain.proposal_adapters import select_adapter_for_pdf
 from ai_copilot_api.domain.proposal_ingest import (
-    apply_auto_proposal_to_opportunity,
+    apply_proposal_to_opportunity,
     resolve_party,
 )
 from ai_copilot_api.schemas.crm import (
@@ -55,14 +55,17 @@ from ai_copilot_api.schemas.crm import (
     OpportunityUpdate,
 )
 from ai_copilot_api.schemas.proposal_ingest import (
-    AutoProposalPayload,
     ProposalIngestResultOut,
+    ProposalPayload,
+    select_proposal_payload_class,
 )
 from ai_copilot_api.storage.factory import get_object_storage
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
 _MAX_PAGE = 100
+# Align with ``routes_document_extraction.PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE`` for life PDF.
+_MIN_LIFE_PDF_AUTO_APPLY_CONFIDENCE = 70
 
 
 def _opp_options():
@@ -606,7 +609,7 @@ def _validation_errors_payload(exc: ValidationError) -> list[dict[str, Any]]:
 def _resolve_party_or_422(
     db: Session,
     organization_id: uuid.UUID,
-    payload: AutoProposalPayload,
+    payload: ProposalPayload,
     opportunity: Opportunity,
 ) -> Client | Lead:
     """Resolve the proposal applicant to a Client/Lead or raise 422 (ADR §D7)."""
@@ -634,11 +637,10 @@ def proposal_extract(
 ) -> ProposalIngestResultOut:
     """Run PDF extraction for an `Opportunity`'s latest PROPOSAL document.
 
-    The endpoint converges the PDF channel onto the same canonical
-    `AutoProposalPayload` used by the JSON channel (ADR-PROPOSAL-INGEST §D2).
-    On success it writes `proposal_data` + idempotency keys; on validation
-    failure it persists a `DocumentExtractionRun` flagged for review and
-    returns a structured error payload for the UI.
+    Dispatches on ``insurance_line`` to the PDF adapter (Bradesco auto,
+    Tokio PME vida, …), validates against the matching canonical payload
+    class, then persists ``proposal_data`` when the run is trusted enough
+    to auto-apply (life PDFs require min confidence / no extraction review).
     """
     org_id = current_user.organization_id
     row = _opportunity_or_404(db, org_id, opp_id)
@@ -671,16 +673,27 @@ def proposal_extract(
         {"compact_text": compact_text, "raw_text": raw_text},
     )
 
-    payload: AutoProposalPayload | None = None
+    payload_cls = select_proposal_payload_class(row.insurance_line)
+    payload: ProposalPayload | None = None
     validation_errors: list[dict[str, Any]] = []
     confidence = 0
     requires_review = True
     try:
-        payload = AutoProposalPayload.model_validate(canonical_dict)
-        confidence = 80
-        requires_review = False
+        payload = payload_cls.model_validate(canonical_dict)
     except ValidationError as exc:
         validation_errors = _validation_errors_payload(exc)
+
+    life_ext = getattr(adapter, "last_pdf_extraction", None)
+    if life_ext is not None:
+        confidence = life_ext.confidence
+        low_conf = confidence < _MIN_LIFE_PDF_AUTO_APPLY_CONFIDENCE
+        requires_review = payload is None or life_ext.requires_review or low_conf
+    elif payload is not None:
+        confidence = 80
+        requires_review = False
+    else:
+        confidence = 0
+        requires_review = True
 
     extraction_run = DocumentExtractionRun(
         organization_id=org_id,
@@ -705,8 +718,13 @@ def proposal_extract(
         party = _resolve_party_or_422(db, org_id, payload, row)
         party_id = party.id
         party_kind = "client" if isinstance(party, Client) else "lead"
-        if not dry_run:
-            apply_auto_proposal_to_opportunity(
+        should_apply = True
+        if life_ext is not None:
+            should_apply = (
+                not life_ext.requires_review and confidence >= _MIN_LIFE_PDF_AUTO_APPLY_CONFIDENCE
+            )
+        if not dry_run and should_apply:
+            apply_proposal_to_opportunity(
                 db,
                 opportunity=row,
                 payload=payload,

@@ -9,6 +9,11 @@ export const INSURANCE_LINE_VALUES = [
 
 export type InsuranceLineValue = (typeof INSURANCE_LINE_VALUES)[number]
 
+/** PDF `proposal-extract`: Bradesco auto + Tokio Marine PME vida heuristics. */
+export function insuranceLineSupportsProposalPdfExtract(line: InsuranceLineValue): boolean {
+  return line === 'AUTO_INSURANCE' || line === 'LIFE_INSURANCE'
+}
+
 export type ProposalDocumentUploadResponse = {
   id: string
   document_type: string

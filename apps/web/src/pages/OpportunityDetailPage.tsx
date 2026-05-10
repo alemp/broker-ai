@@ -43,6 +43,16 @@ const INTERACTION_TYPES = [
   'CAMPAIGN_TOUCH',
 ] as const
 
+type CoverageAdequacyRow = {
+  code: string
+  label: string
+  status: string
+  matched_clause_code: string | null
+  matched_clause_description: string | null
+  match_confidence: number
+  reason: string
+}
+
 type OpportunityDetail = {
   id: string
   stage: string
@@ -62,7 +72,52 @@ type OpportunityDetail = {
   proposal_source: string | null
   quote_number: string | null
   quote_item: number | null
-  proposal_data: Record<string, unknown> | null
+  quote_valid_until?: string | null
+  proposal_data: unknown
+  coverage_adequacy?: CoverageAdequacyRow[]
+}
+
+function hasRenderableProposalPayload(value: unknown): boolean {
+  if (value == null) {
+    return false
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0
+  }
+  if (typeof value === 'object') {
+    return Object.keys(value as object).length > 0
+  }
+  return true
+}
+
+function formatProposalPayloadJson(value: unknown): string {
+  if (value == null) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+function adequacyStatusClass(status: string): string {
+  switch (status) {
+    case 'GREEN':
+      return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-400'
+    case 'YELLOW':
+      return 'bg-amber-500/15 text-amber-900 dark:text-amber-400'
+    case 'RED':
+      return 'bg-destructive/15 text-destructive'
+    default:
+      return 'bg-muted text-muted-foreground'
+  }
 }
 
 type InteractionDto = {
@@ -184,6 +239,42 @@ export function OpportunityDetailPage() {
         if (!cancelled) {
           setDocumentsLoading(false)
         }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [mainTab, opportunityId])
+
+  useEffect(() => {
+    if (mainTab !== 'proposal' || !opportunityId) {
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const d = await apiFetch<OpportunityDetail>(`/v1/opportunities/${opportunityId}`)
+        if (cancelled) {
+          return
+        }
+        setDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                proposal_data: d.proposal_data,
+                proposal_source: d.proposal_source,
+                quote_number: d.quote_number,
+                quote_item: d.quote_item,
+                quote_valid_until: d.quote_valid_until,
+                coverage_adequacy: d.coverage_adequacy,
+                estimated_value: d.estimated_value,
+                preferred_insurer_name: d.preferred_insurer_name,
+                insurance_line: d.insurance_line,
+              }
+            : d,
+        )
+      } catch {
+        /* keep existing detail */
       }
     })()
     return () => {
@@ -323,6 +414,13 @@ export function OpportunityDetailPage() {
     locale: i18n.resolvedLanguage ?? 'pt',
     currency: user?.organization.currency ?? 'BRL',
   }
+
+  const proposalTabAdequacy = detail?.coverage_adequacy ?? []
+  const proposalTabHasSummary = Boolean(detail?.proposal_source || detail?.quote_number)
+  const proposalTabHasPayload = detail ? hasRenderableProposalPayload(detail.proposal_data) : false
+  const proposalTabHasAdequacy = proposalTabAdequacy.length > 0
+  const proposalTabIsEmpty =
+    detail != null && !proposalTabHasSummary && !proposalTabHasPayload && !proposalTabHasAdequacy
 
   const oppDescription = detail
     ? [
@@ -670,13 +768,118 @@ export function OpportunityDetailPage() {
             )}
           </TabsContent>
           <TabsContent value="proposal" className="mt-4 space-y-4">
-            {detail.proposal_data && Object.keys(detail.proposal_data).length > 0 ? (
-              <pre className="bg-muted max-h-[32rem] overflow-auto rounded-md border p-3 text-xs">
-                {JSON.stringify(detail.proposal_data, null, 2)}
-              </pre>
-            ) : (
+            {proposalTabHasSummary ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {t('crm.opportunityDetail.proposalSummaryTitle')}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {detail.proposal_source ? (
+                    <p className="flex flex-wrap items-center gap-2">
+                      <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs font-medium">
+                        {detail.proposal_source}
+                      </span>
+                    </p>
+                  ) : null}
+                  {detail.quote_number ? (
+                    <p>
+                      <span className="text-muted-foreground">
+                        {t('crm.opportunities.quoteNumberShort')}:{' '}
+                      </span>
+                      <span className="font-mono text-xs">{detail.quote_number}</span>
+                      {detail.quote_item != null ? (
+                        <span className="text-muted-foreground text-xs"> · #{detail.quote_item}</span>
+                      ) : null}
+                    </p>
+                  ) : null}
+                  {detail.preferred_insurer_name ? (
+                    <p>
+                      <span className="text-muted-foreground">
+                        {t('crm.opportunities.preferredInsurer')}:{' '}
+                      </span>
+                      {detail.preferred_insurer_name}
+                    </p>
+                  ) : null}
+                  {detail.quote_valid_until ? (
+                    <p>
+                      <span className="text-muted-foreground">
+                        {t('crm.opportunityDetail.quoteValidUntil')}:{' '}
+                      </span>
+                      {new Date(detail.quote_valid_until).toLocaleDateString()}
+                    </p>
+                  ) : null}
+                  {detail.estimated_value ? (
+                    <p>
+                      <span className="text-muted-foreground">
+                        {t('crm.opportunities.tableValue')}:{' '}
+                      </span>
+                      {formatCurrency(detail.estimated_value, money)}
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
+            {proposalTabHasAdequacy ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    {t('crm.opportunityDetail.coverageAdequacyTitle')}
+                  </CardTitle>
+                  <p className="text-muted-foreground text-sm">
+                    {t('crm.opportunityDetail.coverageAdequacySubtitle')}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <ul className="space-y-3 text-sm">
+                    {proposalTabAdequacy.map((row) => (
+                      <li
+                        key={row.code}
+                        className="border-border/60 space-y-1 border-b pb-3 last:border-0"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{row.label}</span>
+                          <span className="text-muted-foreground font-mono text-xs">{row.code}</span>
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-xs font-medium ${adequacyStatusClass(row.status)}`}
+                          >
+                            {t(`crm.opportunityDetail.adequacy.${row.status}`, { defaultValue: row.status })}
+                          </span>
+                        </div>
+                        {row.matched_clause_code ? (
+                          <p className="text-muted-foreground text-xs">
+                            {t('crm.opportunityDetail.matchedClause')}:{' '}
+                            <span className="font-mono">{row.matched_clause_code}</span>
+                            {row.matched_clause_description
+                              ? ` — ${row.matched_clause_description}`
+                              : null}
+                            {row.match_confidence != null ? (
+                              <span>
+                                {' '}
+                                ({t('crm.opportunityDetail.matchConfidence')}: {row.match_confidence}%)
+                              </span>
+                            ) : null}
+                          </p>
+                        ) : null}
+                        <p className="text-muted-foreground text-xs">{row.reason}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
+            {proposalTabHasPayload ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs">{t('crm.opportunityDetail.proposalJsonHint')}</p>
+                <pre className="bg-muted max-h-[32rem] overflow-auto rounded-md border p-3 text-xs">
+                  {formatProposalPayloadJson(detail.proposal_data)}
+                </pre>
+              </div>
+            ) : null}
+            {proposalTabIsEmpty ? (
               <p className="text-muted-foreground text-sm">{t('crm.opportunityDetail.noProposalData')}</p>
-            )}
+            ) : null}
           </TabsContent>
         </TabsRoot>
       ) : null}

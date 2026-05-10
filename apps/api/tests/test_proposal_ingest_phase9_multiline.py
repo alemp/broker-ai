@@ -140,11 +140,11 @@ def test_select_adapter_for_pdf_dispatches_per_line() -> None:
     assert auto.source == "bradesco_pdf_v1"
     assert auto.insurance_line == ProductCategory.AUTO_INSURANCE
 
-    for line in (
-        ProductCategory.LIFE_INSURANCE,
-        ProductCategory.HEALTH_INSURANCE,
-        ProductCategory.GENERAL_INSURANCE,
-    ):
+    life = select_adapter_for_pdf(ProductCategory.LIFE_INSURANCE)
+    assert life.source == "tokio_life_pdf_v1"
+    assert life.insurance_line == ProductCategory.LIFE_INSURANCE
+
+    for line in (ProductCategory.HEALTH_INSURANCE, ProductCategory.GENERAL_INSURANCE):
         with pytest.raises(NotImplementedError, match="No PDF proposal adapter"):
             select_adapter_for_pdf(line)
 

@@ -28,12 +28,15 @@ from ai_copilot_api.domain.document_extraction import (
 )
 from ai_copilot_api.domain.proposal_adapters import select_adapter_for_pdf
 from ai_copilot_api.domain.proposal_ingest import (
-    apply_auto_proposal_to_opportunity,
+    apply_proposal_to_opportunity,
     resolve_party,
 )
 from ai_copilot_api.schemas.crm import BatchJobRunOut
 from ai_copilot_api.schemas.extraction import DocumentExtractionConfirmIn, DocumentExtractionRunOut
-from ai_copilot_api.schemas.proposal_ingest import AutoProposalPayload
+from ai_copilot_api.schemas.proposal_ingest import (
+    ProposalPayload,
+    select_proposal_payload_class,
+)
 from ai_copilot_api.storage.factory import get_object_storage
 
 # Phase 6: when a PROPOSAL document is linked to an opportunity and the canonical
@@ -77,7 +80,7 @@ def _run_proposal_extraction_for_opportunity(
 
     Reads `insurance_line` from the **opportunity** (not from the request),
     runs the matching adapter, persists a `DocumentExtractionRun`, and
-    auto-applies via :func:`apply_auto_proposal_to_opportunity` when the
+    auto-applies via :func:`apply_proposal_to_opportunity` when the
     canonical payload validates with ``confidence >= PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE``.
     Otherwise the run is flagged ``requires_review=True`` and the existing
     ``PATCH .../extractions/{run_id}/confirm`` flow can take over.
@@ -86,7 +89,7 @@ def _run_proposal_extraction_for_opportunity(
     compact_text = " ".join(raw_text.split())
 
     validation_errors: list[dict[str, Any]] = []
-    payload: AutoProposalPayload | None = None
+    payload: ProposalPayload | None = None
     canonical_dict: dict[str, Any] | None = None
     proposal_source: str | None = None
     confidence = 0
@@ -117,15 +120,32 @@ def _run_proposal_extraction_for_opportunity(
     canonical_dict = adapter.to_canonical_dict(
         {"compact_text": compact_text, "raw_text": raw_text},
     )
+    payload_cls = select_proposal_payload_class(opp.insurance_line)
     try:
-        payload = AutoProposalPayload.model_validate(canonical_dict)
-        confidence = 80
-        requires_review = False
+        payload = payload_cls.model_validate(canonical_dict)
     except ValidationError as exc:
         validation_errors = _validation_errors_payload(exc)
 
+    life_ext = getattr(adapter, "last_pdf_extraction", None)
+    if life_ext is not None:
+        confidence = life_ext.confidence
+        requires_review = (
+            payload is None
+            or life_ext.requires_review
+            or confidence < PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE
+        )
+    elif payload is not None:
+        confidence = 80
+        requires_review = False
+    else:
+        confidence = 0
+        requires_review = True
+
     applied = False
-    if payload is not None and confidence >= PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE:
+    apply_ok = payload is not None and confidence >= PROPOSAL_AUTO_APPLY_MIN_CONFIDENCE
+    if life_ext is not None:
+        apply_ok = apply_ok and not life_ext.requires_review
+    if apply_ok:
         try:
             party = resolve_party(db, org_id, payload.applicant, opportunity=opp)
         except LookupError as exc:
@@ -135,7 +155,7 @@ def _run_proposal_extraction_for_opportunity(
                 {"msg": str(exc), "type": "party_resolution_error"},
             )
         else:
-            apply_auto_proposal_to_opportunity(
+            apply_proposal_to_opportunity(
                 db,
                 opportunity=opp,
                 payload=payload,

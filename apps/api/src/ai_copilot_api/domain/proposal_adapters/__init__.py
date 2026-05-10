@@ -1,8 +1,8 @@
 """Proposal source adapters.
 
 Each adapter normalizes a carrier-specific or channel-specific shape into the
-canonical English schema (`schemas.proposal_ingest.AutoProposalPayload` for the
-`AUTO_INSURANCE` line). The `ProposalSourceAdapter` protocol keeps the API
+canonical English schema (e.g. ``AutoProposalPayload`` / ``LifeProposalPayload``).
+The `ProposalSourceAdapter` protocol keeps the API
 layer free of carrier branches: routes select an adapter by `source` /
 `(insurance_line, format)` and call `to_canonical_dict(...)`.
 
@@ -13,9 +13,9 @@ so the same error path is exercised by both JSON and PDF channels.
 
 Phase 9 — multi-line:
 
-- ``select_adapter_for_pdf`` / ``select_adapter_for_json`` now know about
-  ``LIFE_INSURANCE`` and ``GENERAL_INSURANCE`` and surface clean
-  ``NotImplementedError`` messages until a carrier adapter ships.
+- ``select_adapter_for_pdf`` covers ``AUTO_INSURANCE`` (Bradesco) and
+  ``LIFE_INSURANCE`` (Tokio PME vida PDF heuristics). ``GENERAL_INSURANCE`` /
+  ``HEALTH_INSURANCE`` PDF adapters are still ``NotImplementedError``.
 - Canonical pass-through JSON adapters exist for every supported line
   (``canonical_auto_v1``, ``canonical_life_v1``, ``canonical_home_v1``,
   ``canonical_business_v1``) so partners can already submit pre-canonical
@@ -43,18 +43,22 @@ class ProposalSourceAdapter(Protocol):
 def select_adapter_for_pdf(insurance_line: ProductCategory) -> ProposalSourceAdapter:
     """Pick the default PDF adapter for a given line.
 
-    Only ``AUTO_INSURANCE`` has a working PDF extractor today (Phase 2 —
-    Bradesco). All other lines raise a clean :class:`NotImplementedError`
-    so the caller can surface a 422 instead of a 500.
+    ``AUTO_INSURANCE`` uses Bradesco Auto PDF text extraction; ``LIFE_INSURANCE``
+    uses Tokio Marine PME Vida heuristics (same canonical path as
+    ``tokio_life_json_v1``). Other lines raise :class:`NotImplementedError`.
     """
     from ai_copilot_api.domain.proposal_adapters.bradesco_pdf_v1 import (
         BradescoAutoPdfAdapterV1,
     )
+    from ai_copilot_api.domain.proposal_adapters.tokio_life_pdf_v1 import (
+        TokioLifePdfAdapterV1,
+    )
 
     if insurance_line == ProductCategory.AUTO_INSURANCE:
         return BradescoAutoPdfAdapterV1()
+    if insurance_line == ProductCategory.LIFE_INSURANCE:
+        return TokioLifePdfAdapterV1()
     if insurance_line in (
-        ProductCategory.LIFE_INSURANCE,
         ProductCategory.HEALTH_INSURANCE,
         ProductCategory.GENERAL_INSURANCE,
     ):
